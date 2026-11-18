@@ -614,13 +614,13 @@ func (a *application) handler() http.Handler {
 		w.Header().Set("Referrer-Policy", "same-origin")
 		w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'")
 		if r.Host != a.host {
-			problem(w, 403, "请从背词本程序打开此窗口。")
+			problem(w, 403, "请从LexiGo程序打开此窗口。")
 			return
 		}
 		if !strings.HasPrefix(r.URL.Path, "/start/") {
 			cookie, err := r.Cookie(cookieName)
 			if err != nil || subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(a.token)) != 1 {
-				problem(w, 403, "请双击 WordReview.exe 重新打开背词本。")
+				problem(w, 403, "请双击 LexiGo.exe 重新打开LexiGo。")
 				return
 			}
 			if r.Method == http.MethodPost {
@@ -628,7 +628,7 @@ func (a *application) handler() http.Handler {
 				sameOrigin := origin == "http://"+a.host ||
 					(origin == "" && r.Header.Get("Sec-Fetch-Site") == "same-origin")
 				if !sameOrigin || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-					problem(w, 403, "请求必须来自当前背词本窗口。")
+					problem(w, 403, "请求必须来自当前LexiGo窗口。")
 					return
 				}
 			}

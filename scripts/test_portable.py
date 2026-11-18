@@ -13,7 +13,7 @@ import time
 import urllib.request
 
 if len(sys.argv) != 2:
-    raise SystemExit("Usage: python scripts/test_portable.py /path/to/WordReview.exe")
+    raise SystemExit("Usage: python scripts/test_portable.py /path/to/LexiGo.exe")
 
 exe = Path(sys.argv[1]).resolve(strict=True)
 

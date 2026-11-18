@@ -16,7 +16,7 @@ const databaseName = "vocabulary.db"
 func dataDirectory() (string, error) {
 	executable, err := os.Executable()
 	if err != nil {
-		return "", fmt.Errorf("无法识别背词本程序的位置：%w", err)
+		return "", fmt.Errorf("无法识别LexiGo程序的位置：%w", err)
 	}
 	return portableDataDirectory(executable)
 }
@@ -24,7 +24,7 @@ func dataDirectory() (string, error) {
 func portableDataDirectory(executable string) (string, error) {
 	realPath, err := filepath.EvalSymlinks(executable)
 	if err != nil {
-		return "", fmt.Errorf("无法识别背词本程序的真实位置：%w", err)
+		return "", fmt.Errorf("无法识别LexiGo程序的真实位置：%w", err)
 	}
 	return filepath.Join(filepath.Dir(realPath), "Data"), nil
 }
@@ -112,7 +112,7 @@ func migrateLegacy(dir, legacy string) (string, error) {
 		return "", fmt.Errorf("无法锁定旧词库：%w", err)
 	}
 	if !locked {
-		return "", errors.New("旧版背词本仍在运行。请关闭旧版并等待后台退出，或在任务管理器结束旧版进程，然后重新启动新版。旧词库已保留。")
+		return "", errors.New("旧版LexiGo仍在运行。请关闭旧版并等待后台退出，或在任务管理器结束旧版进程，然后重新启动新版。旧词库已保留。")
 	}
 
 	if err = snapshotDatabase(source, target); err != nil {

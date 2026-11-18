@@ -144,7 +144,7 @@ func parseTransfer(file []byte) (transferPayload, error) {
 		return p, errors.New("请选择由「导出数据」「分享数据」或「保存到本机」生成的学习数据文件。文件可能已经损坏或超过 128 MB。")
 	}
 	if envelope.Version != 1 && envelope.Version != transferVersion {
-		return p, errors.New("此文件的数据交换版本不兼容。请使用支持该版本的背词本。")
+		return p, errors.New("此文件的数据交换版本不兼容。请使用支持该版本的LexiGo。")
 	}
 	digest := sha256.Sum256(envelope.Payload)
 	if hex.EncodeToString(digest[:]) != envelope.SHA256 {

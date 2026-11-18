@@ -3,7 +3,7 @@ set -euo pipefail
 
 project="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 android_project="$project/android"
-output="${1:-$project/dist/WordReview.apk}"
+output="${1:-$project/dist/LexiGo.apk}"
 mkdir -p "$(dirname "$output")"
 output="$(cd "$(dirname "$output")" && pwd)/$(basename "$output")"
 sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
@@ -55,7 +55,7 @@ if [[ -n "${WORDREVIEW_ANDROID_PACKAGE:-}" ]]; then
     echo 'Invalid Android package identifier.' >&2
     exit 1
   }
-  sed "s/cn\.wordreview\.app\.share\"/${WORDREVIEW_ANDROID_PACKAGE}.share\"/" "$manifest" > "$work/AndroidManifest.xml"
+  sed "s/cn\.wordreview\.app\.lexigo\.share\"/${WORDREVIEW_ANDROID_PACKAGE}.share\"/" "$manifest" > "$work/AndroidManifest.xml"
   manifest="$work/AndroidManifest.xml"
   package_args=(--rename-manifest-package "$WORDREVIEW_ANDROID_PACKAGE")
 fi
@@ -85,7 +85,7 @@ if [[ ! -f "$signing_key" ]]; then
   mkdir -p "$(dirname "$signing_key")"
   (umask 077; "$keytool_cmd" -genkeypair -keystore "$signing_key" -storetype PKCS12 \
     -storepass:env WORDREVIEW_KEY_PASSWORD -alias "$signing_alias" -keyalg RSA -keysize 3072 \
-    -validity 10000 -dname 'CN=WordReview Personal Release')
+    -validity 10000 -dname 'CN=LexiGo Release')
 fi
 env "JAVA_HOME=$java_root" "$tools_dir/apksigner" sign --ks "$signing_key" --ks-key-alias "$signing_alias" \
   --ks-pass env:WORDREVIEW_KEY_PASSWORD --out "$output" "$work/aligned.apk"

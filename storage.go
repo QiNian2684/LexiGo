@@ -282,7 +282,7 @@ func atomicWrite(file string, data []byte) error {
 	return replaceFile(temp.Name(), file)
 }
 
-var errInvalidBackup = errors.New("备份格式无效。请选择从背词本导出的 JSON 备份。")
+var errInvalidBackup = errors.New("备份格式无效。请选择从LexiGo导出的 JSON 备份。")
 
 func validDatabase(db database) bool {
 	if (db.Version != 2 && db.Version != 3) || !db.Settings.validLongGoal() || db.Words == nil ||

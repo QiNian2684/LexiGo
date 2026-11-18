@@ -1,10 +1,10 @@
-# 背词本 2.1.1
+# LexiGo 2.1.2
 
 个人使用的英语词库与复习软件。支持 Windows 10/11 x64 和 Android 9 及以上。两端共用词典、SQLite 表结构、数据交换格式和复习逻辑。
 
 ## 使用
 
-Windows 双击 `WordReview.exe`，应用通过 WebView2 Runtime 打开本地窗口。Windows 端用同级 `Data/WebView2` 持久保存窗口配置。若缺少运行时，请从 Microsoft 安装 Evergreen WebView2 Runtime。Android 安装 `WordReview-Android-2.1.1.apk` 后打开「背词本」。运行无需安装 Go、Python 或数据库服务器。
+Windows 双击 `LexiGo.exe`，应用通过 WebView2 Runtime 打开本地窗口。Windows 端用同级 `Data/WebView2` 持久保存窗口配置。若缺少运行时，请从 Microsoft 安装 Evergreen WebView2 Runtime。Android 安装 `LexiGo-Android-2.1.2.apk` 后打开「LexiGo」。运行无需安装 Go、Python 或数据库服务器。
 
 1. 在「添加单词」粘贴英文或通过「导入 TXT 文件」打开词表，点击「预览导入」，核对新增及重置数量，再确认。
 2. 在「复习」点击「开始复习」。Windows 的 Enter 展开释义，1 没记住，2 记住了。点「没记住」先保存一次遗忘并留在原卡片。点「下一单词」或再按 1 只翻页。两颗作答按钮固定在底部，「撤销上一次」居中显示于滚动正文末尾。通过导航离开复习时会保存已有进度。Android 展开释义后左滑可记住，记录遗忘后左滑只翻页。 `Ctrl+Z` 撤销本日上一次仍可撤销的普通复习操作。
@@ -74,7 +74,7 @@ JSON 词表是对象数组，也可以用相同的字段名。
 ### Windows 升级
 
 1. 关闭旧版背词本。若旧进程还在后台，等它退出，或在任务管理器中结束旧版进程。
-2. 把新版 `WordReview.exe` 解压到计划长期使用的文件夹，再启动。若该文件夹没有 `Data\vocabulary.db`，新版会从 `%LOCALAPPDATA%\WordReview\vocabulary.db` 创建一致性副本，并通过完整性检查后放入 `Data`。原文件留在原处。
+2. 把新版 `LexiGo.exe` 放到原 EXE 所在的文件夹，保留同级 `Data`，再启动新版。若该文件夹没有 `Data\vocabulary.db`，新版会从 `%LOCALAPPDATA%\WordReview\vocabulary.db` 创建一致性副本，并通过完整性检查后放入 `Data`。原文件留在原处。
 3. 如果两处已有不同的数据库，新版会使用同级 `Data` 并显示提示。要换用旧库时，可先分别备份两边，再在旧版导出 JSON，并在新版确认恢复。迁移不会把两个库合并。
 4. 首次读取旧规则数据库时，先写入 `Data\backups\before-dual-memory-v2-*.json`，再用一次 SQLite 事务升级。旧词条、设置、备注、答题历史和已掌握状态保留。旧规则记住次数在词库里单独标注，当前未掌握词的双层进度从零开始。旧版导出的 JSON 仍可恢复，并应用相同的兼容规则。
 
@@ -97,7 +97,7 @@ JSON 词表是对象数组，也可以用相同的字段名。
 
 Android 数据保存在应用私有目录 `files/StudyData`。卸载应用或清除应用数据之前，请用「导出数据」把快照保存到应用外。导入后可通过「导出覆盖前备份」将最近一次自动快照取出，再用「导入数据」恢复。完整数据含个人备注，请自行保管。
 
-Android 2.1.1 与已发布的 2.1.0、2.0.0、1.11 和 1.10 同包名、同签名，可直接覆盖安装并保留学习记录。从 1.9 及更早的旧签名版升级时，先导出并确认数据已保存在应用外，再卸载旧版、安装新版并导入。
+Android 2.1.2 使用独立包名 `cn.wordreview.app.lexigo`，可与旧版「背词本」同时安装。若要迁移学习记录，在旧版用「设置 → 导出数据 → 保存到手机」保存完整 JSON，再在 LexiGo 用「设置 → 导入数据」恢复。迁移时可以保留旧版。
 
 ## 构建与测试
 
@@ -107,8 +107,8 @@ Android 2.1.1 与已发布的 2.1.0、2.0.0、1.11 和 1.10 同包名、同签�
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-脚本运行 Go 测试并生成 `dist\WordReview.exe`。首次从源码构建需要取得 `go.mod` 和 `go.sum` 声明的依赖。已编入的词典、界面和应用图标无需重新下载。第三方依赖许可证见 `licenses/`，数据处理脚本在 `scripts/`。
+脚本运行 Go 测试并生成 `dist\LexiGo.exe`。首次从源码构建需要取得 `go.mod` 和 `go.sum` 声明的依赖。已编入的词典、界面和应用图标无需重新下载。第三方依赖许可证见 `licenses/`，数据处理脚本在 `scripts/`。
 
-也可用 `go test ./...` 单独测试核心规则。用 Python 3 运行 `python scripts/test_http.py 路径\WordReview.exe` 可以在独立临时词库上测试离线工作流和中止进程后恢复。还可运行 `python scripts/test_portable.py .\dist\WordReview.exe`，用独立临时目录验证 EXE 路径、移动后重新打开和隔离的旧库迁移。脚本经过 EXE 的 `--serve` 模式测试后端，WebView2 窗口的验证需在 Windows 上双击 EXE。
+也可用 `go test ./...` 单独测试核心规则。用 Python 3 运行 `python scripts/test_http.py 路径\LexiGo.exe` 可以在独立临时词库上测试离线工作流和中止进程后恢复。还可运行 `python scripts/test_portable.py .\dist\LexiGo.exe`，用独立临时目录验证 EXE 路径、移动后重新打开和隔离的旧库迁移。脚本经过 EXE 的 `--serve` 模式测试后端，WebView2 窗口的验证需在 Windows 上双击 EXE。
 
 Android 的开发环境、签名方式和命令见 `android/README.md`。两端快照共用 `transfer.go` 中的版本化协议。文件是 UTF-8 JSON，SHA-256 校验针对原始数据负载字节。请直接传输文件，编辑或重新格式化可能使校验失效。文件大小限制为 128 MiB。

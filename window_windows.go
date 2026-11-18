@@ -30,7 +30,7 @@ var (
 func startWindow(link, dataDir string) (<-chan struct{}, func(), error) {
 	profile := filepath.Join(dataDir, "WebView2")
 	if err := os.MkdirAll(profile, 0700); err != nil {
-		return nil, nil, fmt.Errorf("无法创建背词本的窗口配置：%w", err)
+		return nil, nil, fmt.Errorf("无法创建LexiGo的窗口配置：%w", err)
 	}
 	if setDPIContext.Find() == nil {
 		setDPIContext.Call(^uintptr(3)) // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2.
@@ -55,17 +55,17 @@ func startWindow(link, dataDir string) (<-chan struct{}, func(), error) {
 
 		version, err := webviewloader.GetInstalledVersion()
 		if err != nil || version == "" {
-			started <- result{err: errors.New("背词本需要 Microsoft Edge WebView2 Runtime。请安装或修复 Evergreen Runtime 后重试。\nhttps://developer.microsoft.com/microsoft-edge/webview2/")}
+			started <- result{err: errors.New("LexiGo需要 Microsoft Edge WebView2 Runtime。请安装或修复 Evergreen Runtime 后重试。\nhttps://developer.microsoft.com/microsoft-edge/webview2/")}
 			return
 		}
 		// An isolated app profile persists across launches. Nil WebView2
 		// environment options leave OS-account single sign-on disabled.
 		window := webview.NewWithOptions(webview.WebViewOptions{
 			DataPath: profile, AutoFocus: true,
-			WindowOptions: webview.WindowOptions{Title: "背词本", Width: 1200, Height: 860, IconId: 1},
+			WindowOptions: webview.WindowOptions{Title: windowsAppTitle, Width: 1200, Height: 860, IconId: 1},
 		})
 		if window == nil {
-			started <- result{err: errors.New("无法启动背词本的 WebView2 窗口。请检查 Data\\WebView2 的写入权限并重试。")}
+			started <- result{err: errors.New("无法启动LexiGo的 WebView2 窗口。请检查 Data\\WebView2 的写入权限并重试。")}
 			return
 		}
 		if err := installWindowCallbacks(window); err != nil {
@@ -108,7 +108,7 @@ func installWindowCallbacks(window webview.WebView) error {
 		return result
 	})
 	if ok, _, err := setSubclass.Call(hwnd, callback, subclassID, 0); ok == 0 {
-		return fmt.Errorf("无法初始化背词本的关闭保存回调：%w", err)
+		return fmt.Errorf("无法初始化LexiGo的关闭保存回调：%w", err)
 	}
 	if err := window.Bind("wordReviewWindowReady", func() { ready = true }); err != nil {
 		return err

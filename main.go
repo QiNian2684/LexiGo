@@ -75,7 +75,7 @@ func runEngine(serveOnly bool, dir string, ready func(string)) error {
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
-		return errors.New("背词本正在启动，请稍等后再打开。")
+		return errors.New("LexiGo正在启动，请稍等后再打开。")
 	}
 	_ = os.Remove(instance)
 	defer os.Remove(instance)

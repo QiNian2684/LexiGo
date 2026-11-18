@@ -66,18 +66,24 @@ func moveWindowsFile(source, target string, flags uintptr) error {
 	return nil
 }
 
+const windowsAppTitle = "LexiGo"
+
 func openWindow(link string) error {
-	title, _ := syscall.UTF16PtrFromString("背词本")
-	hwnd, _, _ := findWindow.Call(0, uintptr(unsafe.Pointer(title)))
-	if hwnd != 0 {
-		showWindow.Call(hwnd, 9)
-		focusWindow.Call(hwnd)
+	// A copy of 2.1.1 can still hold the lock under the old window title.
+	for _, name := range []string{windowsAppTitle, "背词本"} {
+		title, _ := syscall.UTF16PtrFromString(name)
+		hwnd, _, _ := findWindow.Call(0, uintptr(unsafe.Pointer(title)))
+		if hwnd != 0 {
+			showWindow.Call(hwnd, 9)
+			focusWindow.Call(hwnd)
+			break
+		}
 	}
 	return nil
 }
 
 func reportStartupError(err error) {
 	msg, _ := syscall.UTF16PtrFromString(err.Error())
-	title, _ := syscall.UTF16PtrFromString("背词本")
+	title, _ := syscall.UTF16PtrFromString(windowsAppTitle)
 	messageBox.Call(0, uintptr(unsafe.Pointer(msg)), uintptr(unsafe.Pointer(title)), 0x10)
 }

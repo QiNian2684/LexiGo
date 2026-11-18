@@ -12,7 +12,7 @@ try {
     $env:GOARCH = 'amd64'
     & go test -buildvcs=false ./...
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
-    $target = Join-Path $OutputDirectory 'WordReview.exe'
+    $target = Join-Path $OutputDirectory 'LexiGo.exe'
     & go build -buildvcs=false -trimpath '-ldflags=-s -w -H=windowsgui' -o $target .
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     Get-FileHash -Algorithm SHA256 $target

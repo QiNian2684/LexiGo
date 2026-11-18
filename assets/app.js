@@ -41,7 +41,7 @@ async function request(path, data, options = {}) {
     method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data),
   });
   return fetch(path, options).catch(() => {
-    throw new Error(mobile ? "无法连接到背词本。请退出并重新打开应用。" : "无法连接到背词本。请双击 WordReview.exe 重新打开。");
+    throw new Error(mobile ? "无法连接到LexiGo。请退出并重新打开应用。" : "无法连接到LexiGo。请双击 LexiGo.exe 重新打开。");
   });
 }
 

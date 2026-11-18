@@ -85,7 +85,7 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
         if (saved != null && saved.getString("documentKind") != null) {
             operation = new Operation(saved.getString("documentKind"), saved.getString("documentBody", ""));
         }
-        showStatus("正在打开背词本…");
+        showStatus("正在打开LexiGo…");
         LocalEngine.INSTANCE.connect(getApplicationContext(), this);
         initSpeech();
         io.execute(this::pruneShares);
@@ -119,7 +119,7 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
         try {
             web = new WebView(this);
         } catch (RuntimeException error) {
-            showStatus("系统 WebView 无法启动。请更新或启用 Android System WebView，再打开背词本。");
+            showStatus("系统 WebView 无法启动。请更新或启用 Android System WebView，再打开LexiGo。");
             return;
         }
         root.addView(web, 0, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -194,7 +194,7 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
         showStatus(error + "\n点击重试");
         status.setOnClickListener(v -> {
             status.setOnClickListener(null);
-            showStatus("正在重新打开背词本…");
+            showStatus("正在重新打开LexiGo…");
             LocalEngine.INSTANCE.connect(getApplicationContext(), this);
         });
     }
@@ -403,7 +403,7 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
                     Intent send = new Intent(Intent.ACTION_SEND).setType("application/json")
                         .putExtra(Intent.EXTRA_STREAM, uri)
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    send.setClipData(ClipData.newUri(getContentResolver(), "背词本学习数据", uri));
+                    send.setClipData(ClipData.newUri(getContentResolver(), "LexiGo学习数据", uri));
                     try {
                         startActivity(Intent.createChooser(send, "分享学习数据"));
                     } catch (ActivityNotFoundException error) {

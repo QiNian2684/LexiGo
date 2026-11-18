@@ -49,7 +49,7 @@ func chooseTransferFile(save bool, suggested string) (string, error) {
 	} else {
 		flags |= 0x00001000 // Existing file.
 	}
-	filter := utf16.Encode([]rune("背词本学习数据 (*.json)\x00*.json\x00所有文件\x00*.*\x00\x00"))
+	filter := utf16.Encode([]rune("LexiGo学习数据 (*.json)\x00*.json\x00所有文件\x00*.*\x00\x00"))
 	name, _ := syscall.UTF16PtrFromString(title)
 	ext, _ := syscall.UTF16PtrFromString("json")
 	foreground := syscall.NewLazyDLL("user32.dll").NewProc("GetForegroundWindow")

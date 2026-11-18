@@ -12,7 +12,7 @@ import urllib.error
 import urllib.request
 
 if len(sys.argv) != 2:
-    raise SystemExit('Usage: python scripts/test_http.py /path/to/WordReview.exe')
+    raise SystemExit('Usage: python scripts/test_http.py /path/to/LexiGo.exe')
 exe = Path(sys.argv[1]).resolve()
 
 def start(directory):
@@ -23,7 +23,7 @@ def start(directory):
     agent = urllib.request.build_opener(urllib.request.ProxyHandler({}),
         urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
     with agent.open(url) as response:
-        assert response.status == 200 and '背词本' in response.read().decode()
+        assert response.status == 200 and '<title>LexiGo</title>' in response.read().decode()
     records = {}
     def call(path, body=None, raw=False, expect=200):
         headers = {'Origin': host, 'Content-Type': 'application/json'} if body is not None else {}

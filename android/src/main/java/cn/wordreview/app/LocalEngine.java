@@ -37,7 +37,7 @@ final class LocalEngine {
                 System.loadLibrary("wordreview");
                 error = serve(data.getAbsolutePath(), TimeZone.getDefault().getID());
             } catch (LinkageError | RuntimeException e) {
-                error = "无法加载本地学习引擎。请重新安装与手机架构匹配的背词本。";
+                error = "无法加载本地学习引擎。请重新安装与手机架构匹配的LexiGo。";
             }
             final String result = error;
             main.post(() -> {
