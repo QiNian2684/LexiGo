@@ -60,7 +60,7 @@ func TestForgotHoldSurvivesRestartTransferAndUndo(t *testing.T) {
 	if s.review(tomorrow.Format(time.DateOnly)).Waiting {
 		t.Fatal("yesterday's hold surfaced on a new day")
 	}
-	file, err = s.transferBytes(tomorrow)
+	file, err = s.transferBytes(tomorrow.Add(24 * time.Hour))
 	if err != nil || bytes.Contains(file, []byte("waitingForNext")) {
 		t.Fatal("expired hold leaked into a new day's transfer")
 	}

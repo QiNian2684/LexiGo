@@ -62,9 +62,10 @@ with tempfile.TemporaryDirectory() as temp:
         no=vote(False)
         assert no['current']['key']=='abundance'
         assert vote(True)['graduated']
-        assert vote(False)['due']==1
+        assert vote(False)['due']==2
         reply=vote(True)
-        assert reply['credited'] and reply['reviewed']==2 and reply['due']==0
+        assert reply['credited'] and reply['reviewed']==3 and reply['due']==1
+        assert vote(True)['credited']
         assert call('/api/undo',{})['due']==1
         assert vote(True)['credited']
         again=load(' ABUNDANCE, abundance ')
@@ -72,7 +73,7 @@ with tempfile.TemporaryDirectory() as temp:
         assert call('/api/state')['due']==1
         assert not vote(True)['credited']
         stats=call('/api/stats')
-        assert stats['imported']==3 and stats['days'][-1]=={'day':stats['days'][-1]['day'],'yes':3,'no':2,'distinct':2,'passed':2}
+        assert stats['imported']==3 and stats['days'][-1]=={'day':stats['days'][-1]['day'],'yes':4,'no':2,'distinct':3,'passed':3}
         backup=call('/api/backup')
         assert backup['words']['crucial']['personalNote']=='备注\n本地持久化'
         call('/api/card/crucial',{'word':'subtle'},expect=409)
@@ -93,8 +94,8 @@ with tempfile.TemporaryDirectory() as temp:
         process.wait()
     process,call,load,vote=start(directory)
     try:
-        assert call('/api/state')['reviewed']==2
-        assert call('/api/state')['due']==0
+        assert call('/api/state')['reviewed']==3
+        assert call('/api/state')['due']==1
         assert call('/api/card/solar%20flare')['personalNote']=='天文'
         assert call('/api/card/crucial')['personalNote']=='备注\n本地持久化'
         with sqlite3.connect(directory/'vocabulary.db') as db:

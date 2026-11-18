@@ -11,15 +11,17 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 	"unicode/utf8"
 )
 
 const (
 	transferFormat  = "wordreview.learning-state"
-	transferVersion = 1
+	transferVersion = 2
 	maxTransfer     = 128 << 20
 )
 
@@ -36,6 +38,7 @@ type transferTask struct {
 	Passed   []uint64 `json:"passed"`
 	Ranked   []uint64 `json:"ranked"`
 	Reviewed int      `json:"reviewed"`
+	Current  uint64   `json:"current,omitempty"`
 }
 
 type transferPayload struct {
@@ -44,6 +47,7 @@ type transferPayload struct {
 	DayEnds   time.Time    `json:"sourceDayEnds"`
 	Database  database     `json:"database"`
 	Task      transferTask `json:"task"`
+	legacy    bool
 }
 
 type transferDraft struct {
@@ -68,7 +72,11 @@ type transferSummary struct {
 }
 
 func (s *store) captureTask(day string) transferTask {
-	plan := s.planReview(day)
+	return s.captureTaskRules(day, false)
+}
+
+func (s *store) captureTaskRules(day string, legacy bool) transferTask {
+	plan := s.planReviewRules(day, legacy)
 	task := transferTask{Day: day, Pending: []uint64{}, Passed: []uint64{}, Ranked: []uint64{}, Reviewed: plan.state.Reviewed}
 	for _, group := range [][]*wordCard{plan.old, plan.new, plan.extras, plan.repeats} {
 		for _, card := range group {
@@ -79,6 +87,9 @@ func (s *store) captureTask(day string) transferTask {
 		if !card.Deleted && card.passedOn(day) {
 			task.Passed = append(task.Passed, card.ID)
 		}
+	}
+	if card := s.pinnedCard(day); !legacy && card != nil {
+		task.Current = card.ID
 	}
 	slices.Sort(task.Pending)
 	slices.Sort(task.Passed)
@@ -98,9 +109,9 @@ func (s *store) captureTask(day string) transferTask {
 // Caller holds the store lock while the live database is marshalled.
 func (s *store) transferBytes(now time.Time) ([]byte, error) {
 	_, offset := now.Zone()
-	dayEnds := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
-	day := now.Format(time.DateOnly)
-	payload := transferPayload{now.UTC(), offset, dayEnds.UTC(), s.snapshotDatabase(day), s.captureTask(day)}
+	day := studyDay(now)
+	payload := transferPayload{CreatedAt: now.UTC(), Offset: offset, DayEnds: nextStudyDay(now).UTC(),
+		Database: s.snapshotDatabase(day), Task: s.captureTask(day)}
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -130,9 +141,9 @@ func parseTransfer(file []byte) (transferPayload, error) {
 	var envelope transferEnvelope
 	if len(file) == 0 || len(file) > maxTransfer || !utf8.Valid(file) || decodeExact(file, &envelope) != nil ||
 		envelope.Format != transferFormat {
-		return p, errors.New("请选择通过「导出完整学习数据」生成的文件。文件可能已经损坏或超过 128 MB。")
+		return p, errors.New("请选择由「导出数据」「分享数据」或「保存到本机」生成的学习数据文件。文件可能已经损坏或超过 128 MB。")
 	}
-	if envelope.Version != transferVersion {
+	if envelope.Version != 1 && envelope.Version != transferVersion {
 		return p, errors.New("此文件的数据交换版本不兼容。请使用支持该版本的背词本。")
 	}
 	digest := sha256.Sum256(envelope.Payload)
@@ -141,13 +152,30 @@ func parseTransfer(file []byte) (transferPayload, error) {
 	}
 	if decodeExact(envelope.Payload, &p) != nil || p.Database.Version != 3 || !validDatabase(p.Database) ||
 		p.CreatedAt.IsZero() || p.Offset < -14*3600 || p.Offset > 14*3600 ||
-		!p.DayEnds.After(p.CreatedAt) || p.DayEnds.Sub(p.CreatedAt) > 26*time.Hour ||
-		p.CreatedAt.In(time.FixedZone("", p.Offset)).Format(time.DateOnly) != p.Task.Day {
+		!p.DayEnds.After(p.CreatedAt) || p.DayEnds.Sub(p.CreatedAt) > 26*time.Hour {
 		return transferPayload{}, errors.New("文件中的日期、词库或学习记录无效。")
 	}
-	expected := (&store{db: p.Database}).captureTask(p.Task.Day)
+	p.legacy = envelope.Version == 1
+	local := p.CreatedAt.In(time.FixedZone("", p.Offset))
+	day := studyDay(local)
+	if p.legacy {
+		day = local.Format(time.DateOnly)
+	}
+	check := &store{db: p.Database}
+	if !p.legacy && p.Task.Current != 0 {
+		for _, card := range p.Database.Words {
+			if card.ID == p.Task.Current {
+				check.presented = presentedCard{day, card.Key, card.Order}
+				break
+			}
+		}
+	}
+	if p.Task.Day != day {
+		return transferPayload{}, errors.New("文件中的学习日与导出时间不符。")
+	}
+	expected := check.captureTaskRules(day, p.legacy)
 	if !slices.Equal(expected.Pending, p.Task.Pending) || !slices.Equal(expected.Passed, p.Task.Passed) ||
-		expected.Reviewed != p.Task.Reviewed || !validRanks(p.Task.Pending, p.Task.Ranked) {
+		expected.Reviewed != p.Task.Reviewed || expected.Current != p.Task.Current || !validRanks(p.Task.Pending, p.Task.Ranked) {
 		return transferPayload{}, errors.New("文件中的复习队列与学习记录不一致。")
 	}
 	return p, nil
@@ -165,7 +193,12 @@ func validRanks(pending, ranked []uint64) bool {
 }
 
 func (p transferPayload) dateConflict(now time.Time) string {
-	day := now.Format(time.DateOnly)
+	day := studyDay(now)
+	// A pre-1.10 file labels midnight-to-five activity with the civil date.
+	// Keep those historical labels and let the matching study day start at 05:00.
+	if p.legacy {
+		day = now.Format(time.DateOnly)
+	}
 	if p.CreatedAt.After(now.Add(5*time.Minute)) || p.Task.Day > day {
 		return "文件日期晚于本机。请核对两台设备的日期与时区，再导入。"
 	}
@@ -189,7 +222,7 @@ func (p transferPayload) dateConflict(now time.Time) string {
 
 func (p transferPayload) summarize(token string, now time.Time) transferSummary {
 	info := transferSummary{
-		Token: token, CreatedAt: p.CreatedAt, SourceDay: p.Task.Day, DeviceDay: now.Format(time.DateOnly),
+		Token: token, CreatedAt: p.CreatedAt, SourceDay: p.Task.Day, DeviceDay: studyDay(now),
 		Words: len(p.Database.Words), Events: len(p.Database.Events), Passed: len(p.Task.Passed),
 		Pending: len(p.Task.Pending), Blocked: p.dateConflict(now),
 	}
@@ -263,12 +296,18 @@ func (a *application) commitTransfer(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		a.generation++
 		a.paused = time.Time{}
-		if now.Format(time.DateOnly) == draft.payload.Task.Day {
+		if studyDay(now) == draft.payload.Task.Day {
 			ranks := make(map[uint64]int, len(draft.payload.Task.Ranked))
 			for i, id := range draft.payload.Task.Ranked {
 				ranks[id] = i + 1
 			}
 			a.store.display = reviewDisplay{day: draft.payload.Task.Day, ranks: ranks}
+			for _, card := range a.store.db.Words {
+				if card.ID == draft.payload.Task.Current {
+					a.store.presented = presentedCard{draft.payload.Task.Day, card.Key, card.Order}
+					break
+				}
+			}
 		}
 	}
 	a.store.mu.Unlock()
@@ -289,7 +328,63 @@ func readTransfer(r io.Reader) ([]byte, error) {
 	return data, nil
 }
 
+func (a *application) latestTransferBackup() (string, error) {
+	dir := filepath.Join(filepath.Dir(a.store.io.file), "backups")
+	files, err := os.ReadDir(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	for i := len(files) - 1; i >= 0; i-- {
+		name := files[i].Name()
+		if files[i].Type().IsRegular() && strings.HasPrefix(name, "before-transfer-") && strings.HasSuffix(name, ".json") {
+			return filepath.Join(dir, name), nil
+		}
+	}
+	return "", nil
+}
+
 func (a *application) transferRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/transfer/recovery", func(w http.ResponseWriter, _ *http.Request) {
+		file, err := a.latestTransferBackup()
+		if err != nil {
+			saveError(w, err)
+			return
+		}
+		respond(w, 200, map[string]bool{"available": file != ""})
+	})
+	mux.HandleFunc("POST /api/transfer/windows/recovery", func(w http.ResponseWriter, _ *http.Request) {
+		_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
+		file, err := a.latestTransferBackup()
+		if err != nil {
+			saveError(w, err)
+			return
+		}
+		if file == "" {
+			problem(w, 404, "没有可导出的覆盖前备份。")
+			return
+		}
+		target, err := chooseTransferFile(true, filepath.Base(file))
+		if err != nil {
+			saveError(w, err)
+			return
+		}
+		if target == "" {
+			respond(w, 200, map[string]bool{"cancelled": true})
+			return
+		}
+		data, err := os.ReadFile(file)
+		if err == nil {
+			err = atomicWrite(target, data)
+		}
+		if err != nil {
+			saveError(w, err)
+			return
+		}
+		respond(w, 200, map[string]bool{"ok": true})
+	})
 	mux.HandleFunc("GET /api/transfer/export", func(w http.ResponseWriter, _ *http.Request) {
 		data, err := a.exportTransfer()
 		if err != nil {

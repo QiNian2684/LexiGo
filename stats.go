@@ -3,7 +3,7 @@ package main
 import "time"
 
 func daysAgo(days int) string {
-	return time.Now().AddDate(0, 0, -days).Format(time.DateOnly)
+	return studyDay(time.Now().AddDate(0, 0, -days))
 }
 
 type dailyStats struct {
@@ -27,12 +27,13 @@ type statistics struct {
 
 func (s *store) stats(day string) statistics {
 	t, _ := time.Parse(time.DateOnly, day)
-	result := statistics{Days: make([]dailyStats, 7)}
-	dayIndex := make(map[string]int, 7)
-	dayWords := make([]map[uint64]bool, 7)
-	passedWords := make([]map[uint64]bool, 7)
+	const window = 30
+	result := statistics{Days: make([]dailyStats, window)}
+	dayIndex := make(map[string]int, window)
+	dayWords := make([]map[uint64]bool, window)
+	passedWords := make([]map[uint64]bool, window)
 	for i := range result.Days {
-		key := t.AddDate(0, 0, i-6).Format(time.DateOnly)
+		key := t.AddDate(0, 0, i-(window-1)).Format(time.DateOnly)
 		dayIndex[key] = i
 		dayWords[i] = make(map[uint64]bool)
 		passedWords[i] = make(map[uint64]bool)

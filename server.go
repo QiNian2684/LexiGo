@@ -29,6 +29,9 @@ var appCSS []byte
 //go:embed assets/android.css
 var androidCSS []byte
 
+//go:embed assets/stats-chart.js
+var statsChartJS []byte
+
 //go:embed assets/app.js
 var appJS []byte
 
@@ -76,7 +79,27 @@ type application struct {
 	appearance      *appearanceSettings
 }
 
-func localDay() string { return time.Now().Format(time.DateOnly) }
+func setExamDate(state *reviewState, now time.Time) {
+	state.Exam = countdown(now.Format(time.DateOnly), state.Settings.ExamDate)
+}
+
+func (a *application) reviewResponse(now time.Time, pin bool) reviewState {
+	s := a.store
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state := s.review(s.activeReviewDay(studyDay(now)))
+	if pin {
+		s.pinReview(state)
+	}
+	setExamDate(&state, now)
+	return state
+}
+
+func (a *application) reviewDay() string {
+	a.store.mu.Lock()
+	defer a.store.mu.Unlock()
+	return a.store.activeReviewDay(localDay())
+}
 
 func (a *application) poke() {
 	select {
@@ -229,6 +252,7 @@ func (a *application) handler() http.Handler {
 	mux.HandleFunc("GET /instrument-sans.woff2", asset("font/woff2", instrumentSans))
 	mux.HandleFunc("GET /app.css", asset("text/css; charset=utf-8", appCSS))
 	mux.HandleFunc("GET /app.js", asset("text/javascript; charset=utf-8", appJS))
+	mux.HandleFunc("GET /stats-chart.js", asset("text/javascript; charset=utf-8", statsChartJS))
 	mux.HandleFunc("GET /favicon.png", asset("image/png", favicon))
 	mux.HandleFunc("GET /licenses", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -241,10 +265,7 @@ func (a *application) handler() http.Handler {
 	mux.HandleFunc("GET /ecdict-license", asset("text/plain; charset=utf-8", ecdictLicense))
 
 	mux.HandleFunc("GET /api/state", func(w http.ResponseWriter, _ *http.Request) {
-		a.store.mu.Lock()
-		data := a.store.review(localDay())
-		a.store.mu.Unlock()
-		respond(w, 200, data)
+		respond(w, 200, a.reviewResponse(time.Now(), false))
 	})
 	mux.HandleFunc("GET /api/storage", func(w http.ResponseWriter, _ *http.Request) {
 		respond(w, 200, map[string]string{"database": a.store.io.file, "notice": a.migrationNotice})
@@ -270,30 +291,25 @@ func (a *application) handler() http.Handler {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("POST /api/review/start", func(w http.ResponseWriter, _ *http.Request) {
-		respond(w, 200, a.store.shuffleReview(localDay()))
+		now := time.Now()
+		a.store.mu.Lock()
+		day := a.store.activeReviewDay(studyDay(now))
+		plan := a.store.planReview(day)
+		state := a.store.reviewState(plan)
+		if !state.Waiting && a.store.pinnedCard(day) == nil {
+			a.store.setDisplay(day, plan)
+			state = a.store.reviewState(plan)
+		}
+		a.store.pinReview(state)
+		a.store.mu.Unlock()
+		setExamDate(&state, now)
+		respond(w, 200, state)
 	})
-	mux.HandleFunc("POST /api/review/supplement", func(w http.ResponseWriter, r *http.Request) {
-		var req struct {
-			Count int    `json:"count"`
-			Date  string `json:"date"`
-		}
-		if !requestJSON(w, r, 4096, &req) {
-			return
-		}
-		day := localDay()
-		if req.Date != day {
-			problem(w, 409, errStaleSupplement.Error())
-			return
-		}
-		data, err := a.store.addTodaySupplement(day, req.Count)
-		switch {
-		case errors.Is(err, errStaleSupplement):
-			problem(w, 409, err.Error())
-		case err != nil:
-			saveError(w, err)
-		default:
-			respond(w, 200, data)
-		}
+	mux.HandleFunc("POST /api/review/stop", func(w http.ResponseWriter, _ *http.Request) {
+		a.store.mu.Lock()
+		a.store.presented = presentedCard{}
+		a.store.mu.Unlock()
+		respond(w, 200, a.reviewResponse(time.Now(), false))
 	})
 	mux.HandleFunc("GET /api/stats", func(w http.ResponseWriter, _ *http.Request) {
 		a.store.mu.Lock()
@@ -351,7 +367,7 @@ func (a *application) handler() http.Handler {
 		if !requestJSON(w, r, 4096, &req) {
 			return
 		}
-		day := localDay()
+		day := a.reviewDay()
 		if req.Date != day {
 			problem(w, 409, errStaleReview.Error())
 			return
@@ -362,6 +378,7 @@ func (a *application) handler() http.Handler {
 		} else if err != nil {
 			saveError(w, err)
 		} else {
+			data.reviewState = a.reviewResponse(time.Now(), true)
 			respond(w, 200, data)
 		}
 	})
@@ -372,21 +389,28 @@ func (a *application) handler() http.Handler {
 		if !requestJSON(w, r, 4096, &req) {
 			return
 		}
-		data, err := a.store.nextAfterForgot(localDay(), req.Order)
+		_, err := a.store.nextAfterForgot(a.reviewDay(), req.Order)
 		if errors.Is(err, errStaleReview) {
 			problem(w, 409, err.Error())
 		} else if err != nil {
 			saveError(w, err)
 		} else {
-			respond(w, 200, data)
+			a.store.mu.Lock()
+			a.store.presented = presentedCard{}
+			a.store.mu.Unlock()
+			respond(w, 200, a.reviewResponse(time.Now(), true))
 		}
 	})
 	mux.HandleFunc("POST /api/undo", func(w http.ResponseWriter, _ *http.Request) {
-		data, err := a.store.undo(localDay())
+		data, err := a.store.undo(a.reviewDay())
 		if err != nil {
 			saveError(w, err)
 			return
 		}
+		a.store.mu.Lock()
+		a.store.pinReview(data)
+		a.store.mu.Unlock()
+		setExamDate(&data, time.Now())
 		respond(w, 200, data)
 	})
 	mux.HandleFunc("POST /api/settings", func(w http.ResponseWriter, r *http.Request) {
@@ -402,12 +426,13 @@ func (a *application) handler() http.Handler {
 			problem(w, 400, "当天连续正确次数与长期过关天数均须为 1 至 99。每日上限须为 1 至 10,000，或设为全部。")
 			return
 		}
-		state, err := a.store.changeSettings(localDay(), req)
+		state, err := a.store.changeSettings(a.reviewDay(), req)
 		if err != nil {
 			saveError(w, err)
 			return
 		}
 		a.resumeLookup()
+		setExamDate(&state, time.Now())
 		respond(w, 200, state)
 	})
 	mux.HandleFunc("POST /api/import-preview", func(w http.ResponseWriter, r *http.Request) {

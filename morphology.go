@@ -28,12 +28,21 @@ var annotatedDerivations []byte
 //go:embed assets/morphology-etymdb-v19.tsv.gz
 var historicalRoots []byte
 
-var constructions = loadMorphology()
+var constructions, constructionSources = loadMorphology()
 
-func loadMorphology() map[string]string {
+func loadMorphology() (map[string]string, map[string][]string) {
 	// The index is built once at release time and shared by all cards.
 	// Curated hints take precedence over imported examples and derived forms.
 	matches := loadConstructions()
+	sources := make(map[string][]string)
+	for line := range strings.SplitSeq(morphologyData, "\n") {
+		fields := strings.Split(line, "|")
+		if len(fields) == 4 {
+			for _, word := range strings.Fields(fields[3]) {
+				sources[word] = append(sources[word], fields[1]+"（"+fields[2]+"）")
+			}
+		}
+	}
 	for _, compressed := range [][]byte{derivationData, rootData, inflectionData} {
 		data, err := expand(compressed)
 		if err != nil {
@@ -41,8 +50,11 @@ func loadMorphology() map[string]string {
 		}
 		for line := range strings.SplitSeq(string(data), "\n") {
 			word, hint, ok := strings.Cut(line, "\t")
-			if ok && matches[word] == "" {
-				matches[word] = hint
+			if ok {
+				sources[word] = append(sources[word], hint)
+				if matches[word] == "" {
+					matches[word] = hint
+				}
 			}
 		}
 	}
@@ -61,13 +73,17 @@ func loadMorphology() map[string]string {
 		}
 		for line := range strings.SplitSeq(string(data), "\n") {
 			key, value, ok := strings.Cut(line, "\t")
-			if !ok || manual[key] {
+			if !ok {
 				continue
 			}
 			scoreText, tip, _ := strings.Cut(value, "\t")
 			score, err := strconv.Atoi(scoreText)
 			if err != nil || score < 1 || tip == "" {
 				panic("invalid embedded morphology analysis")
+			}
+			sources[key] = append(sources[key], tip)
+			if manual[key] {
+				continue
 			}
 			previous, exists := scores[key]
 			if !exists {
@@ -78,7 +94,7 @@ func loadMorphology() map[string]string {
 			}
 		}
 	}
-	return matches
+	return matches, sources
 }
 
 func constructionRank(tip string) int {
@@ -127,10 +143,10 @@ func loadConstructions() map[string]string {
 }
 
 func presentCard(card wordCard) any {
-	tip := constructions[card.Key]
+	hint, more := memoryAssociation(card.Key)
 	return struct {
 		wordCard
-		Construction string `json:"construction,omitempty"`
-		Association  string `json:"association,omitempty"`
-	}{card, tip, associationHint(card.Key, tip)}
+		MemoryHint string `json:"memoryHint,omitempty"`
+		MoreMemory string `json:"moreMemory,omitempty"`
+	}{card, hint, more}
 }

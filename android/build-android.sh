@@ -48,11 +48,18 @@ for abi in $abi_list; do
   )
   rm -f "$work/apk/lib/$abi/libwordreview.h"
 done
+manifest="$android_project/src/main/AndroidManifest.xml"
 package_args=()
 if [[ -n "${WORDREVIEW_ANDROID_PACKAGE:-}" ]]; then
+  [[ "$WORDREVIEW_ANDROID_PACKAGE" =~ ^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$ ]] || {
+    echo 'Invalid Android package identifier.' >&2
+    exit 1
+  }
+  sed "s/cn\.wordreview\.app\.share\"/${WORDREVIEW_ANDROID_PACKAGE}.share\"/" "$manifest" > "$work/AndroidManifest.xml"
+  manifest="$work/AndroidManifest.xml"
   package_args=(--rename-manifest-package "$WORDREVIEW_ANDROID_PACKAGE")
 fi
-"$tools_dir/aapt" package -f "${package_args[@]}" -M "$android_project/src/main/AndroidManifest.xml" \
+"$tools_dir/aapt" package -f "${package_args[@]}" -M "$manifest" \
   -S "$android_project/src/main/res" -I "$platform" -F "$work/resources.apk"
 python3 - "$work" <<'PY'
 from pathlib import Path

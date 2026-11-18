@@ -26,7 +26,7 @@ prefix|cor-|一起（con- 的变体）|correlate correlation correspond correspo
 prefix|contra-|相反；对抗|contradict contradiction contradictory contraception contraceptive
 prefix|contro-|相反；对立（contra- 相关形式）|controversy controversial
 prefix|counter-|反制；与之相对|counteract counterbalance counterattack counterpart counterargument countermeasure counterclockwise counterweight
-prefix|de-|去除；逆转（这里的用法）|deactivate deactivation defrost decompose decomposition decentralize decentralization decompress dehydration devalue deregulate
+prefix|de-|向下；降低；去除|deactivate deactivation defrost decompose decomposition decentralize decentralization decompress dehydration devalue deregulate
 prefix|dia-|穿过；横跨|diameter diagonal dialysis
 prefix|di-|二；双|dioxide digraph dichotomy dilemma
 prefix|dis-|分离；取消；否定|disconnect disconnection disagree disagreement disapprove disapproval disassemble disarm disband disbelieve dishonest dishonesty disloyal disorder dislike disobedient disobey disrespect dismantle disqualify
@@ -318,7 +318,7 @@ root|glaci|冰|glacier glacial glaciation
 root|glob|球体|globe global globalization globular
 root|gloss / glott|舌；语言|glossary gloss polyglot
 root|glyc / gluc|甜；糖|glucose glycogen glycolysis glucagon
-root|grad / gress|步；行进（同源变体）|grade gradual graduate graduation gradient degrade degree progress progression regress regression aggression aggressive digress digression congress
+root|grad / gress|步；行进；等级（同源变体）|grade gradual graduate graduation gradient degrade degree progress progression regress regression aggression aggressive digress digression congress
 root|gram / graph|书写；记录（相关形式）|grammar grammatical diagram graphic graphics paragraph photograph photography autograph telegraph biography telegram program histogram cardiogram
 root|grav|重；严重|gravity gravitate gravitation grave aggravate
 root|greg|群聚；群体|aggregate aggregation congregate congregation segregate segregation gregarious

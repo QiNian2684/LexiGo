@@ -95,7 +95,7 @@ func TestFortyWordsThreeRounds(t *testing.T) {
 	for i := 0; i < 45; i++ {
 		input += fmt.Sprintf("schedule%c%c,", 'a'+rune(i/26), 'a'+rune(i%26))
 	}
-	importTest(t, s, day, input)
+	importTest(t, s, "2026-11-15", input)
 	state := s.shuffleReview(day)
 	seen := map[string]int{}
 	recent := []string{}
@@ -123,7 +123,7 @@ func TestFortyWordsThreeRounds(t *testing.T) {
 			state = s.shuffleReview(day)
 		}
 	}
-	if state.Due != 0 || state.Remembered != 40 || state.Reviewed != 40 || len(seen) != 40 || state.OverflowNew != 5 {
+	if state.Due != 0 || state.Remembered != 40 || state.Reviewed != 40 || len(seen) != 40 || state.OverflowNew != 0 {
 		t.Fatalf("wrong final progress: %+v", state)
 	}
 }
@@ -180,7 +180,7 @@ func TestLowerDailyGoalAppliesToStartedCards(t *testing.T) {
 				card.DailyTarget != 3 || card.Reviews != count || (updated.Current == nil) != wantPass {
 				t.Fatalf("unexpected review state %+v, progress %+v", updated, card.progress)
 			}
-			if stats := s.stats(day); stats.TotalReviews != count || (stats.Days[6].Passed == 1) != wantPass {
+			if stats := s.stats(day); stats.TotalReviews != count || (stats.Days[29].Passed == 1) != wantPass {
 				t.Fatalf("resaving changed the answer count or missed the pass: %+v", stats)
 			}
 			if !validDatabase(s.db) || s.attendance(day).credited[card.ID] != wantPass {

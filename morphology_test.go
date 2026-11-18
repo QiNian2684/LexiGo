@@ -130,7 +130,7 @@ func TestConstructionIsPresentationOnly(t *testing.T) {
 			t.Errorf("lost %q", value)
 		}
 	}
-	if !strings.Contains(string(public), `"construction"`) || strings.Contains(string(saved), `"construction"`) {
+	if !strings.Contains(string(public), `"memoryHint"`) || strings.Contains(string(saved), `"memoryHint"`) {
 		t.Fatal("offline analysis should be derived and absent from user data")
 	}
 }

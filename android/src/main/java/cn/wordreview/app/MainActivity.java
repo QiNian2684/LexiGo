@@ -34,6 +34,7 @@ import org.json.JSONException;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -43,6 +44,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -57,6 +59,7 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
     private Uri localUrl;
     private String credential;
     private Operation operation;
+    private boolean preparingShare;
     private Uri delayedDocument;
     private ValueCallback<Uri[]> htmlFile;
     private TextToSpeech speech;
@@ -85,6 +88,7 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
         showStatus("正在打开背词本…");
         LocalEngine.INSTANCE.connect(getApplicationContext(), this);
         initSpeech();
+        io.execute(this::pruneShares);
     }
 
     private void showStatus(String message) {
@@ -358,8 +362,71 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
         return new Intent(action).addCategory(Intent.CATEGORY_OPENABLE).setType(type);
     }
 
+    private void pruneShares() {
+        long expiry = System.currentTimeMillis() - StudyShareProvider.KEEP_MILLIS;
+        File[] files = StudyShareProvider.directory(this).listFiles();
+        if (files == null) return;
+        for (File file : files) {
+            String name = file.getName();
+            if (name.endsWith(".json") && StudyShareProvider.validId(name.substring(0, name.length() - 5)) &&
+                    file.isFile() && file.lastModified() < expiry) {
+                String day = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT)
+                    .format(new java.util.Date(file.lastModified()));
+                String title = "WordReview-Learning-" + day + ".json";
+                revokeUriPermission(StudyShareProvider.uri(this, name.substring(0, name.length() - 5), title),
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                file.delete();
+            }
+        }
+    }
+
+    private void shareStudyData() {
+        preparingShare = true;
+        Uri base = localUrl;
+        String cookie = credential;
+        io.execute(() -> {
+            File directory = StudyShareProvider.directory(this);
+            String id = UUID.randomUUID().toString();
+            File cache = new File(directory, id + ".json");
+            try {
+                pruneShares();
+                if (!directory.isDirectory() && !directory.mkdirs()) throw new IOException("无法准备分享文件。");
+                try (OutputStream destination = new FileOutputStream(cache)) {
+                    processDocument(new Operation("export", ""), null, base, cookie, destination);
+                }
+                String day = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT)
+                    .format(new java.util.Date(cache.lastModified()));
+                Uri uri = StudyShareProvider.uri(this, id, "WordReview-Learning-" + day + ".json");
+                runOnUiThread(() -> {
+                    preparingShare = false;
+                    if (isDestroyed() || !visible) return;
+                    Intent send = new Intent(Intent.ACTION_SEND).setType("application/json")
+                        .putExtra(Intent.EXTRA_STREAM, uri)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    send.setClipData(ClipData.newUri(getContentResolver(), "背词本学习数据", uri));
+                    try {
+                        startActivity(Intent.createChooser(send, "分享学习数据"));
+                    } catch (ActivityNotFoundException error) {
+                        sendResult("share", null, "当前设备没有可用的分享界面，请使用「保存到本机」。");
+                    }
+                });
+            } catch (IOException | RuntimeException error) {
+                cache.delete();
+                String reason = error.getMessage();
+                runOnUiThread(() -> {
+                    preparingShare = false;
+                    if (!isDestroyed()) sendResult("share", null, reason == null || reason.isEmpty() ? "无法准备分享文件，请重试。" : reason);
+                });
+            }
+        });
+    }
+
     private void pick(String kind, String body) {
-        if (!visible || localUrl == null || operation != null) return;
+        if (!visible || localUrl == null || operation != null || preparingShare) return;
+        if ("share".equals(kind)) {
+            shareStudyData();
+            return;
+        }
         if ("recovery".equals(kind)) {
             File latest = latestRecovery();
             if (latest == null) {
@@ -426,7 +493,7 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
             String json = null;
             String error = null;
             try {
-                json = processDocument(chosen, uri, base, cookie);
+                json = processDocument(chosen, uri, base, cookie, null);
             } catch (IOException | RuntimeException ex) {
                 error = ex.getMessage();
                 if (error == null || error.isEmpty()) error = "文件操作未完成。请重试。";
@@ -440,7 +507,7 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
         });
     }
 
-    private String processDocument(Operation op, Uri uri, Uri base, String cookie) throws IOException {
+    private String processDocument(Operation op, Uri uri, Uri base, String cookie, OutputStream privateOutput) throws IOException {
         if ("recovery".equals(op.kind)) {
             if (!op.body.matches("before-transfer-[0-9TZ.]+\\.json")) throw new IOException("备份文件名无效。");
             File file = new File(recoveryDirectory(), op.body);
@@ -494,7 +561,8 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
             }
             try (InputStream response = connection.getInputStream()) {
                 if ("import".equals(op.kind)) return text(response);
-                writeDocument(uri, response);
+                if (privateOutput == null) writeDocument(uri, response);
+                else copy(response, privateOutput, MAX_FILE);
                 return "{\"ok\":true}";
             }
         } finally {
@@ -566,7 +634,7 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
 
         @JavascriptInterface public void pickFile(String kind, String body) {
             if (!"import".equals(kind) && !"export".equals(kind) && !"backup".equals(kind) &&
-                    !"csv".equals(kind) && !"recovery".equals(kind)) return;
+                    !"csv".equals(kind) && !"recovery".equals(kind) && !"share".equals(kind)) return;
             if (body == null || body.length() > 1000000) return;
             runOnUiThread(() -> pick(kind, body));
         }

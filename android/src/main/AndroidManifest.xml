@@ -1,11 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="cn.wordreview.app" android:versionCode="190" android:versionName="1.9.0">
+    package="cn.wordreview.app" android:versionCode="200" android:versionName="1.10.0">
     <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="34" />
     <uses-permission android:name="android.permission.INTERNET" />
     <queries><intent><action android:name="android.intent.action.TTS_SERVICE" /></intent></queries>
     <application android:label="背词本" android:icon="@drawable/app_icon" android:theme="@style/WordReviewTheme"
         android:allowBackup="false" android:extractNativeLibs="true"
         android:networkSecurityConfig="@xml/network_security" android:usesCleartextTraffic="false">
+        <provider android:name="cn.wordreview.app.StudyShareProvider"
+            android:authorities="cn.wordreview.app.share" android:exported="false" android:grantUriPermissions="true">
+            <grant-uri-permission android:pathPrefix="/study/" />
+        </provider>
         <activity android:name="cn.wordreview.app.MainActivity" android:exported="true" android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize" android:configChanges="orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode|fontScale">
             <intent-filter>

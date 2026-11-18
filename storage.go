@@ -259,6 +259,7 @@ func (s *store) replaceLocked(incoming database, backupName string, backup []byt
 	}
 	s.db = incoming
 	s.display = reviewDisplay{}
+	s.presented = presentedCard{}
 	return nil
 }
 

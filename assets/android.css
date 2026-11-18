@@ -81,8 +81,8 @@ body.platform-android {
 .platform-android .memory-panel { border-inline-start: 0; border-top: 1px solid var(--line); padding: .95rem 0 0; }
 .platform-android .personal-note textarea { min-height: 6rem; max-height: none; overflow-y: hidden; resize: none; }
 .platform-android #card-metadata { margin-block: .8rem; }
-.platform-android .can-swipe .card-front,
-.platform-android .can-swipe .meaning-panel { touch-action: pan-y pinch-zoom; }
+.platform-android .can-swipe .swipe-content,
+.platform-android .can-swipe .personal-note textarea:not(:focus) { touch-action: pan-y pinch-zoom; }
 .platform-android .swipe-content { position: relative; }
 .platform-android .review-card { position: relative; overflow-x: clip; overflow-y: visible; }
 .platform-android .swipe-cue {
@@ -99,7 +99,6 @@ body.platform-android {
   box-shadow: var(--shadow);
 }
 .platform-android.has-vote[data-view="review"] .shell { padding-bottom: calc(var(--phone-nav) + var(--phone-actions) + var(--safe-bottom) + 1.35rem); }
-.platform-android.has-vote[data-view="review"] .feedback { margin-block-end: .5rem; }
 .platform-android.editing-input .sidebar,
 .platform-android.editing-input .card-actions { visibility: hidden; pointer-events: none; }
 .platform-android.editing-input .shell { padding-bottom: .85rem; }

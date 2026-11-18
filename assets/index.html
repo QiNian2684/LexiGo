@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="/tokens.css">
   <link rel="stylesheet" href="/app.css">
   <script src="/controls.js" defer></script>
+  <script src="/stats-chart.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body data-view="review">
@@ -40,7 +41,6 @@
           <progress id="day-meter" value="0" max="1" aria-label="今日复习进度"></progress>
         </div>
       </header>
-      <p id="new-overflow" class="notice" role="status" hidden></p>
       <section id="review-start" class="card empty-state start-state" hidden>
         <div class="state-symbol"><svg class="icon" aria-hidden="true"><use href="/icons.svg#review"/></svg></div>
         <h2>今天准备复习的单词</h2>
@@ -82,7 +82,6 @@
           <button class="button primary" id="pass" type="button">记住了 <kbd>2</kbd></button>
         </div>
       </article>
-      <p class="feedback" id="feedback" role="status" hidden></p>
       <article class="card empty-state" id="review-empty" aria-busy="true">
         <div class="state-symbol"><svg class="icon" aria-hidden="true"><use href="/icons.svg#review"/></svg></div>
         <h2 id="empty-title">正在加载…</h2>
@@ -166,14 +165,22 @@
     <section id="stats-view" aria-labelledby="stats-title" hidden>
       <header class="page-heading"><h1 id="stats-title">学习统计</h1></header>
       <div class="card summary stats-summary" id="stats-counts" aria-label="学习概况"></div>
-      <div class="card stats-table">
-        <h2>最近 7 天</h2>
-        <div class="table-scroll" tabindex="0" role="region" aria-label="最近七天的复习记录">
-          <table>
-            <thead><tr><th scope="col">日期</th><th scope="col">复习词数</th><th scope="col">当天过关</th><th scope="col">记住了</th><th scope="col">没记住</th></tr></thead>
-            <tbody id="stats-days"></tbody>
-          </table>
+      <div class="card history-chart">
+        <div class="chart-controls">
+          <div class="chart-switch" role="group" aria-label="时间范围">
+            <button type="button" data-chart-days="7" aria-pressed="true">最近 7 天</button>
+            <button type="button" data-chart-days="30" aria-pressed="false">最近 30 天</button>
+          </div>
+          <div class="chart-switch" role="group" aria-label="统计指标">
+            <button type="button" data-chart-metric="words" aria-pressed="true">学习词数</button>
+            <button type="button" data-chart-metric="answers" aria-pressed="false">作答情况</button>
+          </div>
         </div>
+        <div id="chart-legend" class="chart-legend"></div>
+        <div id="chart-surface" tabindex="0" role="group" aria-label="学习趋势，用左右方向键查看各日数据">
+          <svg id="stats-chart" aria-hidden="true"></svg>
+        </div>
+        <p id="chart-reading" class="chart-reading" aria-live="polite"></p>
       </div>
     </section>
 
@@ -187,7 +194,7 @@
           <section class="card settings-group" aria-labelledby="learning-settings-title">
             <header><h2 id="learning-settings-title">学习</h2></header>
             <div class="setting-row setting-limit">
-              <div class="setting-text"><label for="daily-limit">每日复习上限</label><p>同一个词当天重测不额外占名额。</p></div>
+              <div class="setting-text"><label for="daily-limit">每日复习上限</label><p>当天导入的词优先，可超过上限。学习日每天 05:00 切换。</p></div>
               <div class="setting-control">
                 <select id="daily-limit" data-styled>
                   <option value="10">10 个</option><option value="20">20 个</option><option value="40">40 个</option>
@@ -250,22 +257,29 @@
             <header><h2 id="data-title">数据管理</h2><p>存储位置 <code id="storage-path">Data&#92;vocabulary.db</code></p></header>
             <div class="data-actions">
               <h3>跨设备迁移</h3>
+              <button class="settings-operation" id="transfer-share" type="button" hidden>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#upload"/></svg><span>分享数据</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
+              </button>
               <button class="settings-operation" id="transfer-export" type="button">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg><span>导出完整学习数据</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg><span id="transfer-export-label">导出数据</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
               </button>
               <button class="settings-operation" id="transfer-import" type="button">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg#upload"/></svg><span>导入完整学习数据<small>确认后覆盖本机数据</small></span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#upload"/></svg><span>导入数据</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
               </button>
               <button class="settings-operation" id="transfer-recovery" type="button" hidden>
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg#history"/></svg><span>保存覆盖前的备份</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#history"/></svg><span>导出覆盖前备份</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
               </button>
+              <p class="data-guide"><strong>使用方法</strong> <span id="transfer-guide">在原设备导出数据，将文件发送到另一台设备，再选择「导入数据」。</span></p>
+              <p class="data-guide"><strong>注意</strong> 导入会覆盖本机数据，不会自动合并。</p>
               <h3>本地备份</h3>
               <a class="settings-operation" id="download-backup" href="/api/backup" download>
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg#backup"/></svg><span>备份 JSON</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#backup"/></svg><span>备份数据</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
               </a>
               <button class="settings-operation" id="pick-restore" type="button">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg#history"/></svg><span>从备份恢复<small>确认后覆盖本机数据</small></span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#history"/></svg><span>恢复备份</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
               </button>
+              <p class="data-guide"><strong>备份数据</strong> 保存词库、备注、学习进度和历史记录。</p>
+              <p class="data-guide"><strong>恢复备份</strong> 用此前保存的备份替换当前学习状态。</p>
               <input id="restore-file" type="file" accept=".json,application/json" hidden>
             </div>
             <p id="settings-status" class="inline-status" role="status" hidden></p>
@@ -275,7 +289,6 @@
     </section>
 
     <footer class="app-footer">
-      <span>词库和复习记录保存在本机</span>
       <a href="/licenses" id="open-licenses">第三方许可</a>
     </footer>
   </main>

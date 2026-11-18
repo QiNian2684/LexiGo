@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 const defaultGoal = 6
@@ -67,19 +68,20 @@ type wordCard struct {
 }
 
 type event struct {
-	Kind      string    `json:"kind"`
-	Day       string    `json:"day"`
-	Card      uint64    `json:"card"`
-	Word      string    `json:"word"`
-	Tick      uint64    `json:"tick,omitempty"`
-	Extra     bool      `json:"extra,omitempty"`
-	Legacy    bool      `json:"legacy,omitempty"`
-	DayPassed bool      `json:"dayPassed,omitempty"`
-	Credit    bool      `json:"credit,omitempty"`
-	Practice  bool      `json:"practice,omitempty"`
-	Undone    bool      `json:"undone,omitempty"`
-	Waiting   bool      `json:"waitingForNext,omitempty"`
-	Before    *progress `json:"before,omitempty"`
+	Kind       string     `json:"kind"`
+	Day        string     `json:"day"`
+	Card       uint64     `json:"card"`
+	Word       string     `json:"word"`
+	Tick       uint64     `json:"tick,omitempty"`
+	Extra      bool       `json:"extra,omitempty"`
+	Legacy     bool       `json:"legacy,omitempty"`
+	DayPassed  bool       `json:"dayPassed,omitempty"`
+	Credit     bool       `json:"credit,omitempty"`
+	Practice   bool       `json:"practice,omitempty"`
+	Undone     bool       `json:"undone,omitempty"`
+	Waiting    bool       `json:"waitingForNext,omitempty"`
+	OccurredAt *time.Time `json:"occurredAt,omitempty"`
+	Before     *progress  `json:"before,omitempty"`
 }
 
 type metadata struct {
@@ -95,15 +97,17 @@ type database struct {
 }
 
 type store struct {
-	mu       sync.Mutex
-	db       database
-	io       *diskStore
-	display  reviewDisplay
-	upgraded bool
+	mu        sync.Mutex
+	db        database
+	io        *diskStore
+	display   reviewDisplay
+	presented presentedCard
+	upgraded  bool
 }
 
 func (s *store) record(day, kind string, card *wordCard) {
-	s.db.Events = append(s.db.Events, event{Kind: kind, Day: day, Card: card.ID, Word: card.Word})
+	now := time.Now().UTC()
+	s.db.Events = append(s.db.Events, event{Kind: kind, Day: day, Card: card.ID, Word: card.Word, OccurredAt: &now})
 }
 
 func (s *store) advance(card *wordCard) {
@@ -153,7 +157,8 @@ func (s *store) recordVote(day, key string, version int, order uint64, remembere
 	before, oldOrder, count := card.progress, s.db.NextOrder, len(s.db.Events)
 	s.advance(card)
 	session := plan.session
-	entry := event{Day: day, Card: card.ID, Word: card.Word, Tick: card.Order, Before: &before, Extra: card.ExtraDay == day,
+	now := time.Now().UTC()
+	entry := event{Day: day, OccurredAt: &now, Card: card.ID, Word: card.Word, Tick: card.Order, Before: &before, Extra: card.ExtraDay == day,
 		Waiting: hold && !remembered}
 	card.answer(day, remembered, s.db.Settings, session.credited[card.ID], session.votes, &entry)
 
@@ -185,7 +190,7 @@ func (s *store) nextAfterForgot(day string, order uint64) (reviewState, error) {
 
 func (s *store) snapshotDatabase(day string) database {
 	db := s.db
-	active, _ := s.undoCandidate(day)
+	active, _ := s.undoCandidate(s.activeReviewDay(day))
 	cloned := false
 	for i, item := range s.db.Events {
 		if item.Waiting && i != active {
@@ -248,6 +253,7 @@ func (s *store) undo(day string) (reviewState, error) {
 		}
 		return reviewState{}, err
 	}
+	s.presented = presentedCard{}
 	if wasWaiting {
 		if s.display.day != day {
 			s.display = reviewDisplay{day: day}

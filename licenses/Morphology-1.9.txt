@@ -33,3 +33,8 @@ morphology-etymdb-v19.tsv.gz — CC BY-SA 4.0
 
 重建新版索引（仅重建上游索引时才需要 Python 及 openpyxl）：
 python scripts/build_morphology_v19.py eng.derivational.v1.tsv fixie-morpheme-segmentations.csv MorphoLEX_en.xlsx etymdb.csv ecdict.csv
+
+1.10.0 追加资源
+  memory-forms.tsv.gz 由 scripts/build_memory_forms.py 从同一版本的 ECDICT
+  exchange 字段提取规则词尾。只收录核对过拼写的基本词形变换，
+  中文说明由本项目提供。ECDICT 原数据及衍生索引依照 ECDICT.txt。

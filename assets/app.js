@@ -102,7 +102,7 @@ async function refreshState() {
   const old = state;
   let next = await api("/api/state");
   const reviewing = view === "review" || (view === "settings" && settingsFrom === "review");
-  if (old && old.date !== next.date && studying && reviewing && !practice && !noteDirty()) {
+  if (old && (old.date !== next.date || !old.current && next.current) && studying && reviewing && !practice && !noteDirty()) {
     next = await api("/api/review/start", {});
   }
   if (state === old && !noteDirty()) applyState(next);
@@ -143,8 +143,6 @@ function renderReview() {
   el("review-start").hidden = !!practice || !!studying || !next.current;
   el("review-empty").hidden = !!practice || !!next.current;
   el("start-summary").textContent = `还有 ${next.due} 个词待过关。`;
-  message("new-overflow", next.overflowNew && next.current && !practice
-    ? `另有 ${next.overflowNew} 个今日新增词未排入常规名额。完成本轮后可以选择继续学习。` : "");
   el("vote-actions").hidden = !current || !!practice || (concealed && !windowsReview);
   document.body.classList.toggle("has-vote", !el("vote-actions").hidden);
   if (current) {
@@ -156,9 +154,7 @@ function renderReview() {
     updateVoice();
   }
   if (!next.current) {
-    if (next.overflowNew) {
-      empty("今天的当前任务已完成", `还有 ${next.overflowNew} 个今日新增词未安排。继续学习会增加今天的复习量。`, "supplement");
-    } else if (!next.total) empty("词库还是空的", "先添加一批单词，再开始复习。", "add");
+    if (!next.total) empty("词库还是空的", "先添加一批单词，再开始复习。", "add");
     else if (next.total === next.mastered) empty("词库里的单词都掌握了", "可以在词库提前查看，也可以选词重新学习。", "library");
     else empty("今天的复习已完成", "下次打开时，可以接着复习还没有掌握的单词。", "");
   }
@@ -169,8 +165,8 @@ function empty(title, text, action) {
   el("empty-text").textContent = text;
   el("empty-action").hidden = !action;
   if (action) {
-    el("empty-action").textContent = {add: "添加单词", library: "打开词库", supplement: "继续学习今日新增单词"}[action];
-    el("empty-action").onclick = action === "supplement" ? continueToday : () => changeView(action);
+    el("empty-action").textContent = {add: "添加单词", library: "打开词库"}[action];
+    el("empty-action").onclick = () => changeView(action);
   }
 }
 
@@ -218,18 +214,21 @@ function renderDetails(card) {
     if (!sound.length && card.ipa) sound.push(ipa(card.ipa));
   }
   const meaning = group("中文释义", card.meaning, missing, "meaning");
-  if (card.construction) {
+  if (card.memoryHint) {
     const hint = document.createElement("p");
     hint.className = "construction";
-    hint.textContent = "构词：" + card.construction;
+    hint.textContent = "记忆联想：" + card.memoryHint;
     meaning.append(hint);
-  }
-  if (card.association) {
-    const hint = document.createElement("p");
-    hint.className = "construction";
-    hint.textContent = "字形联想：" + card.association;
-    hint.title = "字母相似，仅供记忆联想";
-    meaning.append(hint);
+    if (card.moreMemory) {
+      const more = document.createElement("details");
+      more.className = "construction construction-details";
+      const title = document.createElement("summary");
+      title.textContent = "更多联想";
+      const content = document.createElement("p");
+      content.textContent = card.moreMemory;
+      more.append(title, content);
+      meaning.append(more);
+    }
   }
   const fields = [
     meaning,
@@ -337,7 +336,6 @@ async function nextCard(fromSwipe = false) {
     await flushNote();
     const result = await api("/api/review/next", {order: state.current.order});
     showError();
-    message("feedback");
     applyState(result, true);
     el("review-title").scrollIntoView({block: "nearest"});
   } catch (error) {
@@ -377,14 +375,6 @@ async function vote(remembered, fromSwipe = false) {
     const result = await api("/api/vote", {
       key: current.key, reviews: current.reviews, order: current.order, date: state.date, remembered, stay: !remembered,
     });
-    const word = current.word;
-    let feedback = `${word} 今日连对 ${result.dailyCount} / ${result.dailyTarget}，稍后再测。`;
-    if (result.graduated) feedback = word + " 已长期掌握。";
-    else if (result.dayPassed) feedback = word + (result.credited
-      ? " 今日过关，连续过关天数加 1。"
-      : " 重新完成今日过关，今天的过关天数已累计过。");
-    else if (!remembered) feedback = word + " 今日连对已清零，稍后再测。";
-    message("feedback", feedback);
     applyState(result, remembered);
     if (remembered) el("review-title").scrollIntoView({block: "nearest"});
   } catch (error) {
@@ -404,7 +394,6 @@ async function undo() {
     await flushNote();
     const wasWaiting = state.waitingForNext;
     applyState(await api("/api/undo", {}), !wasWaiting);
-    message("feedback", "已撤销上一条复习操作。");
   } catch (error) { showError(error); }
   finally { busy = false; renderReview(); }
 }
@@ -414,10 +403,10 @@ async function stopReview() {
   try {
     await flushNote();
     const showLibrary = !!practice;
+    if (!showLibrary && studying) applyState(await api("/api/review/stop", {}));
     studying = false;
     practice = undefined;
     clearAnswer();
-    message("feedback");
     renderReview();
     if (showLibrary) await changeView("library");
   } catch (error) { showError(error); }
@@ -472,7 +461,6 @@ async function startReview() {
     const result = await api("/api/review/start", {});
     studying = true;
     practice = undefined;
-    message("feedback");
     applyState(result, true);
     if (result.current) el("reveal").focus({preventScroll: true});
   } catch (error) {
@@ -483,29 +471,6 @@ async function startReview() {
     renderReview();
     if (state?.waitingForNext && el("answer").hidden) await toggleReveal();
   }
-}
-
-function continueToday() {
-  if (!state?.overflowNew || state.current || busy) return;
-  const {date, overflowNew} = state;
-  ask("追加今天的复习量？", `本次追加 ${overflowNew} 个今日新增词。每日常规上限保持原设置。`, "确认追加", async () => {
-    try {
-      const result = await api("/api/review/supplement", {date, count: overflowNew});
-      studying = true;
-      practice = undefined;
-      message("feedback");
-      applyState(result, true);
-      if (result.current) el("reveal").focus({preventScroll: true});
-    } catch (error) {
-      if (error.status === 409) {
-        el("action-dialog").close();
-        await refreshState();
-        showError(error);
-        return;
-      }
-      throw error;
-    }
-  });
 }
 
 function englishVoice() {
@@ -819,7 +784,7 @@ async function closeEditor() {
 async function retryOne() {
   try {
     await api("/api/batch/retry", {keys: [editing.key]});
-    message("edit-status", "已加入补充队列。");
+    message("edit-status");
     el("retry-one").disabled = true;
   } catch (error) { message("edit-status", error.message); }
 }
@@ -847,7 +812,7 @@ async function submitWords(event) {
         input.value = "";
         fileFormat = "words";
       }
-      message("import-status", `已保存 ${result.keys.length} 个词条 · 新增 ${result.new} · 已重新排队 ${result.reset}。`);
+      message("import-status");
       await updateImportStatus();
       await refreshState();
     });
@@ -859,7 +824,11 @@ async function updateImportStatus() {
   if (!imported.length) return;
   const data = await api("/api/import-status", {keys: imported});
   importPending = data.pending > 0;
-  let label = `资料齐全 ${data.complete} · 仍有缺项 ${data.partial} · 等待补全 ${data.pending}`;
+  if (!data.pending && !data.partial) {
+    message("import-lookup");
+    return;
+  }
+  let label = [data.partial && `资料缺项 ${data.partial}`, data.pending && `等待补全 ${data.pending}`].filter(Boolean).join(" · ");
   if (data.paused && importPending) label += "。暂时连不上在线词典，稍后会重试。";
   if (!data.online) label += "。联网补充已关闭。";
   message("import-lookup", label);
@@ -878,7 +847,7 @@ async function readWordFile(event) {
     const extension = file.name.toLowerCase().split(".").pop();
     fileFormat = ["csv", "json"].includes(extension) ? extension : "words";
     el("add-input").value = value;
-    message("import-status", `已读入 ${file.name}，请先预览导入结果。`);
+    message("import-status");
   } catch { message("import-status", "请将词表另存为 UTF-8 编码，再重新读取。"); }
 }
 
@@ -900,16 +869,7 @@ async function refreshStats() {
     item.append(title, amount);
     return item;
   }));
-  const days = data.days.map(row => {
-    const item = document.createElement("tr");
-    for (const value of [row.day, row.distinct, row.passed, row.yes, row.no]) {
-      const cell = document.createElement("td");
-      cell.textContent = value;
-      item.append(cell);
-    }
-    return item;
-  });
-  el("stats-days").replaceChildren(...days);
+  window.WordReviewChart.update(data.days);
 }
 
 function customLimit() {
@@ -976,6 +936,7 @@ async function openSettings() {
     displayView("settings");
     pageScroller().scrollTo({top: 0});
     el("settings-title").focus({preventScroll: true});
+    await refreshRecovery();
   } catch (error) { showError(error); }
 }
 
@@ -1040,7 +1001,7 @@ async function flushSettings(background = false) {
   finally { if (settingsJob === job) settingsJob = undefined; }
 }
 
-async function showRestored(status) {
+async function showRestored() {
   studying = false;
   practice = undefined;
   clearAnswer();
@@ -1052,7 +1013,6 @@ async function showRestored(status) {
   if (view === "settings") displayView(settingsFrom);
   el("action-dialog").close();
   await changeView("review");
-  message("feedback", status);
 }
 
 function showTransferPreview(data) {
@@ -1075,13 +1035,17 @@ ${plan}
 确认后，程序会先备份本机数据，再完整替换词库、进度、设置和历史。`,
     "确认覆盖", async () => {
       await api("/api/transfer/commit", {token: data.token});
-      await showRestored("已导入完整学习数据。");
+      await showRestored();
     }, true);
+}
+
+async function refreshRecovery() {
+  el("transfer-recovery").hidden = !(await api("/api/transfer/recovery")).available;
 }
 
 async function pickTransfer(kind) {
   const opening = kind === "import";
-  const trigger = el(opening ? "transfer-import" : "transfer-export");
+  const trigger = el("transfer-" + kind);
   message("settings-status");
   if (window.WordReviewFiles) {
     window.WordReviewFiles.pickFile(kind, "");
@@ -1089,22 +1053,17 @@ async function pickTransfer(kind) {
   }
   trigger.disabled = true;
   try {
-    const data = await api("/api/transfer/windows/" + (opening ? "open" : "save"), {});
-    if (data.cancelled) return;
-    if (opening) showTransferPreview(data);
-    else message("settings-status", "完整学习数据已保存。");
+    const path = opening ? "open" : kind === "recovery" ? "recovery" : "save";
+    const data = await api("/api/transfer/windows/" + path, {});
+    if (opening && !data.cancelled) showTransferPreview(data);
   } catch (error) { message("settings-status", error.message); }
   finally { trigger.disabled = false; }
 }
 
 if (mobile) {
-  if (window.WordReviewFiles) {
-    el("transfer-recovery").hidden = false;
-    el("transfer-recovery").onclick = () => {
-      message("settings-status");
-      window.WordReviewFiles.pickFile("recovery", "");
-    };
-  }
+  el("transfer-share").hidden = !window.WordReviewFiles;
+  el("transfer-export-label").textContent = "保存到本机";
+  el("transfer-guide").textContent = "可直接分享数据，也可先保存到本机，再把文件发到另一台设备导入。";
   window.wordReviewFlushNote = flushOnHide;
   window.wordReviewResume = () => refreshState().catch(showError);
   window.wordReviewSpeechChanged = updateVoice;
@@ -1141,8 +1100,6 @@ if (mobile) {
       if (kind === "import") {
         if (view !== "settings") openSettings().then(() => showTransferPreview(result));
         else showTransferPreview(result);
-      } else if (kind !== "csv") {
-        message(target, kind === "export" ? "完整学习数据已保存。" : "备份已保存。");
       }
     } catch (e) { message(target, e.message); }
   };
@@ -1157,7 +1114,7 @@ async function restoreFile(event) {
     const backup = JSON.parse(await file.text());
     ask("覆盖当前词库？", "恢复会替换现有词条、备注、学习历史和设置。程序会先在本地自动保存一份恢复前备份。", "确认覆盖", async () => {
       await api("/api/restore", backup);
-      await showRestored("已从备份恢复。");
+      await showRestored();
     }, true);
   } catch (error) { message("settings-status", error instanceof SyntaxError ? "这个文件不是有效的 JSON 备份。" : error.message); }
 }
@@ -1293,11 +1250,20 @@ if (mobile) {
     cue.style.opacity = "";
     if (x) animate({transform:`translateX(${x}px)`}, {transform:"translateX(0)"}, 190);
   }
+  let suppressClickUntil = 0;
+  surface.addEventListener("click", event => {
+    if (event.detail && performance.now() < suppressClickUntil) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
   surface.addEventListener("pointerdown", event => {
+    suppressClickUntil = 0;
     if (!event.isPrimary || event.pointerType !== "touch" || drag || !canSwipe() ||
-        event.target.closest("input,textarea,select,button,a,summary,[contenteditable],.memory-panel")) return;
+        event.clientX < 24 || innerWidth - event.clientX < 24 ||
+        event.target.closest("input,select,[contenteditable]")) return;
     drag = {id:event.pointerId, x:event.clientX, y:event.clientY, offset:0,
-      threshold:Math.min(88, surface.clientWidth * .21), card:state.current, date:state.date,
+      threshold:Math.min(88, surface.clientWidth * .21) * .75, card:state.current, date:state.date,
       waiting: Boolean(state.waitingForNext)};
   });
   surface.addEventListener("pointermove", event => {
@@ -1307,6 +1273,7 @@ if (mobile) {
     const dy = Math.abs(event.clientY - drag.y);
     if (!drag.offset && (dy > 10 && dy >= Math.abs(dx) || dx > 12)) { cancelDrag(); return; }
     if (!drag.offset && (-dx < 12 || -dx < dy * 1.4)) return;
+    suppressClickUntil = performance.now() + 350;
     if (!surface.hasPointerCapture(event.pointerId)) surface.setPointerCapture(event.pointerId);
     drag.offset = Math.min(0, dx);
     cancelAnimationFrame(frame);
@@ -1320,6 +1287,7 @@ if (mobile) {
   document.addEventListener("selectionchange", () => { if (window.getSelection()?.toString()) cancelDrag(); });
   surface.addEventListener("pointerup", async event => {
     if (drag?.id !== event.pointerId) return;
+    if (drag.offset) suppressClickUntil = performance.now() + 350;
     if (-drag.offset < drag.threshold || !canSwipe()) { cancelDrag(); return; }
     const {offset, card, date, waiting} = drag;
     drag = undefined;
@@ -1372,6 +1340,8 @@ el("settings-form").addEventListener("keydown", event => {
 });
 el("transfer-export").onclick = () => pickTransfer("export");
 el("transfer-import").onclick = () => pickTransfer("import");
+el("transfer-share").onclick = () => pickTransfer("share");
+el("transfer-recovery").onclick = () => pickTransfer("recovery");
 el("download-backup").onclick = event => {
   if (window.WordReviewFiles) {
     event.preventDefault();
@@ -1479,7 +1449,10 @@ setInterval(async () => {
       const result = await api("/api/card/" + keyPath(before.key));
       if (revealed === before && result.lookup !== "pending") { revealed = result; renderDetails(result); }
     }
-    if (tick % 5 === 0) await refreshState();
+    if (tick % 5 === 0) {
+      if (view === "stats") await refreshStats();
+      else await refreshState();
+    }
   } catch (error) { showError(error); }
 }, 4000);
 refreshState().then(resumeWaiting).catch(error => { el("review-empty").removeAttribute("aria-busy"); showError(error); });

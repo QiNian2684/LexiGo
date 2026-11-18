@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"reflect"
 	"slices"
 	"sort"
@@ -22,7 +21,7 @@ func presentationNames(plan reviewPlan, ranks map[uint64]int) []string {
 	return planNames(cards)
 }
 
-func TestReviewPrioritizesOldBatchesAndReservesToday(t *testing.T) {
+func TestReviewPrioritizesAllTodayImports(t *testing.T) {
 	s, _ := newTestStore(t)
 	const day = "2026-11-16"
 	setTestGoal(t, s, day, 6, 6)
@@ -31,21 +30,20 @@ func TestReviewPrioritizesOldBatchesAndReservesToday(t *testing.T) {
 	importTest(t, s, "2026-11-10", "iota, kappa")
 	importTest(t, s, day, "today first, today second, today third")
 	plan := s.planReview(day)
-	if !reflect.DeepEqual(planNames(plan.old), []string{"alpha", "beta", "gamma", "delta"}) ||
-		!reflect.DeepEqual(planNames(plan.new), []string{"today first", "today second"}) ||
-		!reflect.DeepEqual(planNames(plan.overflow), []string{"today third"}) {
+	if !reflect.DeepEqual(planNames(plan.old), []string{"alpha", "beta", "gamma"}) ||
+		!reflect.DeepEqual(planNames(plan.new), []string{"today first", "today second", "today third"}) || len(plan.overflow) != 0 {
 		t.Fatalf("unexpected allocation: old=%v today=%v overflow=%v", planNames(plan.old), planNames(plan.new), planNames(plan.overflow))
 	}
 
 	first := s.shuffleReview(day)
 	for i := 0; i < 6; i++ {
 		card := s.db.Words[s.review(day).Current.Key]
-		if (card.AddedDay == day) != (i%3 == 2) {
-			t.Fatalf("wanted two old then one new, got %q at %d", card.Key, i)
+		if (card.AddedDay == day) != (i < 3) {
+			t.Fatalf("wanted all fresh then old, got %q at %d", card.Key, i)
 		}
 		nextVote(t, s, day, true)
 	}
-	if end := s.review(day); first.Due != 6 || end.Current != nil || end.Reviewed != 6 || end.OverflowNew != 1 {
+	if end := s.review(day); first.Due != 6 || end.Current != nil || end.Reviewed != 6 || end.OverflowNew != 0 {
 		t.Fatalf("unexpected regular completion: first=%+v end=%+v", first, end)
 	}
 }
@@ -91,12 +89,12 @@ func TestReenterShufflesUnfinishedSetAndKeepsWrongWords(t *testing.T) {
 			}
 		}
 	}
-	if !seenWrong || s.review(day).Reviewed != 8 || s.review(day).OverflowNew != 1 {
+	if !seenWrong || s.review(day).Reviewed != 8 || s.review(day).OverflowNew != 0 {
 		t.Fatalf("retry or cap not preserved: seen=%t final=%+v", seenWrong, s.review(day))
 	}
 }
 
-func TestLateImportsAreExplicitSupplementAndSurviveReopen(t *testing.T) {
+func TestLateImportsAutomaticallyExceedCapAndSurviveReopen(t *testing.T) {
 	s, path := newTestStore(t)
 	const day = "2026-11-16"
 	setTestGoal(t, s, day, 6, 2)
@@ -104,15 +102,8 @@ func TestLateImportsAreExplicitSupplementAndSurviveReopen(t *testing.T) {
 	nextVote(t, s, day, true)
 	nextVote(t, s, day, true)
 	importTest(t, s, day, "one new, two new, three new, four new")
-	if end := s.review(day); end.Due != 0 || end.OverflowNew != 4 || end.Reviewed != 2 {
-		t.Fatalf("late imports silently exceeded limit: %+v", end)
-	}
-	if _, err := s.addTodaySupplement(day, 3); !errors.Is(err, errStaleSupplement) {
-		t.Fatalf("accepted stale count: %v", err)
-	}
-	state, err := s.addTodaySupplement(day, 4)
-	if err != nil || state.Due != 4 || state.OverflowNew != 0 || state.Settings.Limit != 2 {
-		t.Fatalf("supplement: %+v %v", state, err)
+	if end := s.review(day); end.Due != 4 || end.OverflowNew != 0 || end.Reviewed != 2 || end.Settings.Limit != 2 {
+		t.Fatalf("late imports not automatically admitted: %+v", end)
 	}
 	nextVote(t, s, day, false)
 	if err := s.io.Close(); err != nil {
@@ -125,13 +116,13 @@ func TestLateImportsAreExplicitSupplementAndSurviveReopen(t *testing.T) {
 	defer reopened.io.Close()
 	importTest(t, reopened, day, "another new")
 	r := reopened.shuffleReview(day)
-	if r.Due != 4 || r.OverflowNew != 1 || r.Reviewed != 3 {
+	if r.Due != 5 || r.OverflowNew != 0 || r.Reviewed != 3 {
 		t.Fatalf("reopen lost queue or authorized future imports: %+v", r)
 	}
 	for reopened.review(day).Due > 0 {
 		nextVote(t, reopened, day, true)
 	}
-	if r = reopened.review(day); r.Reviewed != 6 || r.OverflowNew != 1 {
+	if r = reopened.review(day); r.Reviewed != 7 || r.OverflowNew != 0 {
 		t.Fatalf("wrong final count: %+v", r)
 	}
 }
@@ -143,8 +134,8 @@ func TestNewWordsUseOpenPlacesAndUnlimitedHasNoOverflow(t *testing.T) {
 	importTest(t, s, day, "pear, peach, plum, orange, kiwi, grape")
 	setTestGoal(t, s, day, 6, 5)
 	p := s.planReview(day)
-	if len(p.old) != 1 || len(p.new) != 4 || p.state.OverflowNew != 2 {
-		t.Fatalf("unused old slots were not reused: %+v", p.state)
+	if len(p.old) != 0 || len(p.new) != 6 || p.state.OverflowNew != 0 {
+		t.Fatalf("new words were held back: %+v", p.state)
 	}
 	setTestGoal(t, s, day, 6, 0)
 	p = s.planReview(day)

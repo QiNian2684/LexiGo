@@ -141,11 +141,11 @@ func TestErrorsKeepOldStreakAndRetryCanPass(t *testing.T) {
 		t.Fatalf("retry graded as successful: %+v", r)
 	}
 	stats := s.stats(day)
-	today := stats.Days[6]
+	today := stats.Days[29]
 	if today.Distinct != 1 || today.Yes != 1 || today.No != 3 || stats.TotalReviews != 5 || stats.TotalForgot != 3 {
 		t.Fatalf("incorrect statistics: %+v", stats)
 	}
-	if r, err := s.undo(day); err != nil || r.Due != 1 || r.Current.Reviews != 4 || s.stats(day).Days[6].Yes != 0 {
+	if r, err := s.undo(day); err != nil || r.Due != 1 || r.Current.Reviews != 4 || s.stats(day).Days[29].Yes != 0 {
 		t.Fatalf("undo failed: %+v %v", r, err)
 	}
 }
@@ -154,7 +154,7 @@ func TestQuotaAndExtraReimport(t *testing.T) {
 	s, _ := newTestStore(t)
 	day := "2026-11-16"
 	setTestGoal(t, s, day, 6, 3)
-	importTest(t, s, day, "abundance, crucial, sophisticated, forthright, fiscal")
+	importTest(t, s, "2026-11-15", "abundance, crucial, sophisticated, forthright, fiscal")
 	if r := s.review(day); r.Due != 3 {
 		t.Fatalf("plan: %+v", r)
 	}
@@ -263,7 +263,7 @@ func TestDefaultTwentyWithRepeatedFailures(t *testing.T) {
 	for i := 0; i < 25; i++ {
 		input += fmt.Sprintf("capword%c,", 'a'+rune(i))
 	}
-	importTest(t, s, day, input)
+	importTest(t, s, "2026-11-15", input)
 	initial := s.review(day)
 	if initial.Due != 20 || initial.Settings.Limit != 20 {
 		t.Fatalf("default plan: %+v", initial)
@@ -277,7 +277,7 @@ func TestDefaultTwentyWithRepeatedFailures(t *testing.T) {
 	if current := s.review(day); current.Due != 0 || current.Reviewed != 20 || len(attempts) != 20 {
 		t.Fatalf("retries used new places: %+v", current)
 	}
-	if stats := s.stats(day); stats.TotalReviews != 100 || stats.TotalForgot != 40 || stats.Days[6].Distinct != 20 {
+	if stats := s.stats(day); stats.TotalReviews != 100 || stats.TotalForgot != 40 || stats.Days[29].Distinct != 20 {
 		t.Fatalf("unexpected statistics: %+v", stats)
 	}
 }
