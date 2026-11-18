@@ -32,6 +32,9 @@ var androidCSS []byte
 //go:embed assets/stats-chart.js
 var statsChartJS []byte
 
+//go:embed assets/celebration.js
+var celebrationJS []byte
+
 //go:embed assets/app.js
 var appJS []byte
 
@@ -253,6 +256,7 @@ func (a *application) handler() http.Handler {
 	mux.HandleFunc("GET /app.css", asset("text/css; charset=utf-8", appCSS))
 	mux.HandleFunc("GET /app.js", asset("text/javascript; charset=utf-8", appJS))
 	mux.HandleFunc("GET /stats-chart.js", asset("text/javascript; charset=utf-8", statsChartJS))
+	mux.HandleFunc("GET /celebration.js", asset("text/javascript; charset=utf-8", celebrationJS))
 	mux.HandleFunc("GET /favicon.png", asset("image/png", favicon))
 	mux.HandleFunc("GET /licenses", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")

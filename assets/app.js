@@ -20,6 +20,7 @@ let settingsOffset = 0;
 let studying = false;
 let busy = false;
 let swiping = false;
+let celebratedDay;
 let editTimer, editJob;
 let settingsDraft, settingsJob, settingsSaved;
 let savedNote = "";
@@ -122,14 +123,13 @@ function renderReview() {
   el("day-meter").max = Math.max(1, next.planned);
   el("day-meter").value = next.remembered;
   el("review-empty").removeAttribute("aria-busy");
-  el("session-tools").hidden = !studying && !practice;
-  el("undo").hidden = !!practice;
-  el("undo").disabled = !next.canUndo || busy;
-  el("stop-review").disabled = busy || swiping;
-  el("stop-review").textContent = practice ? "返回词库" : "结束本次复习";
+  el("session-tools").hidden = !studying || !!practice;
+  el("undo").disabled = !next.canUndo || busy || swiping;
   const waiting = !practice && next.waitingForNext;
-  el("session-hint").textContent = practice ? "提前查看这张卡片。复习进度保留。"
-    : waiting ? "1 下一单词" : "Enter 查看释义 · 1 没记住 · 2 记住了";
+  el("session-hint").textContent = next.current
+    ? waiting ? "1 下一单词" : "Enter 查看释义 · 1 没记住 · 2 记住了"
+    : "";
+  el("session-hint").hidden = !next.current;
   el("forgot-label").textContent = waiting ? "下一单词" : "没记住";
   el("vote-actions").classList.toggle("awaiting-next", !!waiting);
   const concealed = el("answer").hidden;
@@ -155,14 +155,14 @@ function renderReview() {
   }
   if (!next.current) {
     if (!next.total) empty("词库还是空的", "先添加一批单词，再开始复习。", "add");
-    else if (next.total === next.mastered) empty("词库里的单词都掌握了", "可以在词库提前查看，也可以选词重新学习。", "library");
-    else empty("今天的复习已完成", "下次打开时，可以接着复习还没有掌握的单词。", "");
+    else if (next.total === next.mastered && !next.remembered) empty("词库里的单词都掌握了", "可以在词库提前查看，也可以选词重新学习。", "library");
+    else empty("今天的复习已完成", "", "");
   }
 }
 
 function empty(title, text, action) {
   el("empty-title").textContent = title;
-  el("empty-text").textContent = text;
+  message("empty-text", text);
   el("empty-action").hidden = !action;
   if (action) {
     el("empty-action").textContent = {add: "添加单词", library: "打开词库"}[action];
@@ -369,14 +369,20 @@ async function vote(remembered, fromSwipe = false) {
   busy = true;
   el("forgot").disabled = el("pass").disabled = true;
   showError();
+  let completed = false;
   try {
     await flushNote();
-    const current = state.current;
+    const {current, date} = state;
     const result = await api("/api/vote", {
-      key: current.key, reviews: current.reviews, order: current.order, date: state.date, remembered, stay: !remembered,
+      key: current.key, reviews: current.reviews, order: current.order, date, remembered, stay: !remembered,
     });
     applyState(result, remembered);
     if (remembered) el("review-title").scrollIntoView({block: "nearest"});
+    if (remembered && result.dayPassed && result.date === date && result.due === 0 &&
+        !result.current && !result.waitingForNext && celebratedDay !== date) {
+      celebratedDay = date;
+      completed = true;
+    }
   } catch (error) {
     if (error.status === 409) await refreshState().catch(() => {});
     showError(error);
@@ -385,6 +391,7 @@ async function vote(remembered, fromSwipe = false) {
     renderReview();
     if (state?.current && studying) (state.waitingForNext ? el("forgot") : el("reveal")).focus({preventScroll: true});
   }
+  if (completed && view === "review") window.WordReviewCelebrate(el("review-empty"));
 }
 
 async function undo() {
@@ -1045,12 +1052,12 @@ async function refreshRecovery() {
 
 async function pickTransfer(kind) {
   const opening = kind === "import";
-  const trigger = el("transfer-" + kind);
   message("settings-status");
   if (window.WordReviewFiles) {
     window.WordReviewFiles.pickFile(kind, "");
     return;
   }
+  const trigger = el("transfer-" + kind);
   trigger.disabled = true;
   try {
     const path = opening ? "open" : kind === "recovery" ? "recovery" : "save";
@@ -1061,9 +1068,7 @@ async function pickTransfer(kind) {
 }
 
 if (mobile) {
-  el("transfer-share").hidden = !window.WordReviewFiles;
-  el("transfer-export-label").textContent = "保存到本机";
-  el("transfer-guide").textContent = "可直接分享数据，也可先保存到本机，再把文件发到另一台设备导入。";
+  el("transfer-guide").textContent = "在「导出数据」中选择分享或保存，再到另一台设备导入。";
   window.wordReviewFlushNote = flushOnHide;
   window.wordReviewResume = () => refreshState().catch(showError);
   window.wordReviewSpeechChanged = updateVoice;
@@ -1167,7 +1172,6 @@ function keyboard(event) {
 }
 
 if (windowsReview) {
-  el("review-view").append(el("session-tools"));
   document.body.append(el("vote-actions"));
   let noteWidth;
   new ResizeObserver(([entry]) => {
@@ -1203,7 +1207,6 @@ for (const form of all("form[data-validation]")) {
 }
 
 if (mobile) {
-  el("review-view").append(el("session-tools"));
   const textField = "textarea, input[type=text], input[type=search], input[type=number], [contenteditable]";
   const viewport = window.visualViewport;
   let nativeKeyboard;
@@ -1338,9 +1341,19 @@ el("settings-form").addEventListener("keydown", event => {
   event.preventDefault();
   event.target.blur();
 });
-el("transfer-export").onclick = () => pickTransfer("export");
+const exportData = el("transfer-export");
+if (mobile && window.WordReviewFiles) {
+  exportData.setAttribute("aria-haspopup", "menu");
+  exportData.setAttribute("aria-expanded", "false");
+  exportData.setAttribute("aria-controls", "popup-list");
+  exportData.onclick = () => controls.context(exportData, "导出数据", [
+    {label: "分享数据", icon: "upload", pick: () => pickTransfer("share")},
+    {label: "保存到手机", icon: "download", pick: () => pickTransfer("export")},
+  ]);
+} else {
+  exportData.onclick = () => pickTransfer("export");
+}
 el("transfer-import").onclick = () => pickTransfer("import");
-el("transfer-share").onclick = () => pickTransfer("share");
 el("transfer-recovery").onclick = () => pickTransfer("recovery");
 el("download-backup").onclick = event => {
   if (window.WordReviewFiles) {
@@ -1352,7 +1365,6 @@ el("pick-restore").onclick = () => el("restore-file").click();
 el("restore-file").onchange = restoreFile;
 el("start-review").onclick = startReview;
 el("undo").onclick = undo;
-el("stop-review").onclick = stopReview;
 el("reveal").onclick = toggleReveal;
 el("forgot").onclick = () => state?.waitingForNext ? nextCard() : vote(false);
 el("pass").onclick = () => vote(true);

@@ -1,0 +1,112 @@
+(() => {
+  "use strict";
+
+  const colors = ["#F2C66D", "#E9A45B", "#DF8957", "#CC655D"];
+  const motion = matchMedia("(prefers-reduced-motion: reduce)");
+  const range = (start, end) => start + Math.random() * (end - start);
+  let stopCurrent;
+
+  window.WordReviewCelebrate = card => {
+    stopCurrent?.();
+    if (motion.matches || document.hidden || !card.getClientRects().length) return;
+
+    const bounds = card.getBoundingClientRect();
+    const width = document.documentElement.clientWidth;
+    const height = document.documentElement.clientHeight;
+    if (width <= 0 || height <= 0 || bounds.bottom <= 0 || bounds.top >= height) return;
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    canvas.className = "completion-ink";
+    canvas.setAttribute("aria-hidden", "true");
+    // Limit the backing surface on both high-DPI phones and large displays.
+    const scale = Math.min(devicePixelRatio || 1, 2, Math.sqrt(3000000 / (width * height)));
+    canvas.width = Math.round(width * scale);
+    canvas.height = Math.round(height * scale);
+    context.scale(canvas.width / width, canvas.height / height);
+
+    const count = Math.random() < .52 ? 3 : 4;
+    const columns = Array.from({length: count}, (_, index) => index);
+    const compact = width < 560;
+    const distance = compact ? .79 : 1;
+    const gravity = compact ? 210 : 263;
+    let delay = 0;
+    const bursts = [];
+    for (let index = 0; index < count; index++) {
+      // Each burst occupies a different randomly selected column in the middle two thirds.
+      const column = columns.splice(Math.floor(Math.random() * columns.length), 1)[0];
+      const x = bounds.left + bounds.width * (1 / 6 + (column + range(.12, .88)) * 2 / (3 * count));
+      const y = bounds.top + bounds.height * range(1 / 6, 5 / 6);
+      const size = (compact ? 15 : 18) + Math.floor(Math.random() * 3);
+      const rotation = range(0, Math.PI * 2);
+      const particles = Array.from({length: size}, (_, i) => {
+        const angle = rotation + (i + range(-.3, .3)) * Math.PI * 2 / size;
+        const speed = range(105, 295) * distance;
+        return {
+          x: Math.cos(angle), y: Math.sin(angle), speed,
+          lifetime: range(.96, 1.23), weight: range(.85, 2.2),
+          trail: Math.random() < .42 ? range(2, 6) : 0,
+          color: colors[Math.floor(Math.random() * colors.length)],
+        };
+      });
+      bursts.push({x, y, delay, particles});
+      delay += range(.11, .16);
+    }
+
+    const start = performance.now();
+    const end = bursts.at(-1).delay + 1.23;
+    let frame;
+    let timeout;
+    function stop() {
+      cancelAnimationFrame(frame);
+      clearTimeout(timeout);
+      window.removeEventListener("resize", stop);
+      document.removeEventListener("visibilitychange", stop);
+      canvas.remove();
+      if (stopCurrent === stop) stopCurrent = undefined;
+    }
+    stopCurrent = stop;
+    window.addEventListener("resize", stop, {once: true});
+    document.addEventListener("visibilitychange", stop, {once: true});
+    document.body.append(canvas);
+
+    function draw(timestamp) {
+      const seconds = (timestamp - start) / 1000;
+      if (seconds >= end || motion.matches || !card.getClientRects().length) {
+        stop();
+        return;
+      }
+      context.clearRect(0, 0, width, height);
+      for (const burst of bursts) {
+        const t = seconds - burst.delay;
+        if (t < 0) continue;
+        const distance = (1 - Math.exp(-2.15 * t)) / 2.15;
+        const drop = .5 * gravity * t * t;
+        for (const particle of burst.particles) {
+          if (t >= particle.lifetime) continue;
+          const travel = particle.speed * distance;
+          const x = burst.x + particle.x * travel;
+          const y = burst.y + particle.y * travel + drop;
+          context.globalAlpha = .91 * (1 - Math.pow(t / particle.lifetime, 1.35));
+          context.beginPath();
+          if (particle.trail) {
+            const trail = particle.trail * (1 - t / particle.lifetime);
+            context.moveTo(x - particle.x * trail, y - particle.y * trail);
+            context.lineTo(x, y);
+            context.lineCap = "round";
+            context.lineWidth = particle.weight;
+            context.strokeStyle = particle.color;
+            context.stroke();
+          } else {
+            context.arc(x, y, particle.weight, 0, Math.PI * 2);
+            context.fillStyle = particle.color;
+            context.fill();
+          }
+        }
+      }
+      frame = requestAnimationFrame(draw);
+    }
+    frame = requestAnimationFrame(draw);
+    timeout = setTimeout(stop, 1800);
+  };
+})();

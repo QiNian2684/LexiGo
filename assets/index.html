@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="/app.css">
   <script src="/controls.js" defer></script>
   <script src="/stats-chart.js" defer></script>
+  <script src="/celebration.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body data-view="review">
@@ -47,10 +48,6 @@
         <p id="start-summary"></p>
         <button class="button primary" type="button" id="start-review">开始复习<svg class="icon" aria-hidden="true"><use href="/icons.svg#right"/></svg></button>
       </section>
-      <div class="session-tools" id="session-tools" hidden>
-        <span id="session-hint">空格查看释义 · 1 没记住 · 2 记住了</span>
-        <div><button class="quiet" type="button" id="undo">撤销上一次</button><button class="quiet" type="button" id="stop-review">结束本次复习</button></div>
-      </div>
       <article class="card review-card" id="flashcard" hidden>
         <div class="swipe-content" id="swipe-content"><div class="card-front">
           <h2 class="english-word" id="word" lang="en"></h2>
@@ -85,9 +82,13 @@
       <article class="card empty-state" id="review-empty" aria-busy="true">
         <div class="state-symbol"><svg class="icon" aria-hidden="true"><use href="/icons.svg#review"/></svg></div>
         <h2 id="empty-title">正在加载…</h2>
-        <p id="empty-text"></p>
+        <p id="empty-text" hidden></p>
         <button class="button primary" type="button" id="empty-action" hidden></button>
       </article>
+      <div class="session-tools" id="session-tools" hidden>
+        <span id="session-hint">Enter 查看释义 · 1 没记住 · 2 记住了</span>
+        <button class="quiet" type="button" id="undo">撤销上一次</button>
+      </div>
     </section>
 
     <section id="add-view" aria-labelledby="add-title" hidden>
@@ -97,7 +98,7 @@
         <p class="help" id="import-help">用英文逗号隔开，或每行一个。再次录入已存在的词会重置它的学习进度，确认前可预览。</p>
         <textarea rows="7" id="add-input" aria-describedby="import-help" placeholder="crucial, abundance, sophisticated, forthright" required spellcheck="false"></textarea>
         <div class="import-actions">
-          <button class="button outline" type="button" id="pick-txt"><svg class="icon" aria-hidden="true"><use href="/icons.svg#file"/></svg>读取词表文件</button>
+          <button class="button outline" type="button" id="pick-txt"><svg class="icon" aria-hidden="true"><use href="/icons.svg#file"/></svg>导入TXT文件</button>
           <input id="txt-file" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" hidden>
           <button class="button primary" type="submit" id="add-submit">预览导入<svg class="icon" aria-hidden="true"><use href="/icons.svg#right"/></svg></button>
         </div>
@@ -212,7 +213,7 @@
               <div class="setting-text"><label for="goal">长期掌握所需过关天数</label><p>新门槛在下一次当天过关时检查。</p></div>
               <div class="number-unit"><input type="number" inputmode="numeric" min="1" max="99" step="1" id="goal" required><span aria-hidden="true">天</span></div>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" id="exam-mode-row">
               <div class="setting-text"><label for="exam-mode">考试日期</label><p>按设备本地日历倒计时。</p></div>
               <div class="setting-control">
                 <select id="exam-mode" data-styled><option value="annual">每年循环</option><option value="fixed">指定日期</option></select>
@@ -257,14 +258,11 @@
             <header><h2 id="data-title">数据管理</h2><p>存储位置 <code id="storage-path">Data&#92;vocabulary.db</code></p></header>
             <div class="data-actions">
               <h3>跨设备迁移</h3>
-              <button class="settings-operation" id="transfer-share" type="button" hidden>
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg#upload"/></svg><span>分享数据</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
-              </button>
               <button class="settings-operation" id="transfer-export" type="button">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg><span id="transfer-export-label">导出数据</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#upload"/></svg><span>导出数据</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
               </button>
               <button class="settings-operation" id="transfer-import" type="button">
-                <svg class="icon" aria-hidden="true"><use href="/icons.svg#upload"/></svg><span>导入数据</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg><span>导入数据</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
               </button>
               <button class="settings-operation" id="transfer-recovery" type="button" hidden>
                 <svg class="icon" aria-hidden="true"><use href="/icons.svg#history"/></svg><span>导出覆盖前备份</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
@@ -286,11 +284,10 @@
           </section>
         </div>
       </div>
+      <footer class="settings-footer">
+        <a href="/licenses" id="open-licenses">第三方许可</a>
+      </footer>
     </section>
-
-    <footer class="app-footer">
-      <a href="/licenses" id="open-licenses">第三方许可</a>
-    </footer>
   </main>
 
   <dialog id="edit-dialog" aria-labelledby="edit-title">

@@ -64,7 +64,7 @@ body.platform-android {
 .platform-android .review-heading { align-items: flex-start; }
 .platform-android .review-heading h1.exam-countdown { font-size: clamp(1.1rem, 4.6vw, 1.4rem); }
 .platform-android .study-summary { min-width: 5.2rem; max-width: 8rem; align-self: flex-start; margin-top: .22rem; font-size: .78rem; }
-.platform-android .session-tools { justify-content: flex-end; margin: .55rem 0 0; }
+.platform-android .session-tools { margin-block-start: .55rem; }
 .platform-android #session-hint, .platform-android .card-actions kbd, .platform-android .desktop-data-copy { display: none; }
 .platform-android .review-card { overflow: visible; }
 .platform-android .card-front { min-height: 0; padding: 2rem .92rem 1.25rem; row-gap: .64rem; }
@@ -104,7 +104,6 @@ body.platform-android {
 .platform-android.editing-input .shell { padding-bottom: .85rem; }
 .platform-android textarea:focus, .platform-android input:focus { scroll-margin-block-end: .8rem; }
 .platform-android .empty-state { min-height: 14.25rem; padding: 2.15rem .9rem; }
-.platform-android .app-footer { margin-top: 1.42rem; font-size: .75rem; }
 
 .platform-android .section-card { padding: 1rem; }
 .platform-android #add-input { min-height: 9.5rem; }
@@ -145,6 +144,9 @@ body.platform-android {
 .platform-android .setting-row { min-height: 3.4rem; padding-block: .58rem; }
 .platform-android .setting-control { width: clamp(7.55rem, 35vw, 10rem); }
 .platform-android .setting-text label { font-size: .94rem; }
+.platform-android #exam-fixed-row { grid-template-columns: minmax(0, 1fr); gap: .42rem; }
+.platform-android #exam-fixed-row .setting-control { width: 100%; }
+.platform-android #exam-fixed { font-variant-numeric: tabular-nums; }
 .platform-android .number-unit { width: 4.5rem; }
 .platform-android .theme-segments label > span { min-height: 3rem; }
 .platform-android .settings-actions { margin: -.05rem 0 .28rem; }
@@ -195,4 +197,10 @@ body.platform-android {
   .platform-android .theme-segments .icon { display: none; }
   .platform-android .word-row { gap: .23rem; }
   .platform-android .dialog-footer .button { padding-inline: .5rem; }
+}
+
+
+@media (max-width: 24rem) {
+  .platform-android #exam-mode-row { grid-template-columns: minmax(0, 1fr); gap: .42rem; }
+  .platform-android #exam-mode-row .setting-control { width: 100%; }
 }
