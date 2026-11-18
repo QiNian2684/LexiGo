@@ -20,7 +20,6 @@ let settingsOffset = 0;
 let studying = false;
 let busy = false;
 let swiping = false;
-let celebratedDay;
 let editTimer, editJob;
 let settingsDraft, settingsJob, settingsSaved;
 let savedNote = "";
@@ -156,11 +155,12 @@ function renderReview() {
   if (!next.current) {
     if (!next.total) empty("词库还是空的", "先添加一批单词，再开始复习。", "add");
     else if (next.total === next.mastered && !next.remembered) empty("词库里的单词都掌握了", "可以在词库提前查看，也可以选词重新学习。", "library");
-    else empty("今天的复习已完成", "", "");
+    else empty("今天的复习任务已完成！", "", "", true);
   }
 }
 
-function empty(title, text, action) {
+function empty(title, text, action, complete = false) {
+  el("review-empty").classList.toggle("is-day-complete", complete);
   el("empty-title").textContent = title;
   message("empty-text", text);
   el("empty-action").hidden = !action;
@@ -372,17 +372,15 @@ async function vote(remembered, fromSwipe = false) {
   let completed = false;
   try {
     await flushNote();
-    const {current, date} = state;
+    const {current, date, due, planned, remembered: passed} = state;
     const result = await api("/api/vote", {
       key: current.key, reviews: current.reviews, order: current.order, date, remembered, stay: !remembered,
     });
     applyState(result, remembered);
     if (remembered) el("review-title").scrollIntoView({block: "nearest"});
-    if (remembered && result.dayPassed && result.date === date && result.due === 0 &&
-        !result.current && !result.waitingForNext && celebratedDay !== date) {
-      celebratedDay = date;
-      completed = true;
-    }
+    completed = remembered && result.dayPassed && result.date === date &&
+      due > 0 && passed < planned && result.planned > 0 && result.remembered === result.planned &&
+      result.due === 0 && !result.current && !result.waitingForNext;
   } catch (error) {
     if (error.status === 409) await refreshState().catch(() => {});
     showError(error);
@@ -1319,7 +1317,6 @@ for (const item of all("[data-close]")) item.addEventListener("click", () => {
   if (dialog.id === "edit-dialog") closeEditor();
   else dialog.close();
 });
-el("settings-back").onclick = closeSettings;
 el("open-licenses").onclick = async event => {
   event.preventDefault();
   try {

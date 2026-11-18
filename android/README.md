@@ -22,6 +22,6 @@ bash android/build-android.sh dist/WordReview.apk
 
 可把签名后的 APK 发到手机，通过系统文件管理器安装。按系统提示为发起安装的应用允许安装未知应用。也可在连接已授权的测试设备后执行 `adb install -r dist/WordReview.apk`。
 
-1.11.0 与已发布的 1.10.0 APK 同包名、同签名，可直接覆盖安装。仍在使用 1.9.0 或更早旧签名版时，先导出完整学习数据并确认 JSON 已保存到应用外，再卸载旧版、安装新版并导入。自行构建如需覆盖升级，可通过 `WORDREVIEW_KEYSTORE` 和 `WORDREVIEW_KEY_ALIAS` 沿用已安装版本的签名库。
+2.0.0 与已发布的 1.11.0 和 1.10.0 APK 同包名、同签名，可直接覆盖安装。仍在使用 1.9.0 或更早旧签名版时，先导出完整学习数据并确认 JSON 已保存到应用外，再卸载旧版、安装新版并导入。自行构建如需覆盖升级，可通过 `WORDREVIEW_KEYSTORE` 和 `WORDREVIEW_KEY_ALIAS` 沿用已安装版本的签名库。
 
 Android 通过系统分享面板发送实际的 `application/json` 文件。系统只向接收应用授予临时读取权限。私有缓存中超过三天的共享文件会在下次启动或分享时清理。「导出数据 → 保存到手机」沿用系统文件选择器。

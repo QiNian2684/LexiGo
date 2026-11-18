@@ -149,6 +149,15 @@ body:not(.platform-android) .swipe-cue { display: none; }
   color: var(--accent); background: var(--accent-soft); border-radius: .9rem;
 }
 .state-symbol .icon { width: 1.55rem; height: 1.55rem; }
+#review-empty.is-day-complete {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-4);
+}
+#review-empty.is-day-complete .state-symbol { margin: 0; }
+#review-empty.is-day-complete #empty-title { max-width: 100%; overflow-wrap: anywhere; }
 #review-empty[aria-busy="true"] .state-symbol .icon { visibility: hidden; }
 #review-empty[aria-busy="true"] .state-symbol::after {
   content: "";
