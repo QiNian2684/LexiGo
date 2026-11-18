@@ -144,9 +144,27 @@ body.platform-android {
 .platform-android .setting-row { min-height: 3.4rem; padding-block: .58rem; }
 .platform-android .setting-control { width: clamp(7.55rem, 35vw, 10rem); }
 .platform-android .setting-text label { font-size: .94rem; }
-.platform-android #exam-fixed-row { grid-template-columns: minmax(0, 1fr); gap: .42rem; }
-.platform-android #exam-fixed-row .setting-control { width: 100%; }
+.platform-android :is(#exam-annual-row, #exam-fixed-row) { grid-template-columns: minmax(0, 1fr); gap: .42rem; }
+.platform-android :is(#exam-annual-row, #exam-fixed-row) .setting-control { width: 100%; }
 .platform-android #exam-fixed { font-variant-numeric: tabular-nums; }
+.platform-android .exam-annual {
+  display: flex; align-items: center; gap: min(.5rem, 2vw);
+  min-height: var(--control); padding: .5rem .7rem;
+  background: var(--input, var(--raised)); border: 1px solid var(--control-line);
+  border-radius: var(--radius-control); font-size: 1rem; line-height: 1.4;
+}
+.platform-android .exam-annual label { display: flex; align-items: center; gap: .04em; font-size: inherit; }
+.platform-android .exam-annual label span { font-size: .875em; }
+.platform-android .exam-annual :is(#exam-month, #exam-day) {
+  order: -1; width: 1.5em; min-height: 0; padding: 0 .06em;
+  background: transparent; border: 0; border-radius: var(--radius-small);
+}
+.platform-android .exam-annual:focus-within { border-color: var(--focus); }
+.platform-android .exam-annual:has([aria-invalid="true"]) { border-color: var(--danger); }
+.platform-android .exam-annual > .icon {
+  display: block; width: min(1rem, 18px); height: min(1rem, 18px);
+  margin-inline-start: auto; color: var(--muted);
+}
 .platform-android .number-unit { width: 4.5rem; }
 .platform-android .theme-segments label > span { min-height: 3rem; }
 .platform-android .settings-actions { margin: -.05rem 0 .28rem; }
@@ -192,6 +210,11 @@ body.platform-android {
 .platform-android .popup-item[aria-selected="true"] { margin-block: .07rem; }
 @media (max-width: 360px) {
   .platform-android .shell { padding-inline: .67rem; }
+  .platform-android :is(.exam-annual, #exam-fixed) { padding-inline: .34rem; }
+  .platform-android #exam-fixed::-webkit-calendar-picker-indicator {
+    width: clamp(14px, 4.5vw, 18px); height: 1em;
+    margin-inline-start: .18em; padding: 0;
+  }
   .platform-android .settings-group header { padding-inline: .72rem; }
   .platform-android .setting-row, .platform-android .theme-field { margin-inline: .72rem; }
   .platform-android .theme-segments .icon { display: none; }

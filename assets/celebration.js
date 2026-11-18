@@ -24,39 +24,46 @@
     canvas.height = Math.round(height * scale);
     context.scale(canvas.width / width, canvas.height / height);
 
-    const count = Math.random() < .52 ? 3 : 4;
+    const android = document.body.classList.contains("platform-android");
+    const cardWidth = Math.min(width, bounds.width);
+    const desktopRoom = android ? 0 : Math.max(0, Math.min(1, (cardWidth - 480) / 330, (height - 440) / 210));
+    const fullDesktop = desktopRoom >= .55;
+    const count = (fullDesktop ? 7 : 5) + Math.floor(Math.random() * (android ? 2 : 3));
     const columns = Array.from({length: count}, (_, index) => index);
-    const compact = width < 560;
-    const spread = compact ? .9 : 1.09;
+    const room = Math.max(.84, Math.min(1, cardWidth / (android ? 300 : 465), height / 470, bounds.height / 210));
+    const spread = room * (android ? 1.12 : 1.24 + .25 * desktopRoom);
     const colors = document.documentElement.dataset.theme === "dark"
       ? ["#FFD45F", "#FFAA47", "#F6794C", "#ED6256"]
       : ["#E9A019", "#F48921", "#F36B3B", "#E65245"];
-    const gravity = compact ? 210 : 263;
+    const gravity = android ? 132 : 150 + 35 * desktopRoom;
+    const interval = .52 / (count - 1);
+    const weight = android ? 1 : 1 + .14 * desktopRoom;
     let delay = 0;
     const bursts = [];
     for (let index = 0; index < count; index++) {
       // Each burst occupies a different randomly selected column in the middle two thirds.
       const column = columns.splice(Math.floor(Math.random() * columns.length), 1)[0];
-      const x = bounds.left + bounds.width * (1 / 6 + (column + range(.12, .88)) * 2 / (3 * count));
-      const y = bounds.top + bounds.height * range(1 / 6, 5 / 6);
-      const size = (compact ? 15 : 18) + Math.floor(Math.random() * 3);
+      const x = bounds.left + bounds.width * (1 / 6 + (column + range(.18, .82)) * 2 / (3 * count));
+      const y = bounds.top + bounds.height * (column % 2 ? range(.18, .54) : range(.46, .82));
+      const size = (fullDesktop ? 16 : 13) + Math.floor(Math.random() * 3);
       const rotation = range(0, Math.PI * 2);
       const particles = Array.from({length: size}, (_, i) => {
         const angle = rotation + (i + range(-.3, .3)) * Math.PI * 2 / size;
         const speed = range(105, 295) * spread;
         return {
           x: Math.cos(angle), y: Math.sin(angle), speed,
-          lifetime: range(.96, 1.23), weight: range(1.25, 2.85),
+          lifetime: range(1.39, 1.72), weight: range(1.25, 2.85) * weight,
           trail: Math.random() < .42 ? range(2.3, 6.6) : 0,
           color: colors[Math.floor(Math.random() * colors.length)],
         };
       });
       bursts.push({x, y, delay, particles});
-      delay += range(.11, .16);
+      delay += interval * range(.86, 1.06);
     }
 
     const start = performance.now();
-    const end = bursts.at(-1).delay + 1.23;
+    const end = Math.max(...bursts.map(({delay, particles}) =>
+      delay + Math.max(...particles.map(particle => particle.lifetime))));
     let frame;
     let timeout;
     function stop() {
@@ -109,6 +116,6 @@
       frame = requestAnimationFrame(draw);
     }
     frame = requestAnimationFrame(draw);
-    timeout = setTimeout(stop, 1800);
+    timeout = setTimeout(stop, Math.ceil(end * 1000) + 150);
   };
 })();

@@ -521,6 +521,7 @@ td:first-child, th:first-child { min-width: 7.4rem; }
 .setting-control { width: clamp(8rem, 17vw, 10.45rem); }
 .exam-annual { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; }
 .exam-annual label { color: var(--muted); font-size: .8rem; }
+.exam-annual > .icon { display: none; }
 #custom-limit { margin-top: .45rem; }
 .number-unit { position: relative; display: flex; align-items: center; width: 5.15rem; }
 .number-unit span { position: absolute; right: .68rem; color: var(--muted); font-size: .83rem; pointer-events: none; }

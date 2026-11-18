@@ -219,10 +219,11 @@
               </div>
             </div>
             <div class="setting-row" id="exam-annual-row">
-              <div class="setting-text">每年考试日</div>
-              <div class="setting-control exam-annual">
-                <label>月<input id="exam-month" type="number" inputmode="numeric" min="1" max="12" step="1"></label>
-                <label>日<input id="exam-day" type="number" inputmode="numeric" min="1" max="31" step="1"></label>
+              <div class="setting-text" id="exam-annual-label">每年考试日</div>
+              <div class="setting-control exam-annual" role="group" aria-labelledby="exam-annual-label">
+                <label><span>月</span><input id="exam-month" type="number" inputmode="numeric" min="1" max="12" step="1"></label>
+                <label><span>日</span><input id="exam-day" type="number" inputmode="numeric" min="1" max="31" step="1"></label>
+                <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#calendar"/></svg>
               </div>
             </div>
             <div class="setting-row" id="exam-fixed-row" hidden>
