@@ -1,0 +1,351 @@
+package main
+
+import (
+	"errors"
+	"math/rand/v2"
+	"slices"
+	"sort"
+)
+
+type reviewState struct {
+	Date        string        `json:"date"`
+	Exam        examCountdown `json:"exam"`
+	Settings    settings      `json:"settings"`
+	Due         int           `json:"due"`
+	OverflowNew int           `json:"overflowNew"`
+	Reviewed    int           `json:"reviewed"`
+	Remembered  int           `json:"remembered"`
+	Planned     int           `json:"planned"`
+	Total       int           `json:"total"`
+	Mastered    int           `json:"mastered"`
+	CanUndo     bool          `json:"canUndo"`
+	Current     *cardFace     `json:"current"`
+	Waiting     bool          `json:"waitingForNext,omitempty"`
+}
+
+type cardFace struct {
+	Key         string `json:"key"`
+	Word        string `json:"word"`
+	Streak      int    `json:"streak"`
+	DailyCount  int    `json:"dailyCount"`
+	DailyTarget int    `json:"dailyTarget"`
+	Reviews     int    `json:"reviews"`
+	Order       uint64 `json:"order"`
+}
+
+const (
+	minTargetGap      = 13
+	maxTargetGap      = 17
+	repeatGapDeadline = 18
+	distinctGapGoal   = 12
+)
+
+type attendance struct {
+	lastShown map[uint64]int
+	regular   map[uint64]bool
+	credited  map[uint64]bool
+	votes     int
+	recent    [repeatGapDeadline]uint64
+}
+
+func (s *store) attendance(day string) attendance {
+	result := attendance{
+		lastShown: make(map[uint64]int),
+		regular:   make(map[uint64]bool), credited: make(map[uint64]bool),
+	}
+	for _, item := range s.db.Events {
+		if item.Day != day || item.Legacy || item.Undone || item.Practice || (item.Kind != "yes" && item.Kind != "no") {
+			continue
+		}
+		result.recent[result.votes%len(result.recent)] = item.Card
+		result.votes++
+		if item.Credit {
+			result.credited[item.Card] = true
+		}
+		if result.lastShown[item.Card] == 0 && !item.Extra {
+			result.regular[item.Card] = true
+		}
+		result.lastShown[item.Card] = result.votes
+	}
+	return result
+}
+
+func (a attendance) hasVarietySince(last, wanted int) bool {
+	if wanted <= 0 {
+		return true
+	}
+	// The caller only checks positions inside the retained history window.
+	var seen [repeatGapDeadline]uint64
+	distinct := 0
+	for index := last; index < a.votes; index++ {
+		id := a.recent[index%len(a.recent)]
+		if id == 0 || slices.Contains(seen[:distinct], id) {
+			continue
+		}
+		seen[distinct] = id
+		distinct++
+		if distinct >= wanted {
+			return true
+		}
+	}
+	return false
+}
+
+type reviewPlan struct {
+	state    reviewState
+	old      []*wordCard
+	new      []*wordCard
+	overflow []*wordCard
+	extras   []*wordCard
+	repeats  []*wordCard
+	session  attendance
+}
+
+func importOrder(a, b *wordCard) bool {
+	if a.AddedDay != b.AddedDay {
+		return a.AddedDay < b.AddedDay
+	}
+	return a.ID < b.ID
+}
+
+func (s *store) planReview(day string) reviewPlan {
+	session := s.attendance(day)
+	plan := reviewPlan{
+		state:   reviewState{Date: day, Exam: countdown(day, s.db.Settings.ExamDate), Settings: s.db.Settings, Reviewed: len(session.lastShown)},
+		session: session,
+	}
+	usedNew := 0
+	for _, card := range s.db.Words {
+		if card.AddedDay == day && session.regular[card.ID] {
+			usedNew++
+		}
+		if card.Deleted {
+			continue
+		}
+		plan.state.Total++
+		if card.passedOn(day) {
+			plan.state.Remembered++
+		}
+		if card.Mastered {
+			plan.state.Mastered++
+		}
+		if card.Mastered || card.passedOn(day) || card.DailyDay > day {
+			continue
+		}
+		switch {
+		case session.lastShown[card.ID] > 0:
+			plan.repeats = append(plan.repeats, card)
+		case card.ExtraDay == day:
+			plan.extras = append(plan.extras, card)
+		case card.AddedDay == day:
+			plan.new = append(plan.new, card)
+		default:
+			plan.old = append(plan.old, card)
+		}
+	}
+	sort.Slice(plan.old, func(i, j int) bool { return importOrder(plan.old[i], plan.old[j]) })
+	sort.Slice(plan.new, func(i, j int) bool { return plan.new[i].ID < plan.new[j].ID })
+	sort.Slice(plan.extras, func(i, j int) bool { return plan.extras[i].Order < plan.extras[j].Order })
+	sort.Slice(plan.repeats, func(i, j int) bool {
+		return session.lastShown[plan.repeats[i].ID] < session.lastShown[plan.repeats[j].ID]
+	})
+	if limit := s.db.Settings.Limit; limit != 0 {
+		remaining := max(0, limit-len(session.regular))
+		// One third, rounded up, goes to today's imports while older words wait.
+		// Unused places on either side go to the other side.
+		reservedNew := max(0, (limit+2)/3-usedNew)
+		newCount := min(len(plan.new), remaining, reservedNew)
+		oldCount := min(len(plan.old), remaining-newCount)
+		newCount = min(len(plan.new), remaining-oldCount)
+		plan.old = plan.old[:oldCount]
+		plan.overflow = plan.new[newCount:]
+		plan.new = plan.new[:newCount]
+	}
+	plan.state.Due = len(plan.old) + len(plan.new) + len(plan.extras) + len(plan.repeats)
+	plan.state.OverflowNew = len(plan.overflow)
+	plan.state.Planned = plan.state.Remembered + plan.state.Due
+	return plan
+}
+
+type reviewDisplay struct {
+	day                 string
+	ranks               map[uint64]int
+	undoCard, undoOrder uint64
+}
+
+// Prior ranks are considered only to avoid giving the exact same order back
+// when a group of unfinished cards can be shown in more than one order.
+func shuffleGroup(group []*wordCard, prior map[uint64]int) {
+	rand.Shuffle(len(group), func(i, j int) { group[i], group[j] = group[j], group[i] })
+	if len(group) < 2 {
+		return
+	}
+	last := 0
+	for _, card := range group {
+		rank := prior[card.ID]
+		if rank <= last {
+			return
+		}
+		last = rank
+	}
+	group[0], group[1] = group[1], group[0]
+}
+
+func presentationOrder(plan reviewPlan, prior map[uint64]int) []*wordCard {
+	old, fresh := slices.Clone(plan.old), slices.Clone(plan.new)
+	extras := slices.Clone(plan.extras)
+	for start := 0; start < len(old); {
+		end := start + 1
+		for end < len(old) && end-start < 5 {
+			end++
+		}
+		shuffleGroup(old[start:end], prior)
+		start = end
+	}
+	shuffleGroup(fresh, prior)
+	shuffleGroup(extras, prior)
+	ordered := make([]*wordCard, 0, len(old)+len(fresh)+len(extras))
+	ordered = append(ordered, extras...)
+	for len(old) > 0 && len(fresh) > 0 {
+		count := min(2, len(old))
+		ordered = append(ordered, old[:count]...)
+		ordered = append(ordered, fresh[0])
+		old, fresh = old[count:], fresh[1:]
+	}
+	ordered = append(ordered, old...)
+	return append(ordered, fresh...)
+}
+
+func (s *store) shuffleReview(day string) reviewState {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	plan := s.planReview(day)
+	if state := s.reviewState(plan); state.Waiting {
+		return state
+	}
+	s.setDisplay(day, plan)
+	return s.reviewState(plan)
+}
+
+func (s *store) setDisplay(day string, plan reviewPlan) {
+	var prior map[uint64]int
+	if s.display.day == day {
+		prior = s.display.ranks
+	}
+	ranks := make(map[uint64]int)
+	for i, card := range presentationOrder(plan, prior) {
+		ranks[card.ID] = i + 1
+	}
+	s.display = reviewDisplay{day: day, ranks: ranks}
+}
+
+func preferred(ranks map[uint64]int, groups ...[]*wordCard) *wordCard {
+	var first *wordCard
+	bestRank := 0
+	for _, group := range groups {
+		for _, card := range group {
+			rank := ranks[card.ID]
+			if first == nil || (rank > 0 && (bestRank == 0 || rank < bestRank)) {
+				first, bestRank = card, rank
+			}
+		}
+	}
+	return first
+}
+
+func (p reviewPlan) readyRepeat() *wordCard {
+	wanted := min(distinctGapGoal, p.state.Due-1)
+	for _, card := range p.repeats {
+		last := p.session.lastShown[card.ID]
+		gap := p.session.votes - last
+		// At most one card can have a given last position. Serving the oldest
+		// eligible card and capping the variety preference prevents starvation.
+		if gap >= repeatGapDeadline {
+			return card
+		}
+		// Reuse the persisted 1.2 jitter value as a salt. The card's stable ID
+		// and last answered position keep the new target stable after a reopen.
+		width := uint64(maxTargetGap - minTargetGap + 1)
+		target := minTargetGap + int((3*(card.ID%width)+uint64(last)+uint64(card.RetryGap))%width)
+		if gap >= target && p.session.hasVarietySince(last, wanted) {
+			return card
+		}
+	}
+	return nil
+}
+
+func (s *store) reviewState(plan reviewPlan) reviewState {
+	state := plan.state
+	var ranks map[uint64]int
+	if s.display.day == state.Date {
+		ranks = s.display.ranks
+	}
+	next := plan.readyRepeat()
+	if next == nil {
+		switch {
+		case len(plan.extras) > 0:
+			next = preferred(ranks, plan.extras)
+		case len(plan.old)+len(plan.new) > 0:
+			next = preferred(ranks, plan.old, plan.new)
+		case len(plan.repeats) > 0:
+			// If no fresh or ready card remains, take the longest-waiting
+			// card. With multiple cards this cannot be the most recent one.
+			next = plan.repeats[0]
+		}
+	}
+	if s.display.day == state.Date && s.display.undoCard != 0 {
+		for _, group := range [][]*wordCard{plan.old, plan.new, plan.extras, plan.repeats} {
+			for _, card := range group {
+				if card.ID == s.display.undoCard && card.Order == s.display.undoOrder {
+					next = card
+					break
+				}
+			}
+		}
+	}
+	index, previous := s.undoCandidate(state.Date)
+	state.CanUndo = index >= 0
+	if state.CanUndo && s.db.Events[index].Waiting {
+		state.Waiting = true
+		next = previous
+	}
+	if next != nil {
+		daily := next.dailyState(state.Date, state.Settings.DailyGoal)
+		state.Current = &cardFace{
+			Key: next.Key, Word: next.Word, Streak: next.effectiveStreak(state.Date),
+			DailyCount: daily.count, DailyTarget: daily.target, Reviews: next.Reviews, Order: next.Order,
+		}
+	}
+	return state
+}
+
+func (s *store) review(day string) reviewState {
+	return s.reviewState(s.planReview(day))
+}
+
+var errStaleSupplement = errors.New("今日任务已变化，请核对剩余新增词数量后重试。")
+
+func (s *store) addTodaySupplement(day string, count int) (reviewState, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	plan := s.planReview(day)
+	if plan.state.Due != 0 || count <= 0 || count != len(plan.overflow) {
+		return reviewState{}, errStaleSupplement
+	}
+	keys := make([]string, 0, count)
+	previousExtraDays := make([]string, 0, count)
+	for _, card := range plan.overflow {
+		previousExtraDays = append(previousExtraDays, card.ExtraDay)
+		card.ExtraDay = day
+		keys = append(keys, card.Key)
+	}
+	if err := s.save(keys, len(s.db.Events)); err != nil {
+		for i, card := range plan.overflow {
+			card.ExtraDay = previousExtraDays[i]
+		}
+		return reviewState{}, err
+	}
+	plan = s.planReview(day)
+	s.setDisplay(day, plan)
+	return s.reviewState(plan), nil
+}

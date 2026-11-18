@@ -1,0 +1,1486 @@
+"use strict";
+
+const el = (id) => document.getElementById(id);
+const all = (selector) => [...document.querySelectorAll(selector)];
+const mobile = document.body.classList.contains("platform-android");
+const windowsReview = document.documentElement.dataset.reviewShortcuts === "windows";
+const shell = document.querySelector(".shell");
+const controls = window.WordReviewControls;
+const views = ["review", "add", "library", "stats", "settings"];
+const editFields = ["word", "meaning", "pos", "ipa", "ipaUK", "ipaUS", "examples",
+  "exampleTranslation", "etymology", "collocations", "note", "personalNote"];
+const dayFormat = new Intl.DateTimeFormat("zh-CN", {
+  year: "numeric", month: "long", day: "numeric", weekday: "long",
+});
+
+let state, revealed, practice, editing, confirmation;
+let view = "review";
+let settingsFrom = "review";
+let settingsOffset = 0;
+let studying = false;
+let busy = false;
+let swiping = false;
+let editTimer, editJob;
+let settingsDraft, settingsJob, settingsSaved;
+let savedNote = "";
+let noteClock = 0;
+let noteTimer;
+let fileFormat = "words";
+let imported = [];
+let importPending = false;
+let listPage = 0;
+let listRequest = 0;
+let listTotal = 0;
+let listSignature;
+let searchTimer;
+let selectedAll = false;
+const selected = new Set();
+
+async function request(path, data, options = {}) {
+  if (data !== undefined) Object.assign(options, {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(data),
+  });
+  return fetch(path, options).catch(() => {
+    throw new Error(mobile ? "无法连接到背词本。请退出并重新打开应用。" : "无法连接到背词本。请双击 WordReview.exe 重新打开。");
+  });
+}
+
+async function api(path, data, options) {
+  const response = await request(path, data, options);
+  const content = await response.json();
+  if (!response.ok) {
+    const error = new Error(content.error || "操作未成功，请重试。");
+    error.status = response.status;
+    throw error;
+  }
+  return content;
+}
+
+function message(id, text = "") {
+  const target = el(id);
+  target.textContent = text;
+  target.hidden = !text;
+}
+
+function showError(error) { message("error", error?.message || ""); }
+function keyPath(key) { return encodeURIComponent(key); }
+
+function button(label, activate, extra = "") {
+  const item = document.createElement("button");
+  item.type = "button";
+  item.className = "quiet " + extra;
+  item.textContent = label;
+  item.addEventListener("click", activate);
+  return item;
+}
+
+function link(label, url) {
+  const item = document.createElement("a");
+  item.textContent = label;
+  item.href = url;
+  item.target = "_blank";
+  item.rel = "noopener noreferrer";
+  return item;
+}
+
+function sameCard(a, b) {
+  return a?.key === b?.key && a?.order === b?.order && a?.reviews === b?.reviews;
+}
+
+function applyState(next, force = false) {
+  const changed = !sameCard(state?.current, next.current) || state?.date !== next.date;
+  const displayChanged = state?.settings.showIPA !== next.settings.showIPA;
+  const retained = !force && (state?.waitingForNext || next.waitingForNext) && state?.date === next.date && revealed?.key === next.current?.key;
+  state = next;
+  if ((changed || force) && !practice && !retained) clearAnswer();
+  renderReview();
+  if (displayChanged && revealed) renderDetails(revealed);
+  if (next.waitingForNext && studying && view === "review" && !practice && !busy && el("answer").hidden && !el("reveal").disabled) toggleReveal();
+}
+
+async function refreshState() {
+  const old = state;
+  let next = await api("/api/state");
+  const reviewing = view === "review" || (view === "settings" && settingsFrom === "review");
+  if (old && old.date !== next.date && studying && reviewing && !practice && !noteDirty()) {
+    next = await api("/api/review/start", {});
+  }
+  if (state === old && !noteDirty()) applyState(next);
+}
+
+function renderReview() {
+  if (!state) return;
+  const next = state;
+  const days = next.exam?.days;
+  const title = el("review-title");
+  title.classList.toggle("exam-countdown", !practice);
+  title.textContent = practice ? "提前复习" : days === 0 ? "今天考试"
+    : days < 0 ? "考试日期已过" : `距考试还有 ${days} 天`;
+  el("date").textContent = dayFormat.format(new Date(next.date + "T12:00:00"));
+  el("study-summary").hidden = !!practice || !next.planned;
+  el("day-completion").textContent = practice ? "" : `今日过关 ${next.remembered} / ${next.planned}`;
+  el("day-meter").max = Math.max(1, next.planned);
+  el("day-meter").value = next.remembered;
+  el("review-empty").removeAttribute("aria-busy");
+  el("session-tools").hidden = !studying && !practice;
+  el("undo").hidden = !!practice;
+  el("undo").disabled = !next.canUndo || busy;
+  el("stop-review").disabled = busy || swiping;
+  el("stop-review").textContent = practice ? "返回词库" : "结束本次复习";
+  const waiting = !practice && next.waitingForNext;
+  el("session-hint").textContent = practice ? "提前查看这张卡片。复习进度保留。"
+    : waiting ? "1 下一单词" : "Enter 查看释义 · 1 没记住 · 2 记住了";
+  el("forgot-label").textContent = waiting ? "下一单词" : "没记住";
+  el("vote-actions").classList.toggle("awaiting-next", !!waiting);
+  const concealed = el("answer").hidden;
+  el("pass").disabled = busy || swiping || concealed || !!waiting;
+  el("forgot").disabled = busy || swiping || concealed;
+  el("flashcard").classList.toggle("can-swipe", !!(mobile && studying && !practice && !busy && next.current && !el("answer").hidden));
+  el("swipe-label").textContent = waiting ? "下一单词" : "记住了";
+  el("swipe-icon").setAttribute("href", waiting ? "/icons.svg#right" : "/icons.svg#check");
+  const current = practice || (studying && next.current);
+  el("flashcard").hidden = !current;
+  el("review-start").hidden = !!practice || !!studying || !next.current;
+  el("review-empty").hidden = !!practice || !!next.current;
+  el("start-summary").textContent = `还有 ${next.due} 个词待过关。`;
+  message("new-overflow", next.overflowNew && next.current && !practice
+    ? `另有 ${next.overflowNew} 个今日新增词未排入常规名额。完成本轮后可以选择继续学习。` : "");
+  el("vote-actions").hidden = !current || !!practice || (concealed && !windowsReview);
+  document.body.classList.toggle("has-vote", !el("vote-actions").hidden);
+  if (current) {
+    el("word").textContent = current.word;
+    el("word").classList.toggle("long-word", current.word.length > 18);
+    el("streak").hidden = !!practice;
+    el("streak").textContent = practice ? "" :
+      `今日连对 ${current.dailyCount} / ${current.dailyTarget} · 连续过关 ${current.streak} / ${next.settings.goal} 天`;
+    updateVoice();
+  }
+  if (!next.current) {
+    if (next.overflowNew) {
+      empty("今天的当前任务已完成", `还有 ${next.overflowNew} 个今日新增词未安排。继续学习会增加今天的复习量。`, "supplement");
+    } else if (!next.total) empty("词库还是空的", "先添加一批单词，再开始复习。", "add");
+    else if (next.total === next.mastered) empty("词库里的单词都掌握了", "可以在词库提前查看，也可以选词重新学习。", "library");
+    else empty("今天的复习已完成", "下次打开时，可以接着复习还没有掌握的单词。", "");
+  }
+}
+
+function empty(title, text, action) {
+  el("empty-title").textContent = title;
+  el("empty-text").textContent = text;
+  el("empty-action").hidden = !action;
+  if (action) {
+    el("empty-action").textContent = {add: "添加单词", library: "打开词库", supplement: "继续学习今日新增单词"}[action];
+    el("empty-action").onclick = action === "supplement" ? continueToday : () => changeView(action);
+  }
+}
+
+function clearAnswer() {
+  clearTimeout(noteTimer);
+  revealed = undefined;
+  savedNote = "";
+  el("answer").hidden = true;
+  el("vote-actions").hidden = true;
+  document.body.classList.remove("has-vote");
+  el("reveal").setAttribute("aria-expanded", "false");
+  el("reveal-label").textContent = "查看中文释义";
+  el("personal-note").value = "";
+  el("note-status").textContent = "";
+  el("details").replaceChildren();
+  el("card-metadata").replaceChildren();
+  fitNote();
+  el("details").scrollTop = 0;
+  el("card-metadata").parentElement.scrollTop = 0;
+  el("personal-note").scrollTop = 0;
+}
+
+function group(title, value, fallback, kind = "") {
+  const wrapper = document.createElement("div");
+  wrapper.className = "detail-group";
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+  const text = document.createElement("p");
+  text.className = value ? kind : "placeholder";
+  if (value && kind === "example") text.lang = "en";
+  text.textContent = value || fallback;
+  wrapper.append(heading, text);
+  return wrapper;
+}
+
+function ipa(text) { return "/" + text.replace(/^\/+|\/+$/g, "") + "/"; }
+
+function renderDetails(card) {
+  const missing = card.lookup === "pending" && state?.settings.online
+    ? "等待在线词典补充。" : "暂无资料，可手动编辑。";
+  const sound = [];
+  if (state?.settings.showIPA) {
+    if (card.ipaUK) sound.push("英 " + ipa(card.ipaUK));
+    if (card.ipaUS) sound.push("美 " + ipa(card.ipaUS));
+    if (!sound.length && card.ipa) sound.push(ipa(card.ipa));
+  }
+  const meaning = group("中文释义", card.meaning, missing, "meaning");
+  if (card.construction) {
+    const hint = document.createElement("p");
+    hint.className = "construction";
+    hint.textContent = "构词：" + card.construction;
+    meaning.append(hint);
+  }
+  if (card.association) {
+    const hint = document.createElement("p");
+    hint.className = "construction";
+    hint.textContent = "字形联想：" + card.association;
+    hint.title = "字母相似，仅供记忆联想";
+    meaning.append(hint);
+  }
+  const fields = [
+    meaning,
+    group("英文例句", card.examples, missing, "example"),
+    group("例句翻译", card.exampleTranslation, "暂无对应译文。", "translation"),
+  ];
+  const sources = document.createElement("div");
+  sources.className = "sources";
+  if (card.ecdict) sources.append(link("ECDICT", "https://github.com/skywind3000/ECDICT"));
+  if (/^https:\/\/en\.wiktionary\.org\/wiki\/Special:PermanentLink\/\d+#English$/.test(card.wikiSource || "")) {
+    sources.append(link("Wiktionary", card.wikiSource), link("CC BY-SA 4.0", "https://creativecommons.org/licenses/by-sa/4.0/"));
+  }
+  if (card.exampleBy === "simple") {
+    sources.append(link("例句 · Simple Wiktionary", "https://simple.wiktionary.org/wiki/" + encodeURIComponent(card.key)),
+      link("CC BY-SA 4.0", "https://creativecommons.org/licenses/by-sa/4.0/"));
+  }
+  if (card.exampleBy?.startsWith("tatoeba|")) {
+    for (const entry of card.exampleBy.split("|").slice(1)) {
+      const [id, ...author] = entry.split(":");
+      if (/^\d+$/.test(id)) sources.append(link("例句 · " + author.join(":"), "https://tatoeba.org/en/sentences/show/" + id));
+    }
+    sources.append(link("CC BY 2.0 FR", "https://creativecommons.org/licenses/by/2.0/fr/"));
+  }
+  sources.append(button("编辑卡片资料", async () => {
+    try {
+      await flushNote();
+      await openEditor(card.key);
+    } catch (error) { showError(error); }
+  }));
+  el("details").replaceChildren(...fields);
+  el("card-metadata").replaceChildren(...(sound.length ? [group("音标", sound.join(" · "))] : []), sources);
+}
+
+async function toggleReveal() {
+  const current = practice || state?.current;
+  if (!current || (!studying && !practice) || busy) return;
+  const trigger = el("reveal");
+  if (!el("answer").hidden) {
+    if (!practice && state?.waitingForNext) return;
+    el("answer").hidden = true;
+    trigger.setAttribute("aria-expanded", "false");
+    el("reveal-label").textContent = "查看中文释义";
+    renderReview();
+    return;
+  }
+  trigger.disabled = true;
+  try {
+    const card = await api("/api/card/" + keyPath(current.key));
+    if ((practice || state?.current)?.key !== current.key || (!studying && !practice)) return;
+    if (!revealed) {
+      savedNote = card.personalNote;
+      el("personal-note").value = savedNote;
+      noteClock = Math.max(noteClock, card.noteClock || 0);
+    }
+    revealed = card;
+    renderDetails(card);
+    el("answer").hidden = false;
+    fitNote();
+    trigger.setAttribute("aria-expanded", "true");
+    el("reveal-label").textContent = "收起释义";
+    renderReview();
+  } catch (error) {
+    showError(error);
+  } finally { trigger.disabled = false; }
+}
+
+function noteDirty() { return !!revealed && el("personal-note").value !== savedNote; }
+
+function fitNote() {
+  if ((!mobile && !windowsReview) || view !== "review" || el("answer").hidden) return;
+  const note = el("personal-note");
+  note.style.height = "auto";
+  note.style.height = (note.scrollHeight + note.offsetHeight - note.clientHeight) + "px";
+}
+
+async function flushNote(background = false) {
+  clearTimeout(noteTimer);
+  if (!noteDirty()) return;
+  const key = revealed.key;
+  const value = el("personal-note").value;
+  const clock = noteClock;
+  let card;
+  try {
+    card = await api("/api/note/" + keyPath(key), {note: value, clock}, {keepalive: background});
+  } catch (error) {
+    if (revealed?.key === key && clock === noteClock) {
+      el("note-status").textContent = "备注保存失败，请修改或离开编辑框后重试。";
+      el("note-status").classList.add("note-error");
+    }
+    throw error;
+  }
+  if (revealed?.key === key && clock === noteClock) {
+    savedNote = card.personalNote;
+    if (savedNote !== value) { el("personal-note").value = savedNote; fitNote(); }
+    el("note-status").textContent = "";
+    el("note-status").classList.remove("note-error");
+    }
+}
+
+async function nextCard(fromSwipe = false) {
+  if (!studying || practice || busy || (swiping && !fromSwipe) || !state?.waitingForNext) return;
+  busy = true;
+  renderReview();
+  try {
+    await flushNote();
+    const result = await api("/api/review/next", {order: state.current.order});
+    showError();
+    message("feedback");
+    applyState(result, true);
+    el("review-title").scrollIntoView({block: "nearest"});
+  } catch (error) {
+    if (error.status === 409) await refreshState().catch(() => {});
+    showError(error);
+  } finally {
+    busy = false;
+    renderReview();
+    if (state?.current && !state.waitingForNext) el("reveal").focus({preventScroll: true});
+  }
+}
+
+async function resumeWaiting() {
+  if (view !== "review" || practice || !state?.waitingForNext) return;
+  studying = true;
+  renderReview();
+  if (el("answer").hidden && !el("reveal").disabled) await toggleReveal();
+}
+
+function noteInput(event) {
+  noteClock = Math.max(noteClock + 1, Date.now() * 1000);
+  el("note-status").textContent = noteDirty() ? "正在保存…" : "";
+  el("note-status").classList.remove("note-error");
+  fitNote();
+  clearTimeout(noteTimer);
+  if (noteDirty() && !event?.isComposing) noteTimer = setTimeout(() => flushNote().catch(showError), 600);
+}
+
+async function vote(remembered, fromSwipe = false) {
+  if (!studying || practice || el("answer").hidden || !state?.current || state.waitingForNext || busy || (swiping && !fromSwipe)) return;
+  busy = true;
+  el("forgot").disabled = el("pass").disabled = true;
+  showError();
+  try {
+    await flushNote();
+    const current = state.current;
+    const result = await api("/api/vote", {
+      key: current.key, reviews: current.reviews, order: current.order, date: state.date, remembered, stay: !remembered,
+    });
+    const word = current.word;
+    let feedback = `${word} 今日连对 ${result.dailyCount} / ${result.dailyTarget}，稍后再测。`;
+    if (result.graduated) feedback = word + " 已长期掌握。";
+    else if (result.dayPassed) feedback = word + (result.credited
+      ? " 今日过关，连续过关天数加 1。"
+      : " 重新完成今日过关，今天的过关天数已累计过。");
+    else if (!remembered) feedback = word + " 今日连对已清零，稍后再测。";
+    message("feedback", feedback);
+    applyState(result, remembered);
+    if (remembered) el("review-title").scrollIntoView({block: "nearest"});
+  } catch (error) {
+    if (error.status === 409) await refreshState().catch(() => {});
+    showError(error);
+  } finally {
+    busy = false;
+    renderReview();
+    if (state?.current && studying) (state.waitingForNext ? el("forgot") : el("reveal")).focus({preventScroll: true});
+  }
+}
+
+async function undo() {
+  if (!state?.canUndo || busy || swiping || practice) return;
+  busy = true;
+  try {
+    await flushNote();
+    const wasWaiting = state.waitingForNext;
+    applyState(await api("/api/undo", {}), !wasWaiting);
+    message("feedback", "已撤销上一条复习操作。");
+  } catch (error) { showError(error); }
+  finally { busy = false; renderReview(); }
+}
+
+async function stopReview() {
+  if (busy || swiping) return;
+  try {
+    await flushNote();
+    const showLibrary = !!practice;
+    studying = false;
+    practice = undefined;
+    clearAnswer();
+    message("feedback");
+    renderReview();
+    if (showLibrary) await changeView("library");
+  } catch (error) { showError(error); }
+}
+
+function displayView(next) {
+  view = next;
+  document.body.dataset.view = next;
+  for (const id of views) el(id + "-view").hidden = id !== next;
+  for (const item of all("button[data-view]")) {
+    if (item.dataset.view === next) item.setAttribute("aria-current", "page");
+    else if (item.dataset.view) item.removeAttribute("aria-current");
+  }
+  if (windowsReview && next === "review") fitNote();
+}
+
+function pageScroller() { return windowsReview ? shell : window; }
+
+async function changeView(next, temporary) {
+  if (swiping) return;
+  if (next === "settings") return openSettings();
+  if (busy) return;
+  if (view === "settings" && next === settingsFrom && !temporary) return closeSettings();
+  try {
+    if (view === "settings") await flushSettings();
+    await flushNote();
+    controls.close(false);
+    const wasPractice = !!practice;
+    practice = temporary;
+    if (wasPractice || practice) clearAnswer();
+    const previous = view === "settings" ? settingsFrom : view;
+    displayView(next);
+    showError();
+    pageScroller().scrollTo({top: 0});
+    if (next === "review") {
+      renderReview();
+      if (previous !== next && studying && !practice) await startReview();
+      else await refreshState();
+      await resumeWaiting();
+    }
+    if (next === "library") await refreshLibrary();
+    if (next === "stats") await refreshStats();
+    if (next === "add" && imported.length) await updateImportStatus();
+  } catch (error) { showError(error); }
+}
+
+async function startReview() {
+  if (busy) return;
+  busy = true;
+  el("start-review").disabled = true;
+  try {
+    const result = await api("/api/review/start", {});
+    studying = true;
+    practice = undefined;
+    message("feedback");
+    applyState(result, true);
+    if (result.current) el("reveal").focus({preventScroll: true});
+  } catch (error) {
+    showError(error);
+  } finally {
+    busy = false;
+    el("start-review").disabled = false;
+    renderReview();
+    if (state?.waitingForNext && el("answer").hidden) await toggleReveal();
+  }
+}
+
+function continueToday() {
+  if (!state?.overflowNew || state.current || busy) return;
+  const {date, overflowNew} = state;
+  ask("追加今天的复习量？", `本次追加 ${overflowNew} 个今日新增词。每日常规上限保持原设置。`, "确认追加", async () => {
+    try {
+      const result = await api("/api/review/supplement", {date, count: overflowNew});
+      studying = true;
+      practice = undefined;
+      message("feedback");
+      applyState(result, true);
+      if (result.current) el("reveal").focus({preventScroll: true});
+    } catch (error) {
+      if (error.status === 409) {
+        el("action-dialog").close();
+        await refreshState();
+        showError(error);
+        return;
+      }
+      throw error;
+    }
+  });
+}
+
+function englishVoice() {
+  if (!window.speechSynthesis) return;
+  const voices = speechSynthesis.getVoices().filter(v => v.localService && /^en\b/i.test(v.lang));
+  return voices.find(v => v.lang === "en-US") || voices[0];
+}
+function updateVoice() {
+  const native = window.WordReviewFiles;
+  el("speak").hidden = native ? !native.canSpeak() : !englishVoice();
+}
+function speak() {
+  if (window.WordReviewFiles) {
+    window.WordReviewFiles.speak(el("word").textContent);
+    return;
+  }
+  const voice = englishVoice();
+  if (!voice) return;
+  const utterance = new SpeechSynthesisUtterance(el("word").textContent);
+  utterance.voice = voice;
+  utterance.lang = voice.lang;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utterance);
+}
+
+function libraryQuery() { return {query: el("search").value, filter: el("filter").value, sort: el("sort").value}; }
+function selection() { return {...libraryQuery(), all: selectedAll, keys: [...selected]}; }
+
+function showSelection() {
+  const count = selectedAll ? listTotal : selected.size;
+  el("selection-count").textContent = count ? `已选 ${count} 个` : "";
+  el("clear-selection").hidden = count === 0;
+  el("batch-action").disabled = count === 0;
+  el("select-all").disabled = !listTotal;
+  const trash = el("filter").value === "trash";
+  for (const option of el("batch-action").options) {
+    option.hidden = option.value === "restore" ? !trash : ["reset", "remove", "retry"].includes(option.value) && trash;
+  }
+  controls.syncSelect(el("batch-action"));
+}
+
+function addWordActions(row, entry) {
+  const edit = () => openEditor(entry.key).catch(showError);
+  const act = name => () => batchAction(name, {keys: [entry.key]}, 1);
+  const restore = act("restore");
+  const items = [{label: "学习历史", icon: "history", pick: () => openHistory(entry).catch(showError)}];
+  if (entry.deleted) items.push({label: "恢复", icon: "backup", pick: restore});
+  else {
+    items.push({label: "编辑", icon: "edit", pick: edit});
+    if (entry.mastered) items.push(
+      {label: "提前复习", icon: "review", pick: () => changeView("review", entry)},
+      {label: "重新学习", icon: "history", pick: act("reset")});
+    items.push({label: "移入回收站", icon: "trash", danger: true, pick: act("remove")});
+  }
+  const actions = document.createElement("div");
+  actions.className = "row-actions";
+  actions.append(entry.deleted ? button("恢复", restore) : button("编辑", edit));
+  const more = document.createElement("button");
+  more.type = "button";
+  more.className = "icon-button";
+  more.setAttribute("aria-label", entry.word + " 的更多操作");
+  more.setAttribute("aria-haspopup", "menu");
+  more.setAttribute("aria-controls", "popup-list");
+  more.setAttribute("aria-expanded", "false");
+  more.append(controls.icon("more"));
+  const show = point => controls.context(more, entry.word, items, point);
+  more.onclick = () => show();
+  more.onkeydown = event => {
+    if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+      event.preventDefault();
+      show();
+    }
+  };
+  const acceptsMenu = target => !target.closest("input, button, a, textarea, [contenteditable], .selection-target");
+  row.addEventListener("contextmenu", event => {
+    if (!acceptsMenu(event.target)) return;
+    event.preventDefault();
+    if (mobile && controls.isOpen()) return;
+    show(event.clientX || event.clientY ? {x: event.clientX, y: event.clientY} : undefined);
+  });
+  if (mobile) {
+    let press;
+    let start;
+    const cancel = () => { clearTimeout(press); press = undefined; };
+    row.addEventListener("pointerdown", event => {
+      if (event.pointerType !== "touch" || !acceptsMenu(event.target)) return;
+      start = {x: event.clientX, y: event.clientY};
+      press = setTimeout(() => { cancel(); if (row.isConnected) show(); }, 475);
+    });
+    row.addEventListener("pointermove", event => {
+      if (press && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) cancel();
+    });
+    for (const type of ["pointerup", "pointercancel", "pointerleave"]) row.addEventListener(type, cancel);
+  }
+  actions.append(more);
+  return actions;
+}
+
+async function refreshLibrary() {
+  const requestID = ++listRequest;
+  const data = await api("/api/cards?" + new URLSearchParams({...libraryQuery(), page: listPage}));
+  if (requestID !== listRequest || view !== "library") return;
+  if (listPage && !data.rows.length) {
+    listPage = Math.max(0, Math.ceil(data.total / 24) - 1);
+    return refreshLibrary();
+  }
+  listTotal = data.total;
+  showSelection();
+  el("lookup-bar").hidden = !data.pending;
+  el("lookup-status").textContent = !data.online ? `有 ${data.pending} 个词待补充，联网查词已关闭。`
+    : data.paused ? `在线词典暂时无法连接，${data.pending} 个词等待重试。` : `正在补充 ${data.pending} 个词。`;
+  el("retry-all").hidden = !data.online || !data.paused;
+  const signature = JSON.stringify([data.rows, data.total, data.goal, listPage, selectedAll, [...selected]]);
+  if (signature === listSignature) return;
+  listSignature = signature;
+  el("word-list").replaceChildren();
+  if (!data.rows.length) {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = el("search").value || el("filter").value ? "没有符合条件的单词。" : "还没有添加单词。";
+    el("word-list").append(paragraph);
+  }
+  for (const entry of data.rows) {
+    const row = document.createElement("article");
+    row.className = "word-row";
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.checked = selectedAll || selected.has(entry.key);
+    check.disabled = selectedAll;
+    check.setAttribute("aria-label", "选择 " + entry.word);
+    check.onchange = () => {
+      if (check.checked) selected.add(entry.key); else selected.delete(entry.key);
+      showSelection();
+      listSignature = undefined;
+    };
+    const checkTarget = document.createElement("label");
+    checkTarget.className = "selection-target";
+    checkTarget.append(check);
+    const main = document.createElement("div");
+    main.className = "word-main";
+    const title = document.createElement("h3");
+    const spelling = document.createElement("span");
+    spelling.lang = "en";
+    spelling.textContent = entry.word;
+    const marker = document.createElement("span");
+    marker.className = "word-status" + (entry.deleted ? " trash" : entry.mastered ? " mastered" : "");
+    marker.textContent = entry.deleted ? "回收站" : entry.mastered ? (entry.legacyMastered ? "已掌握 · 旧规则" : "已掌握") : entry.lastTry ? "学习中" : "待复习";
+    title.append(spelling, marker);
+    const meaning = document.createElement("p");
+    meaning.textContent = entry.meaning || (entry.lookup === "pending" ? "等待词典补充" : "暂无中文释义");
+    const timing = document.createElement("small");
+    const progress = entry.legacyMastered ? `旧规则连续 ${entry.legacyStreak || 0} 次` :
+      `连续过关 ${entry.streak}${entry.mastered ? "" : " / " + data.goal} 天`;
+    const legacy = entry.legacyStreak && !entry.legacyMastered ? ` · 旧规则记录 ${entry.legacyStreak} 次` : "";
+    timing.textContent = `${progress}${legacy} · 最近复习 ${entry.lastTry || "—"}`;
+    main.append(title, meaning, timing);
+    row.append(checkTarget, main, addWordActions(row, entry));
+    el("word-list").append(row);
+  }
+  el("results").textContent = data.total ? `共 ${data.total} 个 · 第 ${listPage + 1} 页` : "共 0 个";
+  el("prev-page").disabled = listPage === 0;
+  el("next-page").disabled = (listPage + 1) * 24 >= data.total;
+}
+
+function clearSelection() { selected.clear(); selectedAll = false; }
+function runSearch() {
+  clearSelection();
+  listPage = 0;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => refreshLibrary().catch(showError), 130);
+}
+function usePage(delta) {
+  listPage += delta;
+  refreshLibrary().catch(showError);
+}
+
+function ask(title, text, label, perform, danger = false) {
+  confirmation = perform;
+  el("action-title").textContent = title;
+  el("action-text").textContent = text;
+  el("action-confirm").textContent = label;
+  el("action-confirm").classList.toggle("danger", danger);
+  message("action-status");
+  el("action-dialog").showModal();
+}
+
+async function confirmAction(event) {
+  event.preventDefault();
+  const confirm = el("action-confirm");
+  confirm.disabled = true;
+  try {
+    await confirmation();
+    el("action-dialog").close();
+  } catch (error) { message("action-status", error.message); }
+  finally { confirm.disabled = false; }
+}
+
+function batchAction(action, items, count) {
+  const actions = {
+    remove: ["移入回收站", "词条、备注和学习历史会一并移入回收站，可以恢复。"],
+    reset: ["重新学习", "当天连对次数和连续过关天数会清零，备注和历史保留。"],
+    restore: ["恢复词条", "卡片会恢复到词库，保留移入回收站前的学习进度。"],
+    retry: ["联网补缺", "词典只填写空白字段。"],
+  };
+  if (action === "export") return exportCSV(items).catch(showError);
+  if (!actions[action]) return;
+  const [label, explain] = actions[action];
+  ask(`${label} · ${count} 个单词`, explain, label, async () => {
+    await api("/api/batch/" + action, items);
+    clearSelection();
+    await refreshLibrary();
+    await refreshState();
+  }, action === "remove" || action === "reset");
+}
+
+async function exportCSV(items) {
+  if (window.WordReviewFiles) {
+    window.WordReviewFiles.pickFile("csv", JSON.stringify(items));
+    return;
+  }
+  const response = await request("/api/export", items);
+  if (!response.ok) throw new Error("无法导出 CSV，请重试。");
+  const url = URL.createObjectURL(await response.blob());
+  const item = document.createElement("a");
+  item.href = url;
+  item.download = "WordReview-words-" + state.date + ".csv";
+  item.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function openHistory(entry) {
+  const history = await api("/api/history/" + keyPath(entry.key));
+  el("history-title").textContent = entry.word + " · 学习历史";
+  const items = {
+    add: "添加单词", reimport: "因重复录入重新学习", reset: "手动重新学习",
+    yes: "记住了", no: "没记住", remove: "移入回收站", restore: "恢复到词库",
+  };
+  el("history-list").replaceChildren(...history.map(row => {
+    const item = document.createElement("li");
+    const rule = row.legacy ? "（旧规则）" : row.dayPassed ? (row.credit ? "（当日过关）" : "（当日重过）") : "";
+    const suffix = rule + (row.undone ? "（已撤销）" : "");
+    item.textContent = [row.day, items[row.kind] + suffix].join(" · ");
+    return item;
+  }));
+  el("history-dialog").showModal();
+}
+
+async function openEditor(key) {
+  editing = await api("/api/card/" + keyPath(key));
+  el("edit-title").textContent = "编辑 " + editing.word;
+  for (const field of editFields) el("edit-" + field).value = editing[field] || "";
+  el("retry-one").hidden = !!(editing.meaning && editing.pos && editing.examples && editing.etymology);
+  el("retry-one").disabled = !state?.settings.online;
+  message("edit-status");
+  el("edit-dialog").showModal();
+}
+
+function editedFields(commitWord) {
+  const updates = {};
+  if (!editing) return updates;
+  for (const field of editFields) {
+    if (field === "word" && !commitWord) continue;
+    const input = el("edit-" + field);
+    if (input.value !== (editing[field] || "")) updates[field] = input.value;
+  }
+  return updates;
+}
+
+async function flushEdit(commitWord = false, background = false) {
+  clearTimeout(editTimer);
+  while (editJob) await editJob;
+  if (!editing || !el("edit-dialog").open) return;
+  const updates = editedFields(commitWord);
+  if (!Object.keys(updates).length) return;
+  if (updates.word !== undefined && !el("edit-word").reportValidity()) {
+    throw new Error("请输入有效的英文拼写。");
+  }
+  const key = editing.key;
+  const job = (async () => {
+    const card = await api("/api/card/" + keyPath(key), updates, {keepalive: background && JSON.stringify(updates).length < 16000});
+    editing = card;
+    if (updates.word !== undefined && el("edit-word").value === updates.word) el("edit-word").value = card.word;
+    el("edit-title").textContent = "编辑 " + card.word;
+    if (revealed?.key === key) {
+      revealed = card;
+      noteClock = Math.max(noteClock, card.noteClock || 0);
+      savedNote = card.personalNote;
+      el("personal-note").value = savedNote;
+      fitNote();
+      renderDetails(card);
+    }
+    if (practice?.key === key) practice = card;
+    message("edit-status");
+  })();
+  editJob = job;
+  try { await job; }
+  finally { if (editJob === job) editJob = undefined; }
+}
+
+function editError(error) { message("edit-status", error.message); }
+
+async function closeEditor() {
+  try {
+    await flushEdit(true);
+    el("edit-dialog").close();
+    editing = undefined;
+    if (view === "library") await refreshLibrary();
+    await refreshState();
+  } catch (error) { editError(error); }
+}
+
+async function retryOne() {
+  try {
+    await api("/api/batch/retry", {keys: [editing.key]});
+    message("edit-status", "已加入补充队列。");
+    el("retry-one").disabled = true;
+  } catch (error) { message("edit-status", error.message); }
+}
+
+async function submitWords(event) {
+  event.preventDefault();
+  const input = el("add-input");
+  const payload = {text: input.value, format: fileFormat};
+  el("add-submit").disabled = true;
+  try {
+    const plan = await api("/api/import-preview", payload);
+    const numbers = `解析 ${plan.total} 项 · 新增 ${plan.new} · 重置 ${plan.reset} · 批内重复 ${plan.duplicates} · 无效 ${plan.invalid.length}`;
+    if (!plan.new && !plan.reset) {
+      message("import-status", numbers + (plan.invalid.length ? "\n请检查：" + plan.invalid.slice(0, 8).join("、") : ""));
+      return;
+    }
+    const parts = [numbers];
+    if (plan.reset) parts.push("将重新学习：" + plan.resetWords.join("、") + (plan.reset > plan.resetWords.length ? " 等" : ""),
+      "连续记住次数清零，资料、备注和历史保留。");
+    if (plan.invalid.length) parts.push("将跳过无效项：" + plan.invalid.slice(0, 8).join("、"));
+    ask("确认批量导入", parts.join("\n"), "确认导入", async () => {
+      const result = await api("/api/import", {...payload, token: plan.token});
+      imported = result.keys;
+      if (input.value === payload.text) {
+        input.value = "";
+        fileFormat = "words";
+      }
+      message("import-status", `已保存 ${result.keys.length} 个词条 · 新增 ${result.new} · 已重新排队 ${result.reset}。`);
+      await updateImportStatus();
+      await refreshState();
+    });
+  } catch (error) { message("import-status", error.message); }
+  finally { el("add-submit").disabled = false; }
+}
+
+async function updateImportStatus() {
+  if (!imported.length) return;
+  const data = await api("/api/import-status", {keys: imported});
+  importPending = data.pending > 0;
+  let label = `资料齐全 ${data.complete} · 仍有缺项 ${data.partial} · 等待补全 ${data.pending}`;
+  if (data.paused && importPending) label += "。暂时连不上在线词典，稍后会重试。";
+  if (!data.online) label += "。联网补充已关闭。";
+  message("import-lookup", label);
+}
+
+async function readWordFile(event) {
+  const file = event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  if (file.size > 4 << 20) {
+    message("import-status", "词表文件过大，请拆成多批。");
+    return;
+  }
+  try {
+    const value = new TextDecoder("utf-8", {fatal: true}).decode(await file.arrayBuffer());
+    const extension = file.name.toLowerCase().split(".").pop();
+    fileFormat = ["csv", "json"].includes(extension) ? extension : "words";
+    el("add-input").value = value;
+    message("import-status", `已读入 ${file.name}，请先预览导入结果。`);
+  } catch { message("import-status", "请将词表另存为 UTF-8 编码，再重新读取。"); }
+}
+
+async function refreshStats() {
+  const data = await api("/api/stats");
+  const today = data.days[data.days.length - 1];
+  const stats = [
+    ["历史累计录入不同词", data.imported], ["当前词库", data.current], ["已掌握", data.mastered],
+    ["未掌握", data.unmastered], ["回收站", data.trashed], ["今天复习的不同词", today.distinct], ["今天过关的词", today.passed],
+    ["今天记住操作", today.yes], ["今天没记住操作", today.no], ["累计复习操作", data.totalReviews],
+    ["累计没记住操作", data.totalForgot], ["累计重新录入", data.totalReimport],
+  ];
+  el("stats-counts").replaceChildren(...stats.map(([label, value]) => {
+    const item = document.createElement("div");
+    const title = document.createElement("span");
+    const amount = document.createElement("strong");
+    title.textContent = label;
+    amount.textContent = value;
+    item.append(title, amount);
+    return item;
+  }));
+  const days = data.days.map(row => {
+    const item = document.createElement("tr");
+    for (const value of [row.day, row.distinct, row.passed, row.yes, row.no]) {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      item.append(cell);
+    }
+    return item;
+  });
+  el("stats-days").replaceChildren(...days);
+}
+
+function customLimit() {
+  const custom = el("daily-limit").value === "custom";
+  el("custom-limit").hidden = !custom;
+  el("custom-limit").required = custom;
+  if (!custom) el("custom-limit").removeAttribute("aria-invalid");
+}
+
+function examMode() {
+  const fixed = el("exam-mode").value === "fixed";
+  el("exam-annual-row").hidden = fixed;
+  el("exam-fixed-row").hidden = !fixed;
+  for (const id of ["exam-month", "exam-day", "exam-fixed"]) el(id).removeAttribute("aria-invalid");
+  return fixed;
+}
+
+function commitExamDate() {
+  const fixed = examMode();
+  const fields = fixed ? [el("exam-fixed")] : [el("exam-month"), el("exam-day")];
+  const date = fixed ? fields[0].value : fields.map(field => field.value.padStart(2, "0")).join("-");
+  const calendarDate = fixed ? date : "2000-" + date;
+  const instant = new Date(calendarDate + "T00:00:00Z");
+  if (fields.some(field => !field.value || !field.validity.valid) ||
+      !Number.isFinite(+instant) || instant.toISOString().slice(0, 10) !== calendarDate) {
+    fields.forEach(field => field.setAttribute("aria-invalid", "true"));
+    message("study-settings-status", "请输入有效的考试日期。此前的日期已保留。");
+    return;
+  }
+  message("study-settings-status");
+  settingsDraft.examDate = date === "12-20" ? undefined : date;
+}
+
+async function openSettings() {
+  if (view === "settings" || busy || swiping) return;
+  try {
+    await flushNote();
+    if (!state) await refreshState();
+    const prefs = state.settings;
+    settingsDraft = {...prefs};
+    settingsSaved = {...prefs};
+    el("daily-limit").value = [0, 10, 20, 40, 100, 200].includes(prefs.limit) ? String(prefs.limit) : "custom";
+    el("custom-limit").value = prefs.limit || 20;
+    el("goal").value = prefs.goal;
+    el("daily-goal").value = prefs.dailyGoal;
+    el("online").checked = prefs.online;
+    el("show-ipa").checked = prefs.showIPA;
+    const fixed = prefs.examDate?.length === 10;
+    const annual = !fixed && prefs.examDate ? prefs.examDate : "12-20";
+    el("exam-mode").value = fixed ? "fixed" : "annual";
+    el("exam-fixed").value = fixed ? prefs.examDate : state.exam.date;
+    el("exam-month").value = Number(annual.slice(0, 2));
+    el("exam-day").value = Number(annual.slice(3));
+    examMode();
+    customLimit();
+    controls.syncSelect(el("daily-limit"));
+    controls.syncSelect(el("exam-mode"));
+    message("settings-status");
+    message("study-settings-status");
+    for (const input of el("settings-form").querySelectorAll("[aria-invalid]")) input.removeAttribute("aria-invalid");
+    controls.close(false);
+    settingsFrom = view;
+    settingsOffset = windowsReview ? shell.scrollTop : window.scrollY;
+    displayView("settings");
+    pageScroller().scrollTo({top: 0});
+    el("settings-title").focus({preventScroll: true});
+  } catch (error) { showError(error); }
+}
+
+async function closeSettings() {
+  if (view !== "settings") return;
+  try { await flushSettings(); } catch { return; }
+  controls.close(false);
+  // Returning from appearance settings leaves the current card and the queue in place.
+  displayView(settingsFrom);
+  pageScroller().scrollTo({top: settingsOffset});
+  const focus = settingsFrom === "review" && !el("flashcard").hidden ? el("reveal")
+    : document.querySelector('button[data-view="' + settingsFrom + '"]');
+  focus?.focus({preventScroll: true});
+  try {
+    if (view === "add") await updateImportStatus();
+    if (view === "library") await refreshLibrary();
+  } catch (error) { showError(error); }
+}
+
+function commitSetting(input) {
+  if (view !== "settings" || !settingsDraft) return;
+  if (["exam-mode", "exam-month", "exam-day", "exam-fixed"].includes(input.id)) {
+    commitExamDate();
+    return;
+  }
+  if (input.id === "daily-limit") {
+    customLimit();
+    if (input.value === "custom") {
+      el("custom-limit").focus();
+      el("custom-limit").select();
+    } else settingsDraft.limit = Number(input.value);
+    return;
+  }
+  const key = {"custom-limit": "limit", "daily-goal": "dailyGoal", goal: "goal", "show-ipa": "showIPA", online: "online"}[input.id];
+  if (!key || (input.id === "custom-limit" && input.hidden)) return;
+  if (!input.validity.valid || (input.type === "number" && input.value === "")) {
+    input.setAttribute("aria-invalid", "true");
+    message("study-settings-status", "请输入范围内的整数。当前设置已保留。");
+    return;
+  }
+  input.removeAttribute("aria-invalid");
+  settingsDraft[key] = input.type === "checkbox" ? input.checked : Number(input.value);
+}
+
+function hasSettingChanges() {
+  return settingsDraft && Object.keys(settingsDraft).some(key => settingsDraft[key] !== settingsSaved[key]);
+}
+
+async function flushSettings(background = false) {
+  while (settingsJob) await settingsJob;
+  if (!hasSettingChanges()) return;
+  const snapshot = {...settingsDraft};
+  const job = (async () => {
+    const next = await api("/api/settings", snapshot, {keepalive: background});
+    settingsSaved = snapshot;
+    applyState(next);
+    message("study-settings-status");
+  })();
+  settingsJob = job;
+  try { await job; }
+  catch (error) { message("study-settings-status", error.message); throw error; }
+  finally { if (settingsJob === job) settingsJob = undefined; }
+}
+
+async function showRestored(status) {
+  studying = false;
+  practice = undefined;
+  clearAnswer();
+  clearSelection();
+  listPage = 0;
+  listSignature = undefined;
+  imported = [];
+  importPending = false;
+  if (view === "settings") displayView(settingsFrom);
+  el("action-dialog").close();
+  await changeView("review");
+  message("feedback", status);
+}
+
+function showTransferPreview(data) {
+  const created = new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  }).format(new Date(data.createdAt));
+  const overview = `文件生成时间（本机时间） ${created}
+导出端学习日 ${data.sourceDay} · 本机学习日 ${data.deviceDay}
+词条 ${data.words} 条 · 已掌握 ${data.mastered} 个 · 有备注 ${data.notes} 条 · 学习记录 ${data.events} 条`;
+  if (data.blocked) {
+    message("settings-status", overview + `
+` + data.blocked);
+    return;
+  }
+  const plan = data.continuation
+    ? `继续当天任务，已过关 ${data.passed} 个，待过关 ${data.pending} 个。`
+    : "文件来自较早的学习日。复习会按本机当前日期安排。";
+  ask("覆盖当前学习数据？", `${overview}
+${plan}
+确认后，程序会先备份本机数据，再完整替换词库、进度、设置和历史。`,
+    "确认覆盖", async () => {
+      await api("/api/transfer/commit", {token: data.token});
+      await showRestored("已导入完整学习数据。");
+    }, true);
+}
+
+async function pickTransfer(kind) {
+  const opening = kind === "import";
+  const trigger = el(opening ? "transfer-import" : "transfer-export");
+  message("settings-status");
+  if (window.WordReviewFiles) {
+    window.WordReviewFiles.pickFile(kind, "");
+    return;
+  }
+  trigger.disabled = true;
+  try {
+    const data = await api("/api/transfer/windows/" + (opening ? "open" : "save"), {});
+    if (data.cancelled) return;
+    if (opening) showTransferPreview(data);
+    else message("settings-status", "完整学习数据已保存。");
+  } catch (error) { message("settings-status", error.message); }
+  finally { trigger.disabled = false; }
+}
+
+if (mobile) {
+  if (window.WordReviewFiles) {
+    el("transfer-recovery").hidden = false;
+    el("transfer-recovery").onclick = () => {
+      message("settings-status");
+      window.WordReviewFiles.pickFile("recovery", "");
+    };
+  }
+  window.wordReviewFlushNote = flushOnHide;
+  window.wordReviewResume = () => refreshState().catch(showError);
+  window.wordReviewSpeechChanged = updateVoice;
+  window.wordReviewBack = () => {
+    if (controls.close()) return true;
+    const dialogs = all("dialog[open]");
+    const last = dialogs[dialogs.length - 1];
+    if (last) {
+      if (last.id === "edit-dialog") closeEditor();
+      else if (last.id !== "action-dialog" || !el("action-confirm").disabled) last.close();
+      return true;
+    }
+    if (view === "settings") { closeSettings(); return true; }
+    if (practice || studying && view === "review") {
+      stopReview();
+      return true;
+    }
+    if (view !== "review") {
+      changeView("review");
+      return true;
+    }
+    return false;
+  };
+  window.wordReviewFileResult = (kind, data, error) => {
+    const target = kind === "csv" ? "error" : "settings-status";
+    if (error) {
+      message(target, error);
+      return;
+    }
+    if (!data) return;
+    try {
+      const result = JSON.parse(data);
+      if (result.cancelled) return;
+      if (kind === "import") {
+        if (view !== "settings") openSettings().then(() => showTransferPreview(result));
+        else showTransferPreview(result);
+      } else if (kind !== "csv") {
+        message(target, kind === "export" ? "完整学习数据已保存。" : "备份已保存。");
+      }
+    } catch (e) { message(target, e.message); }
+  };
+}
+
+async function restoreFile(event) {
+  const file = event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  try {
+    if (file.size > 124 << 20) throw new Error("备份文件过大。");
+    const backup = JSON.parse(await file.text());
+    ask("覆盖当前词库？", "恢复会替换现有词条、备注、学习历史和设置。程序会先在本地自动保存一份恢复前备份。", "确认覆盖", async () => {
+      await api("/api/restore", backup);
+      await showRestored("已从备份恢复。");
+    }, true);
+  } catch (error) { message("settings-status", error instanceof SyntaxError ? "这个文件不是有效的 JSON 备份。" : error.message); }
+}
+
+async function refreshStorage() {
+  const data = await api("/api/storage");
+  el("storage-path").textContent = mobile ? "应用私有存储" : data.database;
+  message("storage-notice", data.notice);
+}
+
+function reviewKeyAllowed(event) {
+  const target = event.target;
+  return !event.defaultPrevented && !event.isComposing && event.keyCode !== 229 &&
+    !event.ctrlKey && !event.altKey && !event.metaKey && view === "review" &&
+    studying && !practice && !busy && !swiping && state?.current &&
+    !controls.isOpen() && !document.querySelector("dialog[open]") && target instanceof Element &&
+    !target.isContentEditable &&
+    (!target.closest("input,textarea,select,button,a[href],summary,[contenteditable]") ||
+     target === el("reveal") || target.closest("#vote-actions"));
+}
+
+function keyboard(event) {
+  if (view === "settings" && event.key === "Escape" && !controls.isOpen() && !document.querySelector("dialog[open]")) {
+    event.preventDefault();
+    closeSettings();
+    return;
+  }
+  if (windowsReview && event.key === "Enter" && reviewKeyAllowed(event)) {
+    event.preventDefault();
+    if (!event.repeat && !event.shiftKey && !el("reveal").disabled && el("answer").hidden) toggleReveal();
+    return;
+  }
+  if (view !== "review" || event.repeat || event.altKey || event.isComposing || event.keyCode === 229 ||
+      event.defaultPrevented || !(event.target instanceof Element) || event.target.isContentEditable ||
+      event.target.closest("textarea,input,select,[contenteditable]") || controls.isOpen() || document.querySelector("dialog[open]")) return;
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+    event.preventDefault(); undo(); return;
+  }
+  if (event.ctrlKey || event.metaKey) return;
+  if (event.code === "Space" && !event.target.closest("button,a,.meaning-panel,.memory-panel")) {
+    event.preventDefault(); toggleReveal();
+  }
+  const voteKeys = windowsReview ? ["1", "2"] : ["1", "2", "ArrowLeft", "ArrowRight"];
+  if (voteKeys.includes(event.key) && !el("vote-actions").hidden && !el("answer").hidden) {
+    event.preventDefault();
+    const remembered = event.key === "2" || event.key === "ArrowRight";
+    if (state.waitingForNext && !remembered) nextCard();
+    else vote(remembered);
+  }
+}
+
+if (windowsReview) {
+  el("review-view").append(el("session-tools"));
+  document.body.append(el("vote-actions"));
+  let noteWidth;
+  new ResizeObserver(([entry]) => {
+    if (entry.contentRect.width === noteWidth) return;
+    noteWidth = entry.contentRect.width;
+    fitNote();
+  }).observe(el("personal-note").parentElement);
+}
+
+for (const form of all("form[data-validation]")) {
+  const status = el(form.dataset.validation);
+  form.addEventListener("invalid", event => {
+    event.preventDefault();
+    const input = event.target;
+    input.setAttribute("aria-invalid", "true");
+    if (input !== form.querySelector(":invalid")) return;
+    const name = input.getAttribute("aria-label") || input.labels?.[0]?.textContent.trim() || "该字段";
+    const detail = input.validity.valueMissing ? "不能为空。"
+      : input.type === "number" ? `应为 ${input.min} 到 ${input.max} 之间的整数。` : "的内容格式无效。";
+    status.setAttribute("data-invalid", "");
+    message(status.id, name + detail);
+    input.focus();
+  }, true);
+  form.addEventListener("input", event => {
+    if (event.target.hasAttribute("aria-invalid") && event.target.validity.valid) {
+      event.target.removeAttribute("aria-invalid");
+    }
+    if (status.hasAttribute("data-invalid") && !form.querySelector("[aria-invalid]")) {
+      status.removeAttribute("data-invalid");
+      message(status.id);
+    }
+  });
+}
+
+if (mobile) {
+  el("review-view").append(el("session-tools"));
+  const textField = "textarea, input[type=text], input[type=search], input[type=number], [contenteditable]";
+  const viewport = window.visualViewport;
+  let nativeKeyboard;
+  let fullHeight = viewport?.height || window.innerHeight;
+  const updateEditing = () => {
+    const editing = document.activeElement?.matches(textField);
+    const height = viewport?.height || window.innerHeight;
+    if (!editing && !nativeKeyboard) fullHeight = height;
+    else fullHeight = Math.max(fullHeight, height);
+    const shown = nativeKeyboard ?? (editing && fullHeight - height > 95);
+    document.body.classList.toggle("editing-input", Boolean(shown));
+    document.documentElement.style.setProperty("--visible-height", height + "px");
+  };
+  window.wordReviewKeyboardChanged = shown => { nativeKeyboard = shown; updateEditing(); };
+  document.addEventListener("focusin", updateEditing);
+  document.addEventListener("focusout", () => setTimeout(updateEditing, 0));
+  viewport?.addEventListener("resize", updateEditing);
+  window.addEventListener("resize", updateEditing);
+  window.addEventListener("resize", fitNote);
+  updateEditing();
+}
+
+if (mobile) {
+  const surface = el("swipe-content");
+  const cue = el("swipe-cue");
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  let drag;
+  let frame;
+  const setOffset = x => { surface.style.transform = `translate3d(${x}px,0,0)`; };
+  const canSwipe = () => view === "review" && studying && !practice && !busy && !swiping &&
+    state?.current && !el("answer").hidden &&
+    !document.activeElement?.matches("input,textarea,select,[contenteditable]") &&
+    !document.querySelector("dialog[open]") && !controls.isOpen() && !window.getSelection()?.toString();
+  function animate(from, to, duration) {
+    if (reducedMotion.matches || !surface.animate) return Promise.resolve();
+    return surface.animate([from, to], {duration, easing: "cubic-bezier(.2,.7,.3,1)"}).finished.catch(() => {});
+  }
+  function cancelDrag() {
+    if (!drag) return;
+    cancelAnimationFrame(frame);
+    const x = drag.offset;
+    drag = undefined;
+    setOffset(0);
+    cue.style.opacity = "";
+    if (x) animate({transform:`translateX(${x}px)`}, {transform:"translateX(0)"}, 190);
+  }
+  surface.addEventListener("pointerdown", event => {
+    if (!event.isPrimary || event.pointerType !== "touch" || drag || !canSwipe() ||
+        event.target.closest("input,textarea,select,button,a,summary,[contenteditable],.memory-panel")) return;
+    drag = {id:event.pointerId, x:event.clientX, y:event.clientY, offset:0,
+      threshold:Math.min(88, surface.clientWidth * .21), card:state.current, date:state.date,
+      waiting: Boolean(state.waitingForNext)};
+  });
+  surface.addEventListener("pointermove", event => {
+    if (drag?.id !== event.pointerId) return;
+    if (!canSwipe()) { cancelDrag(); return; }
+    const dx = event.clientX - drag.x;
+    const dy = Math.abs(event.clientY - drag.y);
+    if (!drag.offset && (dy > 10 && dy >= Math.abs(dx) || dx > 12)) { cancelDrag(); return; }
+    if (!drag.offset && (-dx < 12 || -dx < dy * 1.4)) return;
+    if (!surface.hasPointerCapture(event.pointerId)) surface.setPointerCapture(event.pointerId);
+    drag.offset = Math.min(0, dx);
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      setOffset(drag.offset);
+      cue.style.opacity = Math.min(1, -drag.offset / drag.threshold);
+    });
+  });
+  surface.addEventListener("pointercancel", cancelDrag);
+  surface.addEventListener("contextmenu", cancelDrag);
+  document.addEventListener("selectionchange", () => { if (window.getSelection()?.toString()) cancelDrag(); });
+  surface.addEventListener("pointerup", async event => {
+    if (drag?.id !== event.pointerId) return;
+    if (-drag.offset < drag.threshold || !canSwipe()) { cancelDrag(); return; }
+    const {offset, card, date, waiting} = drag;
+    drag = undefined;
+    cancelAnimationFrame(frame);
+    swiping = true;
+    renderReview();
+    const exit = -surface.clientWidth;
+    await animate({transform:`translateX(${offset}px)`, opacity:1}, {transform:`translateX(${exit}px)`, opacity:0}, 190);
+    surface.style.opacity = "0";
+    if (view === "review" && date === state.date && sameCard(card, state.current) && waiting === Boolean(state.waitingForNext)) {
+      if (waiting) await nextCard(true);
+      else await vote(true, true);
+    }
+    setOffset(0);
+    cue.style.opacity = "";
+    surface.style.opacity = "";
+    await animate({transform:"translateX(22px)", opacity:0.45}, {transform:"translateX(0)", opacity:1}, 190);
+    swiping = false;
+    renderReview();
+  });
+}
+
+for (const item of all("button[data-view]")) item.addEventListener("click", () => changeView(item.dataset.view));
+for (const item of all("[data-close]")) item.addEventListener("click", () => {
+  const dialog = item.closest("dialog");
+  if (dialog.id === "edit-dialog") closeEditor();
+  else dialog.close();
+});
+el("settings-back").onclick = closeSettings;
+el("open-licenses").onclick = async event => {
+  event.preventDefault();
+  try {
+    const dialog = el("license-dialog");
+    el("license-text").textContent = "正在加载…";
+    dialog.showModal();
+    const response = await request("/licenses");
+    if (!response.ok) throw new Error("无法读取第三方许可，请重试。");
+    el("license-text").textContent = await response.text();
+  } catch (error) { el("license-text").textContent = error.message; }
+};
+el("settings-form").addEventListener("change", event => {
+  commitSetting(event.target);
+  flushSettings().catch(() => {});
+});
+el("settings-form").onsubmit = event => event.preventDefault();
+el("settings-form").addEventListener("keydown", event => {
+  if (!["number", "date"].includes(event.target.type) || event.key !== "Enter" || event.isComposing || event.keyCode === 229) return;
+  event.preventDefault();
+  event.target.blur();
+});
+el("transfer-export").onclick = () => pickTransfer("export");
+el("transfer-import").onclick = () => pickTransfer("import");
+el("download-backup").onclick = event => {
+  if (window.WordReviewFiles) {
+    event.preventDefault();
+    window.WordReviewFiles.pickFile("backup", "");
+  }
+};
+el("pick-restore").onclick = () => el("restore-file").click();
+el("restore-file").onchange = restoreFile;
+el("start-review").onclick = startReview;
+el("undo").onclick = undo;
+el("stop-review").onclick = stopReview;
+el("reveal").onclick = toggleReveal;
+el("forgot").onclick = () => state?.waitingForNext ? nextCard() : vote(false);
+el("pass").onclick = () => vote(true);
+el("personal-note").oninput = noteInput;
+el("personal-note").oncompositionend = noteInput;
+el("personal-note").onblur = () => flushNote().catch(showError);
+el("speak").onclick = speak;
+if (window.speechSynthesis) speechSynthesis.onvoiceschanged = updateVoice;
+el("open-add").onclick = () => changeView("add");
+el("search").oninput = runSearch;
+el("filter").onchange = runSearch;
+el("sort").onchange = runSearch;
+el("prev-page").onclick = () => usePage(-1);
+el("next-page").onclick = () => usePage(1);
+el("select-all").onclick = () => { selected.clear(); selectedAll = true; refreshLibrary().catch(showError); };
+el("clear-selection").onclick = () => { clearSelection(); refreshLibrary().catch(showError); };
+el("batch-action").onchange = (event) => {
+  batchAction(event.target.value, selection(), selectedAll ? listTotal : selected.size);
+  event.target.value = "";
+  controls.syncSelect(event.target);
+};
+el("export-list").onclick = () => exportCSV({...libraryQuery(), all: true}).catch(showError);
+el("retry-all").onclick = () => api("/api/batch/retry", {keys: []}).then(refreshLibrary).catch(showError);
+el("edit-form").onsubmit = event => { event.preventDefault(); closeEditor(); };
+el("edit-dialog").addEventListener("cancel", event => { event.preventDefault(); closeEditor(); });
+el("edit-form").addEventListener("input", event => {
+  clearTimeout(editTimer);
+  if (!event.isComposing && event.target.id !== "edit-word") editTimer = setTimeout(() => flushEdit().catch(editError), 600);
+});
+el("edit-form").addEventListener("compositionend", () => {
+  clearTimeout(editTimer);
+  editTimer = setTimeout(() => flushEdit().catch(editError), 600);
+});
+el("edit-form").addEventListener("focusout", event => {
+  if (event.target.id.startsWith("edit-")) flushEdit(event.target.id === "edit-word").catch(editError);
+});
+el("retry-one").onclick = retryOne;
+el("action-form").onsubmit = confirmAction;
+el("add-form").onsubmit = submitWords;
+el("pick-txt").onclick = () => el("txt-file").click();
+el("txt-file").onchange = readWordFile;
+el("add-input").oninput = () => { if (!el("add-input").value.trim()) fileFormat = "words"; };
+document.addEventListener("keydown", keyboard);
+function flushOnHide() {
+  if (view === "settings" && document.activeElement?.type === "number") commitSetting(document.activeElement);
+  flushSettings(true).catch(() => {});
+  flushNote(true).catch(showError);
+  flushEdit(false, true).catch(editError);
+}
+if (window.wordReviewFinishClose) {
+  window.wordReviewPrepareClose = async () => {
+    let saved = false;
+    try {
+      const field = document.activeElement;
+      if (view === "settings" && ["number", "date"].includes(field?.type)) commitSetting(field);
+      await flushSettings();
+      await flushNote();
+      if (editing) await flushEdit(true);
+      saved = true;
+    } catch (error) {
+      if (editing) editError(error);
+      else showError(error);
+    }
+    await window.wordReviewFinishClose(saved);
+  };
+  window.wordReviewWindowReady();
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) flushOnHide();
+});
+window.addEventListener("pagehide", event => {
+  flushOnHide();
+  const ticket = Number(document.documentElement.dataset.windowTicket);
+  if (ticket && !event.persisted) request("/api/window/closed", {ticket}, {keepalive: true}).catch(() => {});
+});
+if (windowsReview) window.addEventListener("beforeunload", event => {
+  if (view === "settings" && document.activeElement?.type === "number") commitSetting(document.activeElement);
+  if (noteDirty() || editJob || hasSettingChanges() || Object.keys(editedFields(true)).length) {
+    flushOnHide();
+    if (editing) flushEdit(true).catch(editError);
+    event.preventDefault();
+    event.returnValue = "";
+  }
+});
+let tick = 0;
+setInterval(async () => {
+  if (busy || swiping) return;
+  tick++;
+  try {
+    if (view === "library" && !controls.isOpen() && !document.querySelector("dialog[open]")) await refreshLibrary();
+    if (view === "add" && importPending) await updateImportStatus();
+    if (view === "review" && revealed?.lookup === "pending" && !el("answer").hidden && state.settings.online) {
+      const before = revealed;
+      const result = await api("/api/card/" + keyPath(before.key));
+      if (revealed === before && result.lookup !== "pending") { revealed = result; renderDetails(result); }
+    }
+    if (tick % 5 === 0) await refreshState();
+  } catch (error) { showError(error); }
+}, 4000);
+refreshState().then(resumeWaiting).catch(error => { el("review-empty").removeAttribute("aria-busy"); showError(error); });
+refreshStorage().catch(showError);

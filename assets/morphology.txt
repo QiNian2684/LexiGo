@@ -1,0 +1,743 @@
+# 分类|构词形式|中文速记|明确列出的适用单词（以空格分隔）
+# word|完整拼写|人工整理的组合提示
+# 图书目与资料边界见 licenses/Construction-notes.txt。
+prefix|a-|无；缺少（希腊语）|amoral atypical apolitical asymmetrical asynchronous aseptic
+prefix|an-|无；缺少（常见于元音前）|anaerobic anhydrous anoxia
+prefix|ab-|离开；偏离|abnormal abduct abduction abdicate
+prefix|ad-|向；靠近|adhere adhesion adjoin adjunct
+prefix|ac-|向；加强（ad- 的变体）|accede accession acclimate acclimatize
+prefix|af-|向（ad- 的变体）|affix affixation
+prefix|ag-|向；加强（ad- 的变体）|aggravate aggravation
+prefix|al-|向（ad- 的变体）|allude allusion
+prefix|an-（ad- 变体）|向；接近|annex annexation
+prefix|ap-|向；接近（ad- 的变体）|approach appraise appraisal
+prefix|as-|向；加强（ad- 的变体）|assimilate assimilation
+prefix|at-|向；接近（ad- 的变体）|attract attraction attribute attribution
+prefix|ante-|在前；先于|antecedent anteroom antenatal
+prefix|anti-|反对；防止|antibody antibiotic antidote anticoagulant antitrust antifreeze antiwar antisocial antiaircraft
+prefix|auto-|自己；自动|autobiography autobiographical autopilot autograph autofocus autosave
+prefix|bi-|二；双|bilingual bilingualism bilateral bicycle bipartisan bicameral biped bifocal
+prefix|circum-|周围；绕着|circumference circumnavigate circumscribe circumvent
+prefix|co-|共同；一起|coauthor cofounder cooperate cooperative coordinate coexist coexistence coproduce coproduct copilot coworker
+prefix|com-|一起（con- 的变体）|combine combination commingle compare comparison
+prefix|con-|一起；会合|converge convergence congregate congregation consolidate consolidation
+prefix|col-|一起（con- 的变体）|collaborate collaboration colleague collect collective
+prefix|cor-|一起（con- 的变体）|correlate correlation correspond correspondence
+prefix|contra-|相反；对抗|contradict contradiction contradictory contraception contraceptive
+prefix|contro-|相反；对立（contra- 相关形式）|controversy controversial
+prefix|counter-|反制；与之相对|counteract counterbalance counterattack counterpart counterargument countermeasure counterclockwise counterweight
+prefix|de-|去除；逆转（这里的用法）|deactivate deactivation defrost decompose decomposition decentralize decentralization decompress dehydration devalue deregulate
+prefix|dia-|穿过；横跨|diameter diagonal dialysis
+prefix|di-|二；双|dioxide digraph dichotomy dilemma
+prefix|dis-|分离；取消；否定|disconnect disconnection disagree disagreement disapprove disapproval disassemble disarm disband disbelieve dishonest dishonesty disloyal disorder dislike disobedient disobey disrespect dismantle disqualify
+prefix|dys-|困难；异常|dysfunction dysfunctional dyslexia dyslexic dysphoria
+prefix|eco-|生态；环境|ecosystem ecotourism ecofriendly
+prefix|epi-|在上；附于|epidermis epilogue epigraph
+prefix|en-|使成为；使进入|enable enact enforce enliven enlarge enrich endanger encircle engulf enlist
+prefix|em-|使成为；置于（en- 的变体）|embolden embodiment embed embarrass embitter
+prefix|e-|出去；向外（ex- 相关形式）|eject ejection emit emission evoke ejector
+prefix|ex-|出去；向外|exhale exhalation excavate excavation excrete excretion extract extraction exodus
+prefix|ex-（曾任）|以前的|ex-president ex-wife ex-husband
+prefix|extra-|在外；超过|extracurricular extraterrestrial extraordinary extrajudicial
+prefix|fore-|在前；预先|forecast foresee foresight forewarn foreword forearm foreground forefather forefront forethought
+prefix|hetero-|不同；异类|heterogeneous heterogeneity heterosexual
+prefix|homo-|相同；同类|homogeneous homogeneity homophone homonym homograph
+prefix|hyper-|过度；高于|hyperactive hyperactivity hypertension hypersensitive hypersensitivity hyperlink hyperinflation hypercritical
+prefix|hypo-|低于；不足|hypothermia hypoglycemia hypotension hypodermic
+prefix|il-|不（否定 in- 在 l 前的变体）|illegal illegality illegible illegitimate illiberal illogical illiterate illiteracy
+prefix|im-|不（否定 in- 在部分唇音前的变体）|impossible impossibility imperfect imperfection impartial impartiality impatient impolite impractical impure immoral immobile immature immeasurable immovable impersonal
+prefix|in-|不（此处是否定前缀）|inactive inaction inaccurate inaccuracy inadequate inadequacy incapable incapacity incoherent inconsistency inconsistent incomplete incomparable inconclusive inconvenient inconvenience indecisive independent independence indirect indifferent indifference ineffective inefficient inefficiently ineligible inequality inexperienced inflexible informal injustice invisible invisibility involuntary
+prefix|in-（向内）|向内；进入|incline inclination inlet inhale inhalation inbound inlay
+prefix|ir-|不（否定 in- 在 r 前的变体）|irrational irrationality irregular irregularity irresistible irresponsible irrelevant irreversible irreparable
+prefix|infra-|在下；低于|infrared infrastructure infrasonic
+prefix|inter-|在……之间；相互|interact interaction international intercontinental interdisciplinary interconnect interdependent interdependence interchange intermediate interpersonal interstate intersection interfere interview interrelated
+prefix|intra-|在……内部|intravenous intracellular intranet intramuscular
+prefix|intro-|向内|introvert introspect introspection
+prefix|iso-|相等；相同|isochronous isometric isotherm
+prefix|mal-|坏；不良；异常|malfunction malpractice malnutrition maltreatment maladjusted maladaptive
+prefix|mega-|很大；百万|megabyte megawatt megacity
+prefix|meta-|关于自身；高阶层面（现代用法）|metadata metalinguistic metacognition
+prefix|mid-|中间|midday midnight midsummer midterm midway midpoint midweek
+prefix|micro-|微小；百万分之一|microscope microscopic microphone microorganism microchip microwave microeconomics
+prefix|macro-|大；宏观|macroeconomics macroeconomic macrostructure macronutrient
+prefix|mini-|小型|minibus miniskirt minibreak
+prefix|mis-|错误；不当|misinterpret misinterpretation mislead misleading misread misuse misunderstand misunderstanding misjudge misplace miscalculate mispronounce misinform misinformation misbehave misspell mistreat misconception
+prefix|mono-|单一|monolingual monologue monogamy monorail monotheism monochrome
+prefix|multi-|多个|multiple multiply multilateral multinational multicultural multimedia multilingual multitask multidimensional
+prefix|neo-|新的；复兴的|neoclassical neolithic neoliberal
+prefix|non-|不；非|nonexistent nonfiction nonverbal nonprofit nonessential nonrenewable nonviolent nonviolence nonsense nonstop nonpayment nonstandard
+prefix|ob-|向着；对着或挡在前面|obstacle obstruct obstruction oppose opposition
+prefix|oc-|在前；挡住（ob- 的变体）|occlude occlusion
+prefix|omni-|所有；无所不及|omnivore omnivorous omnipotent omniscient
+prefix|out-|超过；胜过（这里的用法）|outdo outlast outlive outweigh outperform outrun outnumber outgrow outbid outsell
+prefix|over-|过度；越过（这里的用法）|overeat overwork overload overestimate overstate overreact overreaction oversleep overcrowd overcharge overuse overlook overthrow overtake overheating overpay
+prefix|pan-|全部；整体|panorama panoramic pandemic
+prefix|para-|在旁；在体系之外；辅助|parallel paramedic paralegal paranormal
+prefix|peri-|围绕；周围|perimeter peripheral periphery periscope
+prefix|poly-|多|polygon polygamy polytheism polyester polyglot
+prefix|post-|在后|postwar postgraduate postscript postdate postdoctoral postnatal postoperative
+prefix|pre-|预先；在……以前|preview pretest prepaid prepay preheat preschool prehistoric premature precondition precaution predictable predict prediction preface prenatal prewar presuppose predetermined
+prefix|pro-|向前；在前（这里的拉丁构词）|proceed progress propel promote promotion projection project proposition provisional
+prefix|pro-（赞成）|支持；赞成|pro-democracy pro-choice
+prefix|proto-|最初；原型|prototype protozoan
+prefix|pseudo-|假的；貌似的|pseudonym pseudoscience pseudoscientific
+prefix|quadri-|四|quadrilateral quadriplegia
+prefix|quasi-|似是而非；准|quasiperiodic quasi-scientific quasi-judicial
+prefix|re-|再次；回（这里的用法）|redo remake rewrite reread rethink rebuild restart reuse recycle reconnect reintroduce reevaluate reconsider reorganize restructure renew renewal recover recovery return retell repay replace replacements reposition resend regenerate regain retry resume reverse reappear repaint review
+prefix|retro-|回顾；向后|retroactive retrospect retrospective retrograde
+prefix|semi-|半；部分|semicircle semifinal semiconductor semicolon semiautomatic semiannual
+prefix|sub-|在下；次级；分支|subway submarine subconscious subordinate submerge subdivide subcommittee subtitle subgroup subset subsection subdivision substandard substitute substitution
+prefix|suc-|在下；随后（sub- 的变体）|succeed successor succession success
+prefix|suf-|在下；由下而上（sub- 的变体）|suffix suffuse
+prefix|sug-|由下；从旁提出（sub- 的变体）|suggest suggestion
+prefix|super-|在上；超过|superhuman supernatural superpower supermarket supercomputer superimpose supersede
+prefix|supra-|在上；超出|supranational supramolecular
+prefix|sur-|在上；额外|surplus surcharge surface
+prefix|sym-|一起（syn- 的变体）|symmetry symmetrical symposium sympathy
+prefix|syn-|共同；同时|synchronize synchronic synchronous synonym synthesis
+prefix|tele-|远距离|telephone telegraph telecommunications telescope television telemedicine telework
+prefix|trans-|跨越；转移|transatlantic transplant transplantation transnational transcontinental transcribe transcription transmit transmission transfusion transfer transit translate translation transform transformation transaction transparent transparency
+prefix|tri-|三|triangle triangular tricycle tripod trilingual trilogy trimester
+prefix|ultra-|超出；极端|ultraviolet ultrasound ultrasonic ultramodern
+prefix|un-（否定）|不；非|unable unacceptable uncertain unclear uncomfortable uncommon unconscious unexpected unfair unfamiliar unfavorable unhappy unhealthy unimportant unlikely unlawful unnecessary unofficial unpleasant unpopular unpredictable unrealistic unreasonable unreliable unsuccessful unwilling unwise unsafe unusual unknown
+prefix|un-（逆转）|解除；逆转动作|unlock unwrap unpack untie unfold unfasten unload uncover undo uninstall unbind unplug unscrew unsubscribe
+prefix|under-|在下；不足（这里的用法）|underground underwater undersea underpass underdeveloped underestimate understate underpay underweight underperform undercover
+prefix|uni-|一个；单一|uniform uniformity unite unicycle unilateral unison unique union unity uniformed
+prefix|vice-|副；代理|vice-president vice-chairman viceroy
+prefix|with-|向回；离开（历史形式）|withdraw withdrawal withhold
+prefix|xeno-|外来；陌生|xenophobia xenophobic
+
+# 派生后缀；只列确实适用的词，避开词尾碰巧一致的情况。
+suffix|-able|可以……的；适合……的|acceptable achievable adaptable admirable advisable affordable avoidable believable breakable comparable considerable dependable desirable downloadable eatable enjoyable identifiable imaginable manageable measurable noticeable payable predictable preventable readable reasonable renewable reusable understandable valuable washable
+suffix|-ible|-able 的相关拉丁形式；可……的|accessible compatible comprehensible convertible divisible edible exhaustible feasible flexible illegible legible permissible possible reversible sensible tangible visible
+suffix|-acy|性质；状态；身份|accuracy adequacy advocacy candidacy legitimacy literacy privacy
+suffix|-age|结果、集合、费用或状态（依词而定）|breakage coverage leakage mileage postage shortage storage usage wreckage
+suffix|-al（形容词）|与……有关的|accidental cultural environmental financial global industrial logical musical national natural original personal political regional seasonal structural traditional
+suffix|-al（名词）|动作及其结果|approval arrival denial dismissal disposal proposal refusal removal survival withdrawal
+suffix|-an / -ian|有关的；从事者或居民|historian librarian musician technician politician physician guardian mathematician civilian vegetarian
+suffix|-ance|行为；状态；性质|acceptance appearance attendance assistance avoidance clearance compliance dominance endurance guidance importance performance reliance resistance tolerance
+suffix|-ancy|状态；性质|vacancy pregnancy hesitancy dormancy buoyancy occupancy expectancy
+suffix|-ant|施事者；也可表某种状态|applicant assistant attendant consultant contestant defendant informant inhabitant participant servant claimant
+suffix|-arch|统治者；首领|monarch patriarch matriarch
+suffix|-archy|统治方式；结构|anarchy monarchy oligarchy hierarchy patriarchy matriarchy
+suffix|-ary|与……有关的；具有……功能的|budgetary customary dietary evolutionary inflationary literary monetary planetary precautionary revolutionary
+suffix|-ate（动词）|使……；进行某动作|activate animate calibrate circulate concentrate differentiate facilitate formulate generate illustrate imitate motivate regulate stimulate validate
+suffix|-ation|动作、过程或结果|adaptation admiration application classification conservation consultation cultivation declaration education evaluation examination expectation exploration identification imagination implementation installation integration interpretation limitation migration observation organization participation preparation separation transportation
+suffix|-ator|执行者；执行某动作的装置|accelerator actuator animator calculator coordinator curator educator generator incubator moderator narrator operator regulator simulator translator ventilator
+suffix|-cy|状态；性质|bureaucracy delicacy efficiency infancy lunacy secrecy
+suffix|-cracy|统治；治理制度|democracy aristocracy autocracy meritocracy technocracy plutocracy
+suffix|-crat|某治理体系的成员|bureaucrat democrat aristocrat autocrat technocrat
+suffix|-dom|领域；状态；身份|freedom kingdom wisdom boredom fandom
+suffix|-ee|受到某动作的人；有时指参与者|employee trainee interviewee nominee payee refugee retiree examinee
+suffix|-eer|从事某活动的人|auctioneer mountaineer pioneer volunteer profiteer pamphleteer
+suffix|-en（动词）|变成；使具有某性质|blacken brighten broaden darken deepen fasten flatten frighten harden hasten heighten lengthen lessen loosen moisten redden sharpen shorten soften strengthen sweeten thicken tighten toughen weaken widen worsen
+suffix|-en（形容词）|由……制成的|golden wooden woollen woolen earthen
+suffix|-ence|状态；行为；性质|absence adherence competence confidence dependence difference existence experience impatience influence persistence preference presence reference silence
+suffix|-ency|状态；性质|emergency fluency frequency tendency transparency consistency proficiency residency dependency delinquency urgency currency
+suffix|-ent|有……性质的；有时指某类人|absorbent apparent dependent different persistent resident respondent solvent
+suffix|-er（施事）|做某事的人或物|baker banker cleaner driver employer farmer fighter gardener hiker investigator learner listener painter reader researcher runner swimmer teacher trainer writer worker
+suffix|-er（比较级）|比……更|bigger brighter faster higher kinder longer older shorter smaller stronger wider younger
+suffix|-ery|场所；行为；集合（依词而定）|bakery brewery bribery fishery forgery machinery pottery robbery scenery trickery
+suffix|-esque|具有某种风格或特征|picturesque grotesque statuesque
+suffix|-ess|女性称谓（部分词属传统用法）|actress hostess princess duchess lioness waitress
+suffix|-est|最……（形容词最高级）|biggest fastest highest longest oldest shortest smallest strongest youngest
+suffix|-ette|小型；或表类似品（依词而定）|kitchenette cigarette cassette novelette
+suffix|-fold|……倍；……重|twofold threefold fourfold manifold
+suffix|-ful|具有；充满|beautiful careful cheerful colorful colourful delightful fearful grateful helpful hopeful meaningful mindful painful peaceful playful powerful respectful skillful skilful stressful successful thoughtful useful wasteful wonderful
+suffix|-fy / -ify|使成为；使具有|beautify clarify classify falsify intensify justify modify notify purify qualify rectify simplify solidify specify testify unify verify amplify magnify identify
+suffix|-hood|状态、身份或人生阶段|adulthood childhood brotherhood fatherhood motherhood neighborhood neighbourhood parenthood
+suffix|-ial|与……有关的|colonial editorial managerial memorial
+suffix|-ic|与……有关；有某性质|academic acidic atomic artistic historic ironic metallic poetic scientific systematic tragic dramatic climatic economic
+suffix|-ical|与……有关；有某性质|biological chemical historical ideological medical mechanical psychological theoretical
+suffix|-id|有……性质的（部分拉丁借词词尾）|florid fluid humid rapid rigid timid vivid
+suffix|-ile|有……性质；与……有关|docile ductile fragile juvenile mobile tactile versatile
+suffix|-ine|与……有关；像……的（此处用法）|canine feline marine alpine
+suffix|-ing（名物）|动作、过程或相关事物|booking building farming findings handwriting meeting reading shipping training writing
+suffix|-ion|动作、过程或结果|addiction caution completion contribution correction decision division expansion extension fixation invention revision tension
+suffix|-ish|有点像；稍微；带……性质|bluish childish foolish greenish reddish selfish whitish youngish bookish yellowish
+suffix|-ism|主张、制度、倾向或现象|capitalism socialism colonialism consumerism feminism humanism idealism imperialism individualism nationalism optimism pessimism pragmatism racism realism romanticism secularism symbolism
+suffix|-ist|从事者；主张者|activist artist biologist chemist economist feminist journalist linguist novelist optimist pianist scientist socialist specialist theorist
+suffix|-ity|性质；状态|ability activity adaptability capability creativity complexity diversity equality flexibility hostility individuality intensity legitimacy liability morality necessity neutrality possibility reliability responsibility stability validity vitality
+suffix|-ive|具有……性质或倾向|active adaptive adhesive aggressive attractive competitive constructive destructive effective expressive impressive innovative objective passive productive protective selective sensitive supportive
+suffix|-ization / -isation|使……化的过程|centralization digitalization globalization globalisation industrialization modernization modernisation privatization socialization urbanization standardization
+suffix|-ize / -ise|使……化；按……处理|apologize apologise authorize capitalise capitalize categorize characterize classify colonize criticize customise customize digitize emphasize energize harmonize legalize localize maximize minimize monopolize organize organise prioritize realize realise recognize recognise specialize specialise stabilize summarize summarise symbolize visualize
+suffix|-less|没有；缺少|careless colorless colourless countless endless fearless flawless helpless homeless hopeless jobless meaningless motionless needless painless powerless restless speechless tasteless thoughtless tireless useless worthless
+suffix|-let|小型事物|booklet leaflet piglet droplet starlet
+suffix|-like|像……一样|childlike lifelike businesslike warlike
+suffix|-ling|幼小者；某类身份|darling duckling fledgling gosling underling
+suffix|-logue|讲话；某种文字记录|dialogue monologue prologue travelogue
+suffix|-logy|领域；研究；学科（依词而定）|anthropology archaeology biology cardiology criminology ecology endocrinology geology meteorology mythology neurology oncology pathology pharmacology psychology sociology theology toxicology zoology
+suffix|-ly（形容词）|具有……特点的|costly daily elderly friendly lively lonely lovely monthly scholarly weekly yearly
+suffix|-ly（副词）|以……方式；常将形容词变为副词|accurately actually annually automatically badly briefly carefully clearly closely correctly differently directly easily effectively eventually finally frankly generally gradually highly honestly hopefully incorrectly increasingly largely lightly likely mainly nearly normally obviously partially partly particularly possibly practically properly quickly quietly rarely rapidly regularly relatively roughly seriously shortly simply slightly slowly specifically successfully suddenly truly usually widely
+suffix|-ment|动作、结果或状态|achievement adjustment advancement agreement amazement announcement appointment arrangement assessment assignment attachment commitment development disagreement disappointment employment encouragement enjoyment establishment excitement fulfillment fulfilment government improvement measurement movement payment replacement requirement settlement statement treatment unemployment
+suffix|-most|最靠某方向|easternmost foremost innermost northernmost outermost southernmost uppermost westernmost
+suffix|-ness|性质；状态|awareness bitterness boldness brightness carefulness darkness effectiveness fairness fitness forgiveness fullness greatness happiness illness kindness loneliness neatness openness preparedness readiness richness sadness sickness softness weakness willingness
+suffix|-oid|形似；类似|android asteroid humanoid spheroid trapezoid
+suffix|-oma|肿块；肿瘤（医学术语）|carcinoma lymphoma melanoma
+suffix|-onym|名称；词|acronym antonym homonym pseudonym synonym
+suffix|-or（施事）|做某事的人或物|actor administrator author collector competitor conductor creator donor editor instructor inventor investor mentor projector supervisor visitor
+suffix|-ory|与……有关；起……作用|advisory compulsory explanatory introductory mandatory obligatory preparatory regulatory satisfactory sensory
+suffix|-ose|糖（化学名称的常见词尾）|fructose glucose lactose sucrose cellulose
+suffix|-osis|过程；状态；常用于病症|fibrosis neurosis psychosis thrombosis
+suffix|-ous|具有……性质的|ambitious anonymous anxious autonomous cautious conscious curious dangerous enormous famous generous glorious gracious humorous hazardous infectious jealous joyous nervous numerous outrageous poisonous prosperous religious ridiculous suspicious virtuous
+suffix|-phile|爱好者；偏好某物者|audiophile bibliophile cinephile
+suffix|-phobia|恐惧；强烈排斥|agoraphobia arachnophobia claustrophobia hydrophobia xenophobia
+suffix|-proof|能防护……的|waterproof fireproof bulletproof soundproof
+suffix|-scope|观察用仪器|endoscope kaleidoscope microscope periscope stethoscope telescope
+suffix|-scopy|检查或观察的方法|endoscopy colonoscopy microscopy
+suffix|-ship|身份、关系、技能或状态|citizenship companionship dictatorship entrepreneurship fellowship friendship internship leadership membership ownership partnership relationship scholarship sponsorship stewardship
+suffix|-sion|动作、过程或结果|collision comprehension conclusion confusion conversion exclusion inclusion intrusion persuasion precision provision suspension
+suffix|-some|易引起……；具有某性质|awesome burdensome cumbersome fearsome handsome tiresome troublesome wholesome
+suffix|-th|性质或量（部分旧派生形式）|breadth depth growth health length strength warmth width
+suffix|-tion|动作、过程或结果|absorption adoption conception construction destruction detection direction distinction distribution instruction introduction production protection recognition reduction selection solution transition
+suffix|-tude|状态或性质（部分拉丁来源词）|altitude aptitude attitude gratitude magnitude multitude
+suffix|-ure|动作、状态或结果|closure departure exposure failure fracture mixture pressure procedure signature structure
+suffix|-ward / -wards|朝向……|backward backwards downward downwards eastward forward forwards homeward inward inwards outward outwards onward onwards upward upwards
+suffix|-wise|按……方向；就……方面而言|clockwise likewise lengthwise otherwise sidewise
+suffix|-worthy|值得……|newsworthy noteworthy trustworthy praiseworthy
+suffix|-y|有……特征的（常见形容词后缀）|cloudy dusty foggy funny gloomy greasy grassy guilty hairy healthy hungry icy juicy messy noisy rainy rocky salty sandy sleepy smoky snowy stormy sunny thirsty windy
+
+# 拉丁及希腊来源构词成分，列出有迁移价值的变体与明确示例。
+root|act|做；驱动|action activity enact reaction reactive transact
+root|ag / act|做；驱动（同一拉丁词的不同词干）|agent agency agenda agile agitation
+root|agr / agri|田地；农业|agriculture agricultural agrarian agronomy
+root|alter|另一个；改变|alteration alternate alternative alternation
+root|alt|高|altitude alto
+root|am / ami|爱；友情|amiable amicable amorous enamor
+root|ambul|步行；移动|ambulance ambulatory somnambulism perambulate
+root|anim|呼吸；生命；精神|animal animosity animate animation unanimous inanimate
+root|ann / enn|年|annual anniversary annuity perennial biennial centennial millennium
+root|anthrop|人；人类|anthropology anthropologist anthropomorphic philanthropy
+root|apert|打开（aperture 源于拉丁语）|aperture
+root|aqu|水|aquatic aquarium aqueduct aquaculture
+root|apt|适合；连接|aptitude adapt adapter adaptation
+root|archi / arch|为首；主要|archbishop archduke archangel
+root|archaeo|古代|archaeology archaeologist archaic
+root|aster / astr|星|asterisk astronomy astronaut astrology asteroid astrophysics
+root|atom / tom|切；分割（atom 字面为不可分割）|anatomy atomic atom
+root|aud|听|audio audible inaudible audience audit auditorium audition auditory
+root|aug / auct|增加；扩展|augment augmentation auction
+root|avi|鸟|aviary aviation avian aviator
+root|baro|重量；压力|barometer barometric
+root|belli|战争|bellicose belligerent antebellum
+root|bene|好；善|benevolent benefactor benefit beneficial benediction
+root|benign|善良；温和（现代派生）|benignity benignly
+root|bibli / biblio|书|bibliography bibliophile bibliographic
+root|bio|生命|biography biographical biodegradable biodiversity biosphere biotech biotechnology biochemical biochemistry
+root|brev / brevi|短|abbreviate abbreviation brevity
+root|cad / cas / cid|落下；发生（同源变体）|cascade case accident accidental incident incidence cadence
+root|camp|田野；空地|campus campaign camp
+root|cand|白亮；发光|candid candidate candle incandescent
+root|can / cant|唱|chant cantata canticle incantation
+root|cap / capt|拿取；抓|capture captive captivity captivate capability capacity recap
+root|capit|头（可引申为首要）|capital capitulate decapitate
+root|cardi / cardio|心脏|cardiac cardiology cardiovascular cardiogram
+root|carn|肉|carnal carnivore carnivorous
+root|cede / ceed / cess|走；让步（同源变体）|accede concede precede proceed recede secede exceed access accessible cessation concession predecessor procession recess recession
+root|cellul|小室；细胞|cellular cellulose
+root|centr|中心|center centre central concentric eccentric centrifugal centripetal decentralization
+root|cept / ceiv|取；接受（亲缘形式）|accept acceptable acceptance conceive conception deceive deception perceive perception receive reception receptive susceptible intercept interception
+root|cern / cret|辨别；筛分|discern discernment discrete discretion discreet secret
+root|cert|确定|certain certainty ascertain certify certificate certification
+root|chrom / chromo|颜色|chromatic monochrome chromosome chromatography
+root|chron|时间|chronology chronological chronicle chronic chronometer synchronize asynchronous
+root|cid / cis|切；杀（拉丁语 caedere 的变体）|incision precise precision excise excision homicide suicide genocide pesticide insecticide
+root|cili|睫毛；纤毛|cilia ciliary
+root|cin / cine|运动|cinema cinematic cinematography kinescope
+root|cit|叫动；唤起|cite citation incite incitement excite excitation
+root|civ|公民|civil civic civilian civilization civilize civility
+root|claud / clud / clus|关闭（同源变体）|include inclusion exclude exclusion conclude conclusion inclusive exclusive recluse seclude seclusion
+root|clin / cliv|倾斜；斜坡|incline recline decline inclination
+root|cogn / gnos|知道；认识（同源成分）|cognition cognitive cognizant recognize recognition agnostic diagnosis prognosis
+root|cord|心；心意|accord concord discord cordial cordiality
+root|corp|身体；实体|corpse corps corporation corporate corporal incorporeal corpus
+root|cosm|世界；宇宙|cosmos cosmic cosmology cosmopolitan microcosm
+root|cracy / crat|统治者及统治方式|democratic bureaucratic aristocratic autocratic
+root|cre / cresc|生长；增加|increase decrease crescent crescendo increment accrue
+root|crea / creat|创造；使产生|create creation creative creature creativity recreate procreate
+root|cred|相信；信任|credit credible credibility incredible credulous credential discredit
+root|cruc / cruci|十字形|crucial crucifix cruciform crucify
+root|cry / cryo|冷；冰冻|cryogenic cryogenics cryotherapy
+root|crypt|藏；隐藏|cryptic cryptography encrypt decrypt encryption
+root|cub / cumb|躺；靠（同源变体）|incubate incubator incumbent succumb recumbent
+root|culp|过错；责备|culprit culpable culpability inculpate
+root|cult|培育；耕作|cultivate cultivation culture horticulture aquaculture
+root|cur|照料|cure curable curative curator curatorial
+root|curr / curs|跑；流动|current currency concurrent occurrence recurrent recur excursion cursive cursory
+root|cycl|圈；循环|cycle cyclic cyclone bicycle cyclicality recycle
+root|dactyl|手指；趾|dactylic pterodactyl
+root|deb|欠；应付（同源于拉丁语 debere）|debt debit debtor debenture
+root|dec / deca|十|decade decimal decathlon decagon
+root|dem / demo|民众；人口|democracy democratic demographic demography epidemic endemic pandemic
+root|dent|牙|dentist dentistry dental denture dentition
+root|derm|皮肤|dermatology epidermis dermatological dermatitis
+root|dic / dict|说；指明|dictate dictation diction dictionary dictator verdict indicate indicative indict edict
+root|digit|手指；数码|digital digit digitize digitalization
+root|dol|痛；悲伤|condolence condolences doleful
+root|domin|主人；支配|dominant dominate domination dominance dominion
+root|don|给；赠送|donate donation donor
+root|dorm|睡觉|dormant dormancy dormitory
+root|duc / duct|引导；带领|deduce deduction induce induction introduce introduction produce production reduce reduction conduct conductor aqueduct educate education
+root|dur|硬；持久|durable duration endure endurance durability
+root|dyn / dynam|力量|dynamic dynamics dynamism dynamo
+root|ego|自我|egoism egotism egocentric egotistical
+root|electr|电|electric electrical electricity electrode electrician electromagnetic
+root|embr|手臂相关（embrace 借自法语构词）|embrace
+root|equ|相等|equal equality equate equation equator equivalent equity equilibrium equitable
+root|erg|工作；作用|ergonomic ergonomics energy energetic
+root|ethn|民族；族群|ethnic ethnicity ethnography ethnology
+root|fac / fact / fect / fic|做；造成（拉丁词根变体）|factory factor fact factual facile facility manufacture artifact effect effective defect defective perfect perfection infect infection efficient efficiency benefit deficit artificial sacrifice
+root|fall / fals|欺骗；错|fallacy fallible infallible false falsify falsification
+root|fam|名声；传言|fame famous infamous infamy defame defamation
+root|febr|发烧|febrile
+root|fed / foed|盟约|federal federation confederation federalism
+root|fer|搬运；带来|refer reference transfer confer conference prefer preference differ difference infer inference
+root|fid|信任；忠实|fidelity infidelity confident confidence confidential diffident
+root|fig / fict|塑形；想象|figure figurative fiction fictional fictitious figment configuration
+root|fil|线（拉丁语 filum）|filament file filigree
+root|fin|边界；结束|finish finite infinite infinity final define definite definition definitive confine confinement refine refinement
+root|firm|牢固|firm firmness affirm affirmation confirm confirmation
+root|flect / flex|弯曲|flex flexible flexibility deflect deflection reflect reflection inflection reflex
+root|flor|花|floral florist flora flourish
+root|flu / flux|流|fluid fluent influence influenza influx reflux flux fluctuate fluctuation
+root|foli|叶片|foliage folio portfolio defoliate
+root|forc / fort|力量；坚固|fort fortify fortress fortitude reinforce reinforcement force enforce enforcement
+root|form|形状；形成|form formal format formation conform conformity reform reformer conformist deform deformation transform uniform
+root|fract / frag|打破；碎裂|fracture fraction fragile fragility fragment fragmentation
+root|frater / fratern|兄弟|fraternal fraternity fraternize
+root|fruct|果实|fructose fructify
+root|fug|逃离|fugitive refuge refugee subterfuge centrifugal
+root|funct|执行；发挥作用|function functional functionality malfunction dysfunctional
+root|fus|倒出；倾注（拉丁语 fundere 的词干）|confuse confusion diffuse diffusion infuse infusion fuse fusion profuse transfusion effusion
+root|gam|婚姻|monogamy polygamy bigamy
+root|gen / gener|产生；种类|gene genetic generate generation generic genus genesis genealogy eugenics indigenous
+root|geo|土地；地球|geography geographical geographer geology geological geometry geometric geopolitics geothermal
+root|ger / gest|携带；施行（拉丁词根变体）|gesture digest digestion ingest congest congestion suggest suggestion
+root|geront|老年|gerontology
+root|glaci|冰|glacier glacial glaciation
+root|glob|球体|globe global globalization globular
+root|gloss / glott|舌；语言|glossary gloss polyglot
+root|glyc / gluc|甜；糖|glucose glycogen glycolysis glucagon
+root|grad / gress|步；行进（同源变体）|grade gradual graduate graduation gradient degrade degree progress progression regress regression aggression aggressive digress digression congress
+root|gram / graph|书写；记录（相关形式）|grammar grammatical diagram graphic graphics paragraph photograph photography autograph telegraph biography telegram program histogram cardiogram
+root|grav|重；严重|gravity gravitate gravitation grave aggravate
+root|greg|群聚；群体|aggregate aggregation congregate congregation segregate segregation gregarious
+root|gyn / gyne|女性|gynecology gynecologist
+root|hab / hib|持有；保持|habit habitat inhabit exhibit exhibition inhibit inhibition prohibit prohibition
+root|haem / hemato|血|hemoglobin haemoglobin hematology haematology hemorrhage haemorrhage
+root|heli / helio|太阳|heliocentric heliograph
+root|hered|继承人；继承|hereditary heredity heir heritage
+root|hosp / host|主人；客人；接待|hospital hospitality hospice hostel hotel host hostage hospitable
+root|hydr / hydro|水|hydrate hydration dehydration hydraulic hydrology hydroelectric hydropower
+root|iatr|医疗；医治|psychiatry psychiatrist pediatric pediatrics geriatric geriatrics
+root|ichthyo|鱼|ichthyology ichthyosaur
+root|ign|火|ignite ignition igneous
+root|insul|岛（可引申为隔绝）|insular insulate insulation peninsula
+root|integr / integer|完整；未受损|integrate integration integral integer integrity disintegrate
+root|it / itiner|走；路线|itinerary itinerant
+root|jac / ject|抛；投|eject reject rejection inject injection conjecture interject object objective subjective subject
+root|joc|玩笑|jocular jocularly
+root|jud / judic|裁判；判断|judge judicial judiciary judgment judgement adjudicate prejudice
+root|junct|连接|junction conjunction conjunctive disjunction adjunct juncture
+root|jur / jus|法律；权利|juror jury jurisdiction jurisprudence justice just unjust justify
+root|juven|年轻|juvenile rejuvenate rejuvenation
+root|kilo-|千|kilometer kilometre kilogram kilowatt kilobyte
+root|labor|工作；劳作|labor labour laboratory laborious elaborate collaboration
+root|lact|乳|lactose lactation lactate
+root|later|侧边|lateral unilateral bilateral multilateral collateral
+root|lect / leg|选择；拾取|elect election electorate select selection collect collection eligible delegate delegation
+root|leg / legis|法律|legal legally illegal legalize legislation legislature legislative legitimize legitimate
+root|legi / lect|读（另参“选择”的同源用法）|legible illegible lecture lector
+root|lev|举起；轻|elevate elevation elevator alleviate alleviation levity lever leverage
+root|lex / lexi|词；词汇|lexicon lexical lexicography dyslexia
+root|liber|自由|liberty liberate liberation liberal liberalism
+root|lign|木材|lignin
+root|limin|门槛；边界|liminal preliminary subliminal eliminate elimination
+root|line|线|linear lineage delineate align alignment underline outline
+root|lingu|舌；语言|language linguistic linguistics multilingual bilingual monolingual
+root|lip / lipo|脂肪|lipid liposuction lipoprotein
+root|liter|字母；文字|literacy literate literature literary literal alliteration
+root|loc|地点|local locality locate location allocate allocation relocate locomotive
+root|locu / loqu|说话|eloquent eloquence loquacious soliloquy colloquial colloquialism interlocutor
+root|lumin / luc|光；明亮（相关形式）|illuminate illumination luminous luminary translucent lucid elucidate
+root|lun|月亮|lunar lunation lunatic
+root|lus / lud|玩；戏弄|allude allusion collude collusion illusion delude delusion elude elusive
+root|magn|大|magnify magnitude magnification magnificent magnate
+root|mand|委托；命令|mandate mandatory command commander demand countermand
+root|manu|手|manual manuscript manufacture manipulate manipulation emancipate
+root|mar / mari|海|marine maritime marina submarine
+root|mater / matr|母亲|maternal maternity matriarch matron
+root|med / medi|中间；居间|median medium medieval intermediate mediation mediate mediator immediate
+root|memor|记忆|memory memorial memorable memorize commemorate commemoration
+root|merg / mers|浸没|merge merger immerse immersion emerge emergence submerge submersion
+root|meso|中间|mesosphere mesoderm
+root|meter / metr|测量；度量|meter metre metric metrical thermometer barometer diameter perimeter metronome hydrometer
+root|migr|迁移|migrate migration migrant emigrate emigrant immigration immigrate immigrant
+root|min / minu|小；减少|minor minority minimum minimal diminish diminution minuscule
+root|mir|惊奇；赞赏|miracle miraculous admire admiration
+root|mit / miss|发送；放行（同源变体）|admit admission commit commitment commissioner commission permit permission submit submission remit remittance dismiss dismissal missile omit omission
+root|mobil / mot / mov|移动（同一拉丁语族）|movement mobile mobility mobilize remove removal movie motive motion motor motivate motivation emotion commotion
+root|mod|尺度；方式|mode model moderate moderation modest modify modification module modular
+root|moll|软|mollify emollient
+root|mon / monit|提醒；告诫|monitor monitoring admonish monument monumental
+root|mor / mort|死亡|mortal mortality immortal immortality mortuary mortify
+root|morph|形状；形态|morphology morphologic polymorphism metamorphosis amorphous anthropomorphic
+root|mult|多|multitude multiple multiply multiplicity
+root|mur|墙|mural intramural extramural
+root|mut|改变|mutate mutation mutable immutable transmute
+root|myth|神话；故事|myth mythical mythology
+root|nasc / nat|出生（同源变体）|native nature natural nation national natal prenatal innate renaissance nascent
+root|nav / naut|船；航行（相关形式）|naval navy navigation navigate navigator nautical astronaut
+root|necr|死亡；尸体|necrosis necrotic
+root|neur|神经|neural neuron neurologist neurology neuroscience neuralgia
+root|noc / nox|伤害；有害|innocent innocence innocuous noxious obnoxious
+root|nom / nomin|名称|nominate nomination nominee nominal denomination denominator nomenclature
+root|nom / nomos|规则；法（不同于拉丁语的“名称”）|autonomy autonomous astronomy economy taxonomy
+root|nov|新|novel novelty novice novelistic innovate innovation renovate renovation
+root|nucle|核心；核|nucleus nuclei nuclear nucleic nucleon
+root|numer|数|number numeral numerical numerous enumerate enumeration numerator innumerable
+root|nutri|养育；营养|nutrient nutrition nutritious nutritional malnutrition
+root|oct / octa|八|octagon octave octopus octagonal
+root|ocul|眼|ocular oculist binocular inoculate monocular
+root|odont|牙齿|orthodontics orthodontist periodontal
+root|ole|油|oleic petroleum oleaginous
+root|onym|名称|eponym eponymous
+root|oper|工作；做|operate operation operator cooperate cooperative operational
+root|opt / ops|看；视觉（希腊语）|optic optical optics optician optometry
+root|opt|选择；希望（拉丁语）|option optional opt adopt adoption
+root|ord / ordin|次序；安排|order ordinary ordinal ordain ordinance coordinate subordinate extraordinary
+root|orn|装饰|ornament ornamental ornate adorn
+root|oro / or|口（拉丁语 os, oris）|oral orally orifice
+root|orth / ortho|正；直；正确|orthodox orthodoxy orthogonal orthography orthodontist
+root|oss|骨（拉丁语）|ossify ossification osseous
+root|osteo|骨（希腊语）|osteoporosis osteology osteoarthritis
+root|pac / pax|和平；平静|pacific pacify pacifist pacifism appease
+root|palaeo / paleo|古老|paleontology palaeontology paleolithic palaeolithic
+root|par|相等；配对|parity pair compare comparative disparate disparity
+root|part / partit|部分；划分|partial partition partner multipartite participation
+root|pass / pati|遭受；感受|patient patience passion passionate compassion passive
+root|path / patho|感受；病痛|empathy sympathy apathy pathetic pathology pathogen pathological antipathy neuropathy
+root|patr / patern|父亲（相关拉丁形式）|paternal paternity patriarch patriot patron patrimony compatriot
+root|ped / pod|脚（拉丁语与希腊语相关形式）|pedal pedestrian pedicure pedestal tripod podiatry centipede
+root|paed / pedi|儿童（希腊语）|pedagogy pedagogical paediatric paediatrics
+root|pel / puls|推；驱赶（同源变体）|compel expel repel propel expulsion repulsion propulsion impulse impulsive compulsory
+root|pend / pens|悬挂；称量（同源变体）|pendant pendulum pending depend dependent suspend suspension expend expense expensive compensate compensation pension
+root|pet / petit|趋向；追求|compete competition competitive petition repeat repetition appetite
+root|phil / philo|爱好；爱|philosophy philosophical philosopher philanthropist philanthropy anglophile
+root|phob / phobo|害怕；排斥|phobic hydrophobic
+root|phon|声音|phonetic phonetics phoneme phonology phonograph microphone symphony euphonious
+root|phot / photo|光|photon photosynthesis photographic photocopy photoelectric
+root|phys / physio|自然；身体机能|physics physical physician physiology physiotherapy
+root|plac|安抚；使满意|placate placid complacent complacency implacable
+root|plan|平；平面|plane planar plan plain
+root|plast / plasm|塑造；成形|plastic plasticity plasma neoplasm
+root|ple / plen|填满；充分|complete compliment complement supplement plenty replenish plenary plentiful plenitude
+root|plic / pli|折叠；卷入|apply application imply implication implicit explicit complicate complicated complexity duplicate multiply replicate replica
+root|plor|呼喊；哀求|implore deplore
+root|plu / pluvi|雨|pluvial pluviosity
+root|plur|更多；复数|plural plurality pluralism
+root|pneum|气息；肺|pneumatic pneumonia pneumothorax
+root|pon / pos / posit|放置（同源变体）|compose composer composition compost composite impose imposition deposit deposition dispose disposition expose exposure oppose proponent postpone position positive
+root|popul|人民；人口|popular popularity popularize population populate populous
+root|port|搬运；携带|portable portage porter portfolio transport deport deportation export exporter import importer report reporter support supporter
+root|prec|请求；祈求|precarious imprecate deprecate
+root|prehend / prehens|抓住；领会|apprehend apprehension comprehend comprehensive reprehensible prehensile
+root|prim|第一；最初|primary primitive prime primordial primarily
+root|primi / proto|初始（前者拉丁语，后者希腊语）|primacy
+root|priv|私有；个别|private privately privacy privilege privation deprive
+root|prob / prov|检验；证明（同源变体）|probable probability probe prove proof approve improve
+root|psych / psycho|心理；精神|psyche psychic psychological psychoanalysis psychotherapy psychosomatic
+root|pugn|斗争|pugnacious impugn repugnant repugnance
+root|punct|刺；点|punctual punctuality punctuation puncture
+root|pur|清洁；纯|pure purify purification impurity
+root|put|估算；认为（拉丁语 putare）|compute computer computation dispute reputation repute
+root|quer / quir / quis|寻找；询问（同源变体）|query question require requirement inquire inquiry enquire enquiry acquire acquisition inquisitive request quest
+root|radi|光线；辐射|radiant radiate radiation radius radial radio radioactive
+root|rat / ration|计算；理由|ratio rational rationalize rationale ration
+root|rect / reg|直；引导或治理（同源成分）|rectify rectangle direct direction correct correction erect regime regulate regulation region
+root|regn|统治；王权|reign interregnum
+root|rid / ris|笑|ridicule ridiculous deride derision
+root|rog|问；请求|interrogate interrogation derogatory prerogative
+root|rot|轮；旋转|rotate rotation rotary rotor
+root|rubr / rube|红|rubric rubella
+root|rupt|破裂|rupture interrupt interruption disrupt disruption disruptive erupt eruption abrupt corrupt corruption bankrupt bankruptcy
+root|sacr / sanct|神圣（相关形式）|sacred sacrifice sacrificial sanctify sanctuary sanction
+root|sal / sult|跳跃（同源变体）|salient assault insult result exult
+root|sal / salin|盐（拉丁语 sal，与“跳”无关）|saline salinity salt
+root|salv / salut|安全；健康；拯救|salvage salvation salute salutation
+root|sat / satis|足够；满足|satisfy satisfaction satiate saturated saturation
+root|sci|知道|science scientist scientific omniscient conscious conscience conscientious
+root|scind / sciss|切开；分开|rescind scissors scission
+root|scrib / script|写（同源变体）|scribe ascribe describe description prescribe prescription subscribe subscription inscribe inscription manuscript script postscript scripture
+root|sect / sec|切；划分|section sectional sectionalism bisect dissect dissection segment sector
+root|sed / sid / sess|坐；停留（同源变体）|sedentary sediment reside resident residential preside president session assess assessment possess possession
+root|sens / sent|感觉；想法（同源变体）|sense sensation sensitive sensory sentiment sentimental assent dissent consent resent resentment sensible
+root|sequ / secut|跟随（同源变体）|sequence sequential sequel consequence consequent consecutive execute executive execution persecute persecution prosecute prosecution
+root|ser / sert|连接；放入|series serial insert insertion assert assertion
+root|serv|保留；保护（拉丁语 servare）|conserve conservation conservative preserve preservation reserve reservation observe observation
+root|serv（服务）|侍奉；服务（拉丁语 servire）|serve servant service servile servitude
+root|sign|标记；符号|sign signal signature designate designation assign assignment consign resign resignation significant signify
+root|simil / simul|相似；同时（依词而定）|similar similarity assimilate simulate simulation simultaneous
+root|sist / stat / stit|站立；使固定（拉丁同源词干）|assist assistance consist consistent insist insistence persist resist resistance exist existence status station state static statue establish constitution constitute institution reinstate substitute institute restitution
+root|soci|同伴；社会|social sociable society associate association dissociate sociology
+root|sol|太阳（拉丁语 sol）|solar solstice
+root|sol / soli|单独（拉丁语 solus）|solo solitary solitude isolate isolation desolate
+root|solv / solu|松开；解开|solve solver solution dissolve dissolution resolve resolution solvent soluble insoluble
+root|som / somat|身体|somatic psychosomatic chromosome
+root|somn|睡眠|insomnia somnolent somnambulism
+root|son|声音|sonic sonorous consonant dissonant resonance resonate sonar supersonic
+root|soph|智慧（希腊语词根）|sophist sophistry sophisticated sophistication
+root|spec / spect / spic|看；观察（同源变体）|spectacle spectator spectacular spectrum inspect inspection inspector respect respectful expect expectation aspect prospect prospective suspect suspicion suspicious conspicuous retrospect perspective specimen special species
+root|spir|呼吸（拉丁语）|spirit aspire aspiration inspire inspiration respire respiration respiratory perspire perspiration expire expiration conspire conspiracy
+root|spond / spons|承诺；回应|respond response responsible responsibility sponsor sponsorship
+root|stereo|固体；立体|stereo stereoscopic stereotype stereotypical
+root|strat|铺层；层次|stratum strata stratify stratification
+root|strict / string|拉紧（同源变体）|strict restrict restriction constrict constriction stringent stringency restrain restraint
+root|stru / struct|搭建；安排|construct construction instruct instruction instructive structure structural destructive destruction infrastructure reconstruct reconstruction
+root|suad / suas|劝说（同源变体）|persuade persuasion persuasive dissuade dissuasion
+root|sum / summ|总和；顶端|sum summit summary summarize
+root|sum / sumpt|拿取；消耗（不同于“总和”）|assume assumption consume consumption consumer presume presumption resume resumption subsume
+root|tact / tang|触碰（同源变体）|tact tactile contact intact tangent tangible intangible contingent contagion contagious
+root|techn / techno|技艺；技术|technical technology technological technique technician technocrat biotechnology
+root|teg / tect|覆盖；保护（同源变体）|detect detection protect protection protective integument
+root|tempor|时间|temporary temporarily contemporary contemporaneous temporal extemporaneous
+root|ten / tain / tin|握住；保持（同源变体）|contain container retain retention sustain maintain maintenance detain detention obtain entertain entertainment tenacious tenacity tenant tenure continuation continue
+root|tend / tens / tent|伸展；张紧（同源变体）|extend extension extensive intend intention intense intensity tension tense attention attentive contend contention distend pretend pretense
+root|term / termin|界限；结束|term terminal terminate termination determine determination interminable exterminate
+root|terr|土地|terrain terrestrial territory territorial terrace
+root|terr（惊恐）|使害怕（不同于“土地”）|terror terrible terrified terrify terrorism
+root|test|作证；见证|attest contest protest testament testimony testify testimonial
+root|text / tex|编织（引申为文字组织）|text textile texture context contextual pretext textural
+root|the / theo|神|theism monotheism polytheism theology theologian atheist atheism
+root|therm|热|thermal thermometer thermostat thermodynamics geothermal thermos
+root|thes / thet|放置；设立（同源形式）|thesis antithesis hypothesis hypothetical synthesis synthetic epithet
+root|tom / tome|切开；切片|lobotomy tomography appendectomy mastectomy
+root|tox / toxi|毒|toxic toxicity toxin detoxify intoxicate intoxication toxicology
+root|tract / trah|拉；拖（相关词干）|tract traction tractor distract distraction contract contraction retract retraction subtract subtraction abstract abstraction
+root|trib / tribut|分配；给予|tribute contribute contributor contribution distribute distribution distributor retribution attribute attribution
+root|troph|营养；生长|atrophy hypertrophy dystrophy autotroph heterotroph
+root|trop|转；朝向|tropics tropical tropism phototropism
+root|trud / trus|推；闯入|intrude intrusion intrusive protrude protrusion extrude extrusion obtrude obtrusive
+root|turb|扰动；混乱|disturb disturbance perturb perturbation turbulent turbulence
+root|typ / typo|印记；类型|type typical atypical typography archetype prototype stereotype
+root|umbr|影子；阴影|umbrella umbra penumbra
+root|urb|城市|urban urbanize urbanization suburban suburb suburbia
+root|vac / vacu|空|vacant vacancy vacate vacation vacuum evacuate evacuation
+root|vag|游荡；漂移|vagrant vagrancy vagabond
+root|val / valu|强；价值|valid validity validate valor value valuable evaluate evaluation equivalent
+root|ven / vent|来（同源变体）|convene convention convenient convenience intervene intervention prevent prevention invent invention venture advent adventure event
+root|ver|真实|verify verified verification verdict veracity veritable
+root|verb|词；话|verb verbal verbalize verbose verbosity proverb adverb
+root|vert / vers|转（同源变体）|convert converter conversion divert diversion invert inversion revert reverse reversal version controversy versatile adverse adversity diverse diversity subvert subversion introvert extrovert universe universal
+root|vi / via|道路（拉丁语 via）|via deviate deviation obvious obviate viaduct
+root|vict / vinc|征服（同源变体）|victory victorious victor convince convincing invincible convict conviction
+root|vid / vis|看（同源变体）|video visual vision visualize visit visitor revise revision supervise supervisor television view
+root|vir|男性；男子气概（拉丁语）|virile virility
+root|viv / vit|活；生命（相关拉丁形式）|vivid revive revival survive survival survivor vital vitality vitamin vivacious
+root|voc / vok|声音；呼叫（同源变体）|voice vocal vocation vocational advocate advocacy convoke evoke invoke invocation provoke provocation revoke revocation equivocal
+root|vol / volunt|意愿|voluntary volunteer involuntary volition benevolent
+root|volv / volut|卷；转（同源变体）|evolve evolution revolve revolution revolutionary involve involvement convoluted
+root|vor|吞吃|devour voracious carnivore herbivore omnivore insectivore
+root|vulg|普通人；大众|vulgar vulgarity vulgarize
+root|zoo|动物|zoo zoology zoologist zoological zooplankton
+
+# 完整拼写的例外与可直观解释的多成分组合。
+word|transport|trans-（跨越） + port（搬运）
+word|import|im-（向内，in- 的变体） + port（搬运）
+word|export|ex-（向外） + port（搬运）
+word|deport|de-（离开） + port（搬运）
+word|portable|port（搬运） + -able（可以……的）
+word|unhelpful|un-（不） + help（帮助） + -ful（具有……性质的）
+word|unforgettable|un-（不） + forget（忘记） + -able（可以……的）；t 双写
+word|uncomfortable|un-（不） + comfort（舒适） + -able（有……性质的）
+word|unemployment|un-（无） + employ（雇用） + -ment（状态）
+word|dishonesty|dis-（否定） + honesty（诚实）
+word|impossible|im-（不，in- 在 p 前的变体） + possible（可能的）
+word|irregular|ir-（不，in- 在 r 前的变体） + regular（规则的）
+word|illegal|il-（不，in- 在 l 前的变体） + legal（合法的）
+word|inactive|in-（不） + active（活跃的）
+word|input|in（向内） + put（放）
+word|re-enter|re-（再次） + enter（进入）
+word|reconstruct|re-（再次） + construct（建造）
+word|interact|inter-（彼此） + act（行动）
+word|international|inter-（在……之间） + national（国家的）
+word|bilingual|bi-（双） + lingu（语言） + -al（与……有关）
+word|multilingual|multi-（多个） + lingu（语言） + -al（与……有关）
+word|biography|bio（生命） + -graphy（记录）
+word|autobiography|auto-（自己） + biography（传记）
+word|photograph|photo（光） + graph（记录）
+word|photosynthesis|photo（光） + synthesis（合成）
+word|thermometer|therm（热） + -meter（测量仪器）
+word|geothermal|geo（地球） + therm（热）
+word|microscope|micro-（微小） + -scope（观察用仪器）
+word|telescope|tele-（远距离） + -scope（观察用仪器）
+word|psychology|psych（心理） + -logy（研究领域）
+word|chronology|chron（时间） + -logy（研究领域）；也指按年代排列
+word|anthropology|anthrop（人类） + -logy（研究领域）
+word|aqueduct|aque（与 aqua “水”同源） + duct（引导）
+word|introduce|intro-（向内） + duc（引导）
+word|description|de-（写下来，此处表向下） + script（写） + -ion（结果）
+word|describe|de-（向下） + scrib（写）；来自拉丁语“写下来”
+word|predict|pre-（预先） + dict（说）
+word|contradict|contra-（相反） + dict（说）
+word|dictation|dict（说） + -ation（行为）
+word|inject|in-（向内） + ject（投）
+word|eject|e-（向外） + ject（投）
+word|reject|re-（向回） + ject（投）
+word|attract|at-（朝向，ad- 的变体） + tract（拉）
+word|distract|dis-（分开） + tract（拉）；把注意力拉开
+word|extract|ex-（向外） + tract（拉）
+word|subtract|sub-（在下；这里引申为移去） + tract（拉）
+word|disrupt|dis-（分离） + rupt（破裂）
+word|interrupt|inter-（在中间） + rupt（打断）
+word|erupt|e-（向外） + rupt（破裂）
+word|transmit|trans-（跨越） + mit（发送）
+word|transmission|trans-（跨越） + miss（发送，mit 的变体） + -ion（过程）
+word|admission|ad-（朝向） + miss（放行，mit 的变体） + -ion（过程）
+word|receive|re-（向回） + ceiv（取，和 cept 同源）
+word|reception|re-（向回） + cept（接收，和 ceiv 同源） + -ion（过程）
+word|perceive|per-（彻底，此处加强） + ceiv（取）；此处引申为领会
+word|perception|per-（彻底，此处加强） + cept（取） + -ion（过程）
+word|dependent|de-（向下） + pend（悬挂）；引申为依赖
+word|suspend|sus-（从下，sub- 的变体） + pend（悬挂）
+word|democracy|demo（民众） + -cracy（治理）
+word|archaeology|archaeo（古代） + -logy（研究领域）
+word|malnutrition|mal-（不良） + nutrition（营养）
+word|introspection|intro-（向内） + spect（看） + -ion（动作）
+word|retrospect|retro-（向后） + spect（看）
+word|prospect|pro-（向前） + spect（看）
+word|circumference|circum-（周围） + fer（带着）；指绕一圈的周长
+word|happiness|happy（快乐的） + -ness（状态）；y 变 i
+word|kindness|kind（善良的） + -ness（性质）
+word|reliability|reliable（可靠的） + -ity（性质）；-able 变 -abil-
+word|simplify|simpl-（简单，simple 的词干） + -ify（使……化）
+word|purify|pur-（纯净，pure 的词干） + -ify（使……化）
+word|readability|readable（可读的） + -ity（性质）；-able 变 -abil-
+word|quickly|quick（快的） + -ly（构成副词）
+word|happily|happy（快乐的） + -ly（构成副词）；y 变 i
+word|unhappy|un-（不） + happy（快乐的）
+word|irresponsible|ir-（不） + responsible（负责任的）
+word|friendship|friend（朋友） + -ship（关系）
+word|childhood|child（孩子） + -hood（人生阶段）
+word|acquaintance|acquaint（使认识） + -ance（状态或结果）
+word|forthright|forth（向前） + right（笔直）；引申为直截了当
+word|overestimate|over-（过度） + estimate（估计）
+word|underestimate|under-（不足） + estimate（估计）
+word|misunderstand|mis-（错误地） + understand（理解）
+word|misinterpretation|mis-（错误地） + interpretation（解读）
+word|nonrenewable|non-（非） + renewable（可再生的）
+word|disagreeable|dis-（否定） + agreeable（令人愉快的）
+word|inherently|inherent（内在的） + -ly（构成副词）
+word|commuter|commute（通勤） + -er（从事者）
+word|contradictory|contradict（反驳；抵触） + -ory（具有……性质的）
+word|disruptive|dis-（分离） + rupt（破裂） + -ive（具有……性质）
+word|virtually|virtual（虚拟的；近乎实际的） + -ly（构成副词）
+word|conversely|converse（相反的） + -ly（构成副词）
+word|assigned|assign（分派） + -ed（过去式或过去分词）
+word|empower|em-（使具备，en- 的变体） + power（力量、权力）
+word|impoverished|impoverish（使贫困） + -ed（在此作形容词词尾）
+word|thorny|thorn（刺） + -y（具有……特征的）
+word|abundance|und（波浪）；古义与“满得溢出来”有关，今指充裕
+word|authentication|authenticate（证实；验证） + -ion（过程）
+word|authenticity|authentic（真实的） + -ity（性质）
+word|prevalent|pre-（领先；在前） + val（强）；历史上引申为占优势
+word|evade|e-（向外） + vad（走，来自拉丁语 vadere）
+word|domestic|dom（家，源自拉丁语 domus）；从家庭引申到国内
+word|pervasive|per-（遍及） + vas（走，拉丁语 vadere 的相关词干） + -ive（具有……性质）
+
+# 阶段十：常见透明派生词，以及容易与外形相似的词混淆的词条。
+word|rebuild|re-（再次） + build（建造）
+word|unbelievable|un-（不） + believe（相信） + -able（可以……的）
+word|unprecedented|un-（没有） + precedent（先例） + -ed（具有……的）
+word|unacceptable|un-（不） + accept（接受） + -able（可以……的）
+word|irreconcilable|ir-（不） + reconcile（使和解；使一致） + -able（可以……的）
+word|unintelligible|un-（不） + intelligible（可理解的）
+word|unintentionally|un-（不） + intentional（有意的） + -ly（副词）
+word|unproductive|un-（不） + productive（富有成效的）
+word|inadequately|in-（不） + adequate（足够的） + -ly（副词）
+word|inaccessible|in-（不） + accessible（可接近的）
+word|imprecise|im-（不） + precise（精确的）
+word|imprecision|im-（不） + precision（精确）
+word|impracticable|im-（不） + practicable（可行的）
+word|insufficient|in-（不） + sufficient（充足的）
+word|insignificant|in-（不） + significant（重要的）
+word|inability|in-（不） + ability（能力）
+word|incompetent|in-（不） + competent（胜任的）
+word|insensitivity|in-（不） + sensitivity（敏感性）
+word|involuntarily|in-（不） + voluntary（自愿的） + -ly（副词）
+word|irreversible|ir-（不） + reverse（使反转） + -ible（可以……的）
+word|irreplaceable|ir-（不） + replace（替换） + -able（可以……的）
+word|illiteracy|il-（不） + literacy（读写能力）
+word|illegally|il-（不） + legal（合法的） + -ly（副词）
+word|noncompliance|non-（不） + compliance（遵守）
+word|nonjudgmental|non-（不） + judgment（评判） + -al（形容词）
+word|counterproductive|counter-（相反） + productive（有成效的）
+word|disadvantageous|dis-（否定） + advantage（优势） + -ous（具有……的）
+word|disapproval|dis-（否定） + approval（赞同）
+word|disillusionment|dis-（去除） + illusion（幻觉；幻想） + -ment（状态）
+word|disengagement|dis-（脱离） + engage（参与；接合） + -ment（行为；状态）
+word|disproportionate|dis-（相反） + proportion（比例） + -ate（形容词）
+word|dissatisfaction|dis-（否定） + satisfaction（满意）
+word|misrepresentation|mis-（错误；歪曲） + representation（表述）
+word|misallocation|mis-（错误） + allocation（分配）
+word|misleadingly|mis-（错误；误导） + leading（引导） + -ly（副词）
+word|overgeneralize|over-（过度） + generalize（概括）
+word|overgeneralise|over-（过度） + generalise（概括）
+word|underrepresentation|under-（不足） + representation（代表性）
+word|underemployment|under-（不足） + employment（就业）
+word|preconceived|pre-（事先） + conceive（形成想法） + -ed（已经……的）
+word|precondition|pre-（事先） + condition（条件）
+word|postgraduate|post-（在后） + graduate（毕业）
+word|intergovernmental|inter-（相互；在……之间） + governmental（政府的）
+word|interconnectivity|inter-（相互） + connectivity（连通性）
+word|coexistence|co-（共同） + existence（存在）
+word|multidisciplinary|multi-（多个） + disciplinary（学科的）
+word|cross-cultural|cross-（跨越） + cultural（文化的）
+word|reevaluation|re-（重新） + evaluation（评估）
+word|reassessment|re-（重新） + assessment（评估）
+word|redevelopment|re-（重新） + development（开发）
+word|reconfiguration|re-（重新） + configuration（配置）
+word|reconsideration|re-（重新） + consideration（考虑）
+word|reappraisal|re-（重新） + appraisal（评估）
+word|reallocation|re-（重新） + allocation（分配）
+word|readjustment|re-（重新） + adjustment（调整）
+word|friendliness|friendly（友好的） + -ness（性质）；y 变 i
+word|thoughtfulness|thoughtful（体贴的） + -ness（性质）
+word|forgetfulness|forgetful（健忘的） + -ness（性质）
+word|sustainability|sustain（维持） + -ability（可……的性质）
+word|accessibility|accessible（可接近的） + -ity（性质）；-ible 变 -ibil-
+word|affordability|afford（负担） + -ability（可……的性质）
+word|vulnerability|vulnerable（易受伤害的） + -ity（性质）；-able 变 -abil-
+word|compatibility|compatible（兼容的） + -ity（性质）；-ible 变 -ibil-
+word|feasibility|feasible（可行的） + -ity（性质）；-ible 变 -ibil-
+word|visibility|visible（可见的） + -ity（性质）；-ible 变 -ibil-
+word|variability|variable（可变化的） + -ity（性质）；-able 变 -abil-
+word|comprehensiveness|comprehensive（全面的） + -ness（性质）
+word|resiliency|resilient（能恢复的；有韧性的）与名词后缀 -ency 对应
+word|affiliation|affiliate（使加入） + -ion（关系；动作）
+word|endangerment|endanger（使处于危险） + -ment（动作；状态）
+word|hypersensitivity|hyper-（过度） + sensitivity（敏感性）
+word|industrialization|industrialize（使工业化） + -ation（过程）
+word|modernization|modernize（使现代化） + -ation（过程）
+word|modernisation|modernise（使现代化） + -ation（过程）
+word|personification|personify（使人格化）对应名词形式 -ification（……化的过程）
+word|diversification|diversify（使多样化）对应名词形式 -ification（……化的过程）
+word|simplification|simplify（使简化）对应名词形式 -ification（……化的过程）
+word|substantiate|substanti-（实质、根据） + -ate（动词）；给出依据
+word|unconditionally|un-（不） + conditional（有条件的） + -ly（副词）
+word|complementary|complement（补足） + -ary（与……有关）
+word|consequential|consequence（后果）相关派生；-ial 构成形容词
+word|evidence|e-（向外；此处引申为显明） + vid（看）
+word|evidently|evident（显然的） + -ly（副词）
+word|prevalence|prevalent（流行的；普遍的）与名词后缀 -ence 对应
+word|segregation|segregate（使隔离） + -ion（过程）
+word|exclusionary|exclusion（排除） + -ary（与……有关）
+word|equitable|equ（相等；公平） + -able（有……性质的）
+word|equivalence|equ（相等） + val（有价值；有效力）
+word|contravene|contra-（相反） + ven（来）；与规则相抵触
+word|electrification|electrify（使电气化）对应名词形式 -ification（……化的过程）
+word|preheat|pre-（预先） + heat（加热）
+word|careless|care（关心） + -less（缺少）
+word|biology|bio-（生命） + -logy（学科；研究）
+word|reconstruction|re-（重新） + struct（搭建） + -ion（动作；过程）
+word|remarkable|remark（指出；留意） + -able（值得……的）

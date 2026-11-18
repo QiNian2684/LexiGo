@@ -1,0 +1,20 @@
+离线英语构词资料 / Offline English word formation
+
+实用范围：常见英语前后缀、现代派生、拉丁语及希腊语借词中的高频词干、变体与常见拼写变化。一个词形可能含有多个构词元素，单项提示只解释其中一个明确可辨的元素。历史词干可能经过拼写或语义变化，提示不代表现代英语可重新组合该词。
+
+内容为本项目整理的中文简注和例词索引。完整单词必须出现在内置表中。拼写的子串、常见屈折词尾和未经列出的同形拼写不会触发提示。采用直接映射的条目优先，兼顾历史构词与现代可解释的派生。
+
+外部资料仅用于参考构词体系与核对代表性词条。发行包未附带站点正文、释义数据库或其导出文件。
+- Michael Quinion. Affixes: The Building Blocks of English, Introduction and index.
+  https://www.affixes.org/introduction.html
+  https://www.affixes.org/
+- Douglas Harper. Online Etymology Dictionary, representative entries consulted:
+  https://www.etymonline.com/word/transport
+  https://www.etymonline.com/word/import
+  https://www.etymonline.com/word/perceive
+  https://www.etymonline.com/word/acquaintance
+  https://www.etymonline.com/word/abundance
+  https://www.etymonline.com/word/forthright
+  https://www.etymonline.com/word/prospect
+  https://www.etymonline.com/word/sophisticated
+  https://www.etymonline.com/word/photograph

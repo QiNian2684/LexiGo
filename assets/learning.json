@@ -1,0 +1,114 @@
+{
+  "crucial": {
+    "meaning": "决定性的；至关重要的",
+    "pos": "形容词",
+    "examples": "Getting enough sleep is crucial for learning.",
+    "note": "记忆场景：走到决定方向的十字路口，下一步选哪里至关重要。",
+    "exampleTranslation": "睡眠充足对学习至关重要。"
+  },
+  "abundance": {
+    "meaning": "丰富；充足；大量",
+    "pos": "名词",
+    "examples": "The lake supports an abundance of wildlife.",
+    "note": "词源联想：它的拉丁语来源和「溢出」有关。水箱里的水多到溢出来，就是充足、有大量。",
+    "exampleTranslation": "这片湖泊养育了大量野生动物。"
+  },
+  "sophisticated": {
+    "meaning": "复杂精密的；先进的；老练的；有鉴赏力的",
+    "pos": "形容词",
+    "examples": "The hospital uses sophisticated imaging equipment.",
+    "note": "搭配：修饰设备、系统时多译作「先进的、精密的」；修饰人时可译作「老练的、有鉴赏力的」。",
+    "exampleTranslation": "这家医院使用先进的影像设备。"
+  },
+  "forthright": {
+    "meaning": "直率的；坦诚的；直截了当地",
+    "pos": "形容词、副词",
+    "examples": "She was forthright about the problems with the plan.",
+    "note": "构词联想：forth（向前）+ right（直地）。把话直着说出去，就是直率。",
+    "exampleTranslation": "她直截了当地指出了这个计划的问题。"
+  },
+  "disintegration": {
+    "meaning": "解体；瓦解；崩解",
+    "pos": "名词",
+    "examples": "The dispute led to the disintegration of the alliance.",
+    "note": "构词：dis-（分开）+ integration（整合）。把原来聚在一起的部分拆散，就是瓦解。",
+    "exampleTranslation": "这场争执导致了联盟瓦解。"
+  },
+  "curb": {
+    "meaning": "抑制；控制；路缘（美式）；限制",
+    "pos": "动词、名词",
+    "examples": "The city introduced new rules to curb air pollution.",
+    "note": "记忆场景：路缘石挡住车轮滚上人行道。从「路缘」想到「挡住、限制」。",
+    "exampleTranslation": "市政府出台新规来遏制空气污染。"
+  },
+  "chronic": {
+    "meaning": "慢性的；长期存在的；积习难改的",
+    "pos": "形容词",
+    "examples": "He has suffered from chronic back pain for years.",
+    "note": "词根联想：chron- 表示时间。问题持续很长时间，就有「慢性的、长期的」这个意思。",
+    "exampleTranslation": "他多年来一直受慢性背痛困扰。"
+  },
+  "fiscal": {
+    "meaning": "财政的；国库的；会计年度的",
+    "pos": "形容词",
+    "examples": "The government announced a new fiscal policy.",
+    "note": "搭配：看到 fiscal policy，直接想政府怎么收税、怎么花钱，也就是财政政策。",
+    "exampleTranslation": "政府公布了一项新的财政政策。"
+  },
+  "benign": {
+    "meaning": "良性的；无害的；和善的",
+    "pos": "形容词",
+    "examples": "The doctor confirmed that the tumor was benign.",
+    "note": "词源联想：bene- 表示「好」，可用来记 benign 的「良性、无害、和善」。",
+    "exampleTranslation": "医生确认肿瘤是良性的。"
+  },
+  "conceited": {
+    "meaning": "自负的；自命不凡的",
+    "pos": "形容词",
+    "examples": "He sounded conceited when he claimed he was the only person who could solve it.",
+    "note": "记忆场景：别人还没评价，他已经认定「只有我行」。",
+    "exampleTranslation": "他声称只有自己能解决这件事，听起来很自负。"
+  },
+  "impose": {
+    "meaning": "强加；施加；征收（税等）；勉强打扰",
+    "pos": "动词",
+    "examples": "The city imposed a fine on companies that broke the rule.",
+    "note": "常见结构：impose A on B，把规定、限制、罚款等 A 施加到 B 身上。",
+    "exampleTranslation": "市政府对违规企业处以罚款。"
+  },
+  "pervasive": {
+    "meaning": "遍布的；无处不在的；广泛渗透的",
+    "pos": "形容词",
+    "examples": "Online advertising has become pervasive.",
+    "note": "词源联想：拉丁语里 per 表示「穿过」，走遍每个角落，就是到处渗透、无处不在。",
+    "exampleTranslation": "线上广告已经变得无处不在。"
+  },
+  "amplify": {
+    "meaning": "放大（声音或信号）；增强（效果）；详述",
+    "pos": "动词",
+    "examples": "The microphone amplified her voice.",
+    "note": "构词联想：ampl- 表示「大、宽」，-ify 表示「使变成」，合起来就是使变大、放大。",
+    "exampleTranslation": "麦克风放大了她的声音。"
+  },
+  "dictate": {
+    "meaning": "口述；命令；决定；规定；命令或原则",
+    "pos": "动词、名词",
+    "examples": "She dictated a short email to her assistant.",
+    "note": "词根联想：dict- 表示「说」。老师说、学生写，是口述或听写；领导发话、下属照做，是命令。",
+    "exampleTranslation": "她向助理口述了一封简短的邮件。"
+  },
+  "counsel": {
+    "meaning": "劝告；建议；法律顾问；为……提供咨询",
+    "pos": "名词、动词",
+    "examples": "The adviser counseled students to apply early.",
+    "note": "记忆场景：遇到麻烦时找专业人士谈谈，对方给建议，就是 counsel。",
+    "exampleTranslation": "顾问劝学生们早点申请。"
+  },
+  "subtle": {
+    "meaning": "细微的；微妙的；不易察觉的；巧妙的",
+    "pos": "形容词",
+    "examples": "There is a subtle difference between the two colors.",
+    "note": "记忆场景：两种颜色猛一看一样，凑近比较才发现一点差别。",
+    "exampleTranslation": "这两种颜色有细微差别。"
+  }
+}

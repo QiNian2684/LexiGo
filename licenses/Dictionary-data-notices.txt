@@ -1,0 +1,18 @@
+Example sentences from Tatoeba
+Source: https://tatoeba.org/en/downloads
+License: CC BY 2.0 France https://creativecommons.org/licenses/by/2.0/fr/
+The original English and Mandarin sentence numbers and usernames are
+embedded in the index and shown on the corresponding flashcard.
+
+Example sentences from Simple English Wiktionary contributors
+Source: https://simple.wiktionary.org/
+Data extraction: https://kaikki.org/simplewiktionary/rawdata.html
+License: CC BY-SA 4.0 https://creativecommons.org/licenses/by-sa/4.0/
+The associated headword page and its history identify contributors.
+Example text is selected and whitespace can be normalized.
+
+Optional network lookups from English Wiktionary contributors
+Source: https://en.wiktionary.org/
+License: CC BY-SA 4.0 https://creativecommons.org/licenses/by-sa/4.0/
+Results are selected, tags removed, and whitespace normalized.
+The specific source revision is linked from the associated flashcard.

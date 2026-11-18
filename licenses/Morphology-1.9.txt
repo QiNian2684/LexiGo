@@ -1,0 +1,35 @@
+1.9.0 离线构词资料来源与构建
+
+Morphology-1.8.txt 继续记录原索引、人工整理资料和 ECDICT 的署名。
+新版保留原资源，并分文件分发三份压缩索引。程序运行时不下载构词资料。
+
+morphology-derivations-v19.tsv.gz — CC BY-SA 3.0
+  Batsuren、Bella、Giunchiglia 的 MorphyNet（版本和 SHA-256 见 1.8 说明）。
+  Linxie/Fixie Tools 2026，DOI 10.5281/zenodo.24264741，
+  https://ling.fixie.tools/morphology/data
+  https://ling.fixie.tools/static/data/fixie-morpheme-segmentations.csv
+  SHA-256 b2f0f6213cd735e0472e6fb97d6bd9c89cd3d6a56ba6ab407437775a0fbdf29f
+  涉及从 MorphyNet 与 Wiktionary 取得的拆分，筛选组合关系、核对变体及补写中文解释。
+  https://creativecommons.org/licenses/by-sa/3.0/
+
+morphology-morpholex-v19.tsv.gz — CC BY-NC-SA 4.0，非商业用途
+  Sánchez-Gutiérrez、Mailhot、Deacon、Wilson，MorphoLex，
+  DOI 10.3758/s13428-017-0981-8
+  https://github.com/hugomailhot/MorphoLex-en
+  https://raw.githubusercontent.com/hugomailhot/MorphoLex-en/80bcff1bd70e311f2ec70fd64510e88eb059b0f2/MorphoLEX_en.xlsx
+  SHA-256 5bc425fbb710f3d63cab69e77ee731fa466653ed0ace94937cac6c1fd6de52c6
+  选取可解释的英语形态标记，校验拼写位置，补写中文解释，保留独立文件。
+  https://creativecommons.org/licenses/by-nc-sa/4.0/
+  完整条款见 MorphoLex-CC-BY-NC-SA-4.0.txt。
+
+morphology-etymdb-v19.tsv.gz — CC BY-SA 4.0
+  Clémentine Fourrier、Benoît Sagot，EtymDB 2.0，2020。
+  https://aclanthology.org/2020.lrec-1.392/
+  https://github.com/clefourrier/EtymDB
+  https://raw.githubusercontent.com/clefourrier/EtymDB/master/data/etymdb.csv
+  SHA-256 b1cff578f16c8e51dd8ec65c651d942cf6b5d9ffa587b16b2e59bc868280dc85
+  只选英语单词指向少数已人工核对的拉丁、希腊字根关系，加入简短中文解释。
+  https://creativecommons.org/licenses/by-sa/4.0/
+
+重建新版索引（仅重建上游索引时才需要 Python 及 openpyxl）：
+python scripts/build_morphology_v19.py eng.derivational.v1.tsv fixie-morpheme-segmentations.csv MorphoLEX_en.xlsx etymdb.csv ecdict.csv

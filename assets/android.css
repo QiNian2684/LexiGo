@@ -1,0 +1,199 @@
+body.platform-android {
+  --control: 3rem;
+  --phone-nav: 4.35rem;
+  --phone-actions: 4.15rem;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+  display: block;
+  min-width: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+.platform-android .shell {
+  width: min(100%, 45rem);
+  padding: calc(1.2rem + var(--safe-top)) 1rem calc(var(--phone-nav) + var(--safe-bottom) + 1.35rem);
+}
+.platform-android .sidebar {
+  position: fixed;
+  z-index: 20;
+  inset: auto 0 0;
+  width: 100%; height: auto; min-height: 0;
+  padding: .37rem .38rem calc(.39rem + var(--safe-bottom));
+  background: var(--surface);
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+:root[data-theme="dark"] .platform-android .sidebar { background: var(--rail); }
+.platform-android .brand { display: none; }
+.platform-android .nav {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  width: 100%;
+  gap: .27rem;
+  margin-inline: auto;
+  max-width: 38rem;
+}
+.platform-android .nav button {
+  min-height: 3.5rem;
+  height: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: .08rem;
+  padding: .28rem .12rem;
+  font-size: .77rem;
+  line-height: 1.3;
+  text-align: center;
+}
+.platform-android .nav button > span {
+  position: static; width: auto; height: auto;
+  clip: auto; clip-path: none;
+  overflow: visible; text-wrap: balance;
+}
+.platform-android .nav button .wide-label { display: none; }
+.platform-android .nav button .icon { width: 1.19rem; height: 1.19rem; }
+.platform-android .nav button[aria-current="page"]::before { display: none; }
+.platform-android #open-settings { margin: 0; }
+
+.platform-android button, .platform-android .settings-operation { touch-action: manipulation; }
+.platform-android .quiet, .platform-android .button.small { min-height: 3rem; }
+.platform-android .page-heading { margin-bottom: 1rem; gap: .55rem; }
+.platform-android .page-heading h1 { font-size: clamp(1.65rem, 6vw, 2.02rem); }
+.platform-android .page-heading .button { padding-inline: .63rem; }
+.platform-android .review-date { font-size: .77rem; }
+.platform-android .review-heading { align-items: flex-start; }
+.platform-android .review-heading h1.exam-countdown { font-size: clamp(1.1rem, 4.6vw, 1.4rem); }
+.platform-android .study-summary { min-width: 5.2rem; max-width: 8rem; align-self: flex-start; margin-top: .22rem; font-size: .78rem; }
+.platform-android .session-tools { justify-content: flex-end; margin: .55rem 0 0; }
+.platform-android #session-hint, .platform-android .card-actions kbd, .platform-android .desktop-data-copy { display: none; }
+.platform-android .review-card { overflow: visible; }
+.platform-android .card-front { min-height: 0; padding: 2rem .92rem 1.25rem; row-gap: .64rem; }
+.platform-android .english-word { font-size: clamp(2.3rem, 10.6vw, 3.9rem); }
+.platform-android .english-word.long-word { font-size: clamp(1.85rem, 8vw, 2.95rem); }
+.platform-android .streak { font-size: .81rem; }
+.platform-android .answer {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin: 0 .94rem 1rem;
+  padding-top: .95rem;
+}
+.platform-android .meaning-panel { padding-inline-end: 0; }
+.platform-android .memory-panel { border-inline-start: 0; border-top: 1px solid var(--line); padding: .95rem 0 0; }
+.platform-android .personal-note textarea { min-height: 6rem; max-height: none; overflow-y: hidden; resize: none; }
+.platform-android #card-metadata { margin-block: .8rem; }
+.platform-android .can-swipe .card-front,
+.platform-android .can-swipe .meaning-panel { touch-action: pan-y pinch-zoom; }
+.platform-android .swipe-content { position: relative; }
+.platform-android .review-card { position: relative; overflow-x: clip; overflow-y: visible; }
+.platform-android .swipe-cue {
+  position: absolute; right: .8rem; top: .8rem; z-index: 2; opacity: 0;
+  display: inline-flex; align-items: center; gap: .35rem; padding: .35rem .55rem;
+  color: var(--accent); background: var(--accent-soft); border-radius: var(--radius-small);
+  font-size: .84rem; pointer-events: none;
+}
+.platform-android .card-actions {
+  position: fixed; z-index: 19;
+  inset: auto 0 calc(var(--phone-nav) + var(--safe-bottom));
+  padding: .53rem 1rem;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.platform-android.has-vote[data-view="review"] .shell { padding-bottom: calc(var(--phone-nav) + var(--phone-actions) + var(--safe-bottom) + 1.35rem); }
+.platform-android.has-vote[data-view="review"] .feedback { margin-block-end: .5rem; }
+.platform-android.editing-input .sidebar,
+.platform-android.editing-input .card-actions { visibility: hidden; pointer-events: none; }
+.platform-android.editing-input .shell { padding-bottom: .85rem; }
+.platform-android textarea:focus, .platform-android input:focus { scroll-margin-block-end: .8rem; }
+.platform-android .empty-state { min-height: 14.25rem; padding: 2.15rem .9rem; }
+.platform-android .app-footer { margin-top: 1.42rem; font-size: .75rem; }
+
+.platform-android .section-card { padding: 1rem; }
+.platform-android #add-input { min-height: 9.5rem; }
+.platform-android #add-form .import-actions { gap: .55rem; }
+.platform-android #add-form .import-actions .button { flex: 1; padding-inline: .45rem; }
+.platform-android .filters {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .5rem;
+  padding: .77rem .75rem .48rem;
+}
+.platform-android .search-control { grid-column: 1 / -1; }
+.platform-android .batch-bar { padding: .15rem .75rem .53rem; gap: .36rem; }
+.platform-android .selection-actions { flex: 1 1 100%; }
+.platform-android .batch-bar > .select-control { flex: 1 1 6.9rem; min-width: 0; }
+.platform-android #export-list { flex: 1 1 auto; padding-inline: .37rem; }
+.platform-android .word-row {
+  grid-template-columns: 3rem minmax(0, 1fr) auto;
+  gap: .37rem;
+  padding: .8rem .55rem;
+}
+.platform-android .word-row .selection-target {
+  display: grid; place-items: start center;
+  min-height: 3rem; padding-top: .36rem;
+  cursor: pointer;
+}
+.platform-android .word-row:focus-within { background: var(--inset); }
+.platform-android .word-main { user-select: none; touch-action: pan-y; }
+.platform-android .word-row p { font-size: .94rem; }
+.platform-android .word-row h3 { gap: .27rem .38rem; font-size: 1.09rem; }
+.platform-android .row-actions .icon-button { width: 3rem; height: 3rem; }
+.platform-android .row-actions > .quiet { display: none; }
+.platform-android .pagination { padding-inline: .69rem; }
+
+.platform-android .settings-layout { grid-template-columns: minmax(0, 1fr); gap: .85rem; }
+.platform-android .settings-stack { gap: .78rem; }
+.platform-android .setting-row, .platform-android .theme-field { margin-inline: .88rem; }
+.platform-android .settings-group header { padding-inline: .88rem; }
+.platform-android .setting-row { min-height: 3.4rem; padding-block: .58rem; }
+.platform-android .setting-control { width: clamp(7.55rem, 35vw, 10rem); }
+.platform-android .setting-text label { font-size: .94rem; }
+.platform-android .number-unit { width: 4.5rem; }
+.platform-android .theme-segments label > span { min-height: 3rem; }
+.platform-android .settings-actions { margin: -.05rem 0 .28rem; }
+.platform-android .settings-actions .button.primary { min-width: 6.9rem; }
+.platform-android .data-actions, .platform-android .exit-group { padding-inline: .88rem; }
+.platform-android .settings-operation { min-height: 3rem; }
+
+.platform-android dialog:not(.control-popup) {
+  max-width: calc(100vw - 1.25rem);
+  max-height: calc(100vh - 1.25rem);
+  max-height: calc(var(--visible-height, 100dvh) - 1.25rem);
+}
+.platform-android .dialog-form {
+  max-height: calc(100vh - 1.37rem);
+  max-height: calc(var(--visible-height, 100dvh) - 1.37rem);
+}
+.platform-android .dialog-header { padding: .75rem .9rem .58rem; }
+.platform-android .dialog-header h2 { font-size: 1.2rem; }
+.platform-android .dialog-header .icon-button { width: 3rem; height: 3rem; }
+.platform-android .dialog-body, .platform-android .dialog-footer { padding-inline: .9rem; }
+.platform-android .dialog-actions, .platform-android .right-actions { gap: .45rem; }
+.platform-android .dialog-footer .button { padding-inline: .63rem; }
+.platform-android .control-popup {
+  inset: auto 0 0;
+  width: min(100%, 33rem);
+  max-width: 100%;
+  max-height: min(33rem, 78vh);
+  max-height: min(33rem, 78dvh);
+  margin: 0 auto;
+  padding: 0 0 var(--safe-bottom);
+  border-radius: var(--radius-dialog) var(--radius-dialog) 0 0;
+  border-bottom: 0;
+}
+.platform-android .control-popup[open] { display: flex; flex-direction: column; }
+.platform-android .popup-header {
+  display: flex; justify-content: space-between; align-items: center; gap: .5rem;
+  padding: .47rem .85rem .38rem 1.05rem;
+  border-bottom: 1px solid var(--line);
+}
+.platform-android .popup-header h2 { min-width: 0; font-size: 1.09rem; font-weight: 650; overflow-wrap: anywhere; }
+.platform-android .popup-list { max-height: none; padding: .32rem .58rem .55rem; flex: 1 1 auto; min-height: 0; }
+.platform-android .popup-item { min-height: 3rem; padding-inline: .75rem; }
+.platform-android .popup-item[aria-selected="true"] { margin-block: .07rem; }
+@media (max-width: 360px) {
+  .platform-android .shell { padding-inline: .67rem; }
+  .platform-android .settings-group header { padding-inline: .72rem; }
+  .platform-android .setting-row, .platform-android .theme-field { margin-inline: .72rem; }
+  .platform-android .theme-segments .icon { display: none; }
+  .platform-android .word-row { gap: .23rem; }
+  .platform-android .dialog-footer .button { padding-inline: .5rem; }
+}

@@ -1,0 +1,99 @@
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("/instrument-sans.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  --canvas: #f5f7fa;
+  --rail: #eef2f6;
+  --surface: #ffffff;
+  --raised: #ffffff;
+  --input: #f8fafc;
+  --inset: #eef2f6;
+  --hover: #edf2f8;
+  --pressed: #dbe6f1;
+  --ink: #202833;
+  --secondary: #48566a;
+  --muted: #5c6a7c;
+  --line: #d6dee8;
+  --control-line: #78899e;
+  --accent: #486a90;
+  --accent-fill: #546f94;
+  --accent-hover: #456184;
+  --on-accent: #fff;
+  --accent-soft: #e0e9f3;
+  --accent-soft-hover: #d6e2ef;
+  --focus: #5479a6;
+  --danger: #922f3d;
+  --danger-fill: #9b3442;
+  --danger-hover: #842b37;
+  --on-danger: #fff;
+  --danger-soft: #f7e6e6;
+  --warning: #76551c;
+  --warning-soft: #f7eedb;
+  --overlay: rgb(24 34 49 / 40%);
+  --shadow: 0 2px 5px rgb(39 53 75 / 4%), 0 16px 38px rgb(39 53 75 / 7%);
+  --shadow-popup: 0 4px 12px rgb(31 49 75 / 10%), 0 16px 44px rgb(31 49 75 / 16%);
+  --font-ui: "Instrument Sans", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-word: "Instrument Sans", "Segoe UI", Roboto, system-ui, sans-serif;
+  --space-1: .25rem;
+  --space-2: .5rem;
+  --space-3: .75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --radius-small: .5rem;
+  --radius-control: .6875rem;
+  --radius-panel: 1rem;
+  --radius-dialog: 1.25rem;
+  --control: 2.75rem;
+  --rail-size: 13.5rem;
+  --motion: 140ms;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #16181b;
+  --rail: #1b1d21;
+  --surface: #202329;
+  --raised: #292e35;
+  --input: #252b34;
+  --input-hover: #303846;
+  --input-disabled: #20252c;
+  --input-disabled-ink: #9ca7b5;
+  --input-selection: #405572;
+  --inset: #191c20;
+  --hover: #292d34;
+  --pressed: #333943;
+  --ink: #eef1f5;
+  --secondary: #c0c6cf;
+  --muted: #9ca7b5;
+  --line: #363b44;
+  --control-line: #646e7d;
+  --accent: #adc2de;
+  --accent-fill: #819bbe;
+  --accent-hover: #9bb3d1;
+  --on-accent: #111820;
+  --accent-soft: #303e50;
+  --accent-soft-hover: #39495f;
+  --focus: #9bb3d1;
+  --danger: #ffb0b9;
+  --danger-fill: #f4a9b1;
+  --danger-hover: #ffc5ca;
+  --on-danger: #4a1520;
+  --danger-soft: #482b30;
+  --warning: #e3c68b;
+  --warning-soft: #3b3324;
+  --overlay: rgb(8 9 11 / 68%);
+  --shadow: 0 2px 5px rgb(0 0 0 / 12%), 0 16px 40px rgb(0 0 0 / 14%);
+  --shadow-popup: 0 5px 15px rgb(0 0 0 / 24%), 0 20px 54px rgb(0 0 0 / 35%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion: 0ms; }
+}

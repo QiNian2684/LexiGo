@@ -1,0 +1,35 @@
+1.8.0 离线构词资料来源与构建
+
+原人工资料来源与边界见 Construction-notes.txt。1.8.0 的三个新增文本索引
+已压缩并打包。生成器 scripts/build_morphology.py 只依赖 Python 标准库。
+正常运行和使用 APK / EXE 无需下载这些上游文件或联网。
+
+1. MorphyNet English Derivational Morphology, v1
+   Khuyagbaatar Batsuren, Gábor Bella, Fausto Giunchiglia (2021).
+   https://aclanthology.org/2021.sigmorphon-1.5/
+   https://github.com/kbatsuren/MorphyNet/tree/378144f64df58c78db5245af19d16a511ccecf3a
+   https://raw.githubusercontent.com/kbatsuren/MorphyNet/378144f64df58c78db5245af19d16a511ccecf3a/eng/eng.derivational.v1.tsv
+   SHA-256: 5920edacc1888b14464fc5cd96beea0a721221d56d1dc0e49de22f4c7c537c50
+   许可证与其 Wiktionary 上游署名：CC BY-SA 3.0，详见项目 README。
+   https://creativecommons.org/licenses/by-sa/3.0/
+   改动：只选英语派生关系的一部分，按词性、拼写、词典存在性过滤，补写中文解释。
+   morphynet-hints.tsv.gz 及继承至 morphology-inflections.tsv.gz 的这些记录
+   继续以 CC BY-SA 3.0 分发。英文原数据不随应用打包。
+
+2. LexiRoot, curated English morphemes/attested example list
+   https://github.com/tcyeee/lexiroot/tree/04d5f00e12ac8c78e111810229e5dec047a7672e
+   https://raw.githubusercontent.com/tcyeee/lexiroot/04d5f00e12ac8c78e111810229e5dec047a7672e/data/sources/morphemes.json
+   SHA-256: de75780386c06450ad3ab15ea1a231ab1d27a89acf233c8eb5b8e1a81e87f9ab
+   MIT，原项目及其 colingoldberg/morphemes、WithEnglishWeCan 上游署名见
+   LexiRoot-MIT.txt、LexiRoot-Third-Party.txt。按原例词、白名单和可信拼写筛选，
+   加入中文释义。运行时仅使用例词索引，未引入该项目的引擎。
+
+3. ECDICT
+   https://github.com/skywind3000/ECDICT
+   https://raw.githubusercontent.com/skywind3000/ECDICT/master/ecdict.csv
+   本次构建输入 SHA-256: d1ecbdf9ee2b920afb6f430ca6b6bb9f559588cf0dff86e04bd255f9390843cc
+   现有许可见 ECDICT.txt。仅用 exchange 原型及变换类型支持常见词形继承，
+   并用词频与考研标签构造独立比较样本。程序内仍使用原内置中英词典。
+
+重建索引：
+python scripts/build_morphology.py eng.derivational.v1.tsv morphemes.json ecdict.csv

@@ -1,0 +1,24 @@
+# Local learning records, exports and backups
+/Data/
+/StudyData/
+/backups/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+WordReview-Learning-*.json
+WordReview-Backup-*.json
+# Signing credentials
+.local-signing/
+*.p12
+*.jks
+*.keystore
+.env
+.env.*
+# Local build output
+/dist/
+/build/
+*.exe
+*.apk
+*.idsig
+__pycache__/

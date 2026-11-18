@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f5f7fa">
+  <title>背词本</title>
+  <link rel="icon" href="/favicon.png">
+  <script src="/appearance.js"></script>
+  <link rel="stylesheet" href="/tokens.css">
+  <link rel="stylesheet" href="/app.css">
+  <script src="/controls.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body data-view="review">
+  <aside class="sidebar">
+    <div class="brand"><img src="/favicon.png" alt="" width="35" height="35"><span>背词本</span></div>
+    <nav class="nav" aria-label="主导航">
+      <button type="button" data-view="review" aria-current="page"><svg class="icon" aria-hidden="true"><use href="/icons.svg#review"/></svg><span>复习</span></button>
+      <button type="button" data-view="add"><svg class="icon" aria-hidden="true"><use href="/icons.svg#add"/></svg><span>添加<span class="wide-label">单词</span></span></button>
+      <button type="button" data-view="library"><svg class="icon" aria-hidden="true"><use href="/icons.svg#library"/></svg><span>词库<span class="wide-label">管理</span></span></button>
+      <button type="button" data-view="stats"><svg class="icon" aria-hidden="true"><use href="/icons.svg#stats"/></svg><span><span class="wide-label">学习</span>统计</span></button>
+      <button type="button" id="open-settings" data-view="settings"><svg class="icon" aria-hidden="true"><use href="/icons.svg#settings"/></svg><span>设置</span></button>
+    </nav>
+  </aside>
+  <main class="shell">
+    <div id="error" class="notice error" role="alert" hidden></div>
+    <div id="storage-notice" class="notice" role="status" hidden></div>
+    <section id="closed" class="card empty-state" hidden>
+      <h1>背词本已退出</h1>
+      <p class="desktop-data-copy">可以关闭窗口，或移动程序和同级的 Data 文件夹。</p>
+    </section>
+
+    <section id="review-view" aria-labelledby="review-title">
+      <header class="page-heading review-heading">
+        <div><h1 id="review-title" class="exam-countdown">考试倒计时</h1><p id="date" class="review-date"></p></div>
+        <div class="study-summary" id="study-summary" hidden>
+          <p id="day-completion" aria-live="polite"></p>
+          <progress id="day-meter" value="0" max="1" aria-label="今日复习进度"></progress>
+        </div>
+      </header>
+      <p id="new-overflow" class="notice" role="status" hidden></p>
+      <section id="review-start" class="card empty-state start-state" hidden>
+        <div class="state-symbol"><svg class="icon" aria-hidden="true"><use href="/icons.svg#review"/></svg></div>
+        <h2>今天准备复习的单词</h2>
+        <p id="start-summary"></p>
+        <button class="button primary" type="button" id="start-review">开始复习<svg class="icon" aria-hidden="true"><use href="/icons.svg#right"/></svg></button>
+      </section>
+      <div class="session-tools" id="session-tools" hidden>
+        <span id="session-hint">空格查看释义 · 1 没记住 · 2 记住了</span>
+        <div><button class="quiet" type="button" id="undo">撤销上一次</button><button class="quiet" type="button" id="stop-review">结束本次复习</button></div>
+      </div>
+      <article class="card review-card" id="flashcard" hidden>
+        <div class="swipe-content" id="swipe-content"><div class="card-front">
+          <h2 class="english-word" id="word" lang="en"></h2>
+          <p class="streak" id="streak" hidden></p>
+          <div class="review-controls">
+            <button class="icon-button sound" type="button" id="speak" title="播放发音" aria-label="播放发音" hidden><svg class="icon" aria-hidden="true"><use href="/icons.svg#sound"/></svg></button>
+            <button class="button subtle" type="button" id="reveal" aria-expanded="false" aria-controls="answer">
+              <span id="reveal-label">查看中文释义</span><svg class="icon" aria-hidden="true"><use href="/icons.svg#down"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="answer" id="answer" hidden>
+          <section id="details" class="meaning-panel" tabindex="0" aria-label="释义和例句"></section>
+          <section class="memory-panel" aria-label="我的备注">
+            <div class="personal-note">
+              <label for="personal-note">我的备注</label>
+              <textarea id="personal-note" rows="4" maxlength="12000" placeholder="写下你的联想、易混点或任何想记的内容。"></textarea>
+              <div class="note-actions">
+                <span id="note-status" role="status"></span>
+              </div>
+            </div>
+            <div id="card-metadata"></div>
+          </section>
+        </div>
+        </div>
+        <div class="swipe-cue" id="swipe-cue" aria-hidden="true"><svg class="icon"><use id="swipe-icon" href="/icons.svg#check"/></svg><span id="swipe-label">记住了</span></div>
+        <div class="card-actions" id="vote-actions" hidden>
+          <button class="button outline" id="forgot" type="button"><span id="forgot-label">没记住</span> <kbd>1</kbd></button>
+          <button class="button primary" id="pass" type="button">记住了 <kbd>2</kbd></button>
+        </div>
+      </article>
+      <p class="feedback" id="feedback" role="status" hidden></p>
+      <article class="card empty-state" id="review-empty" aria-busy="true">
+        <div class="state-symbol"><svg class="icon" aria-hidden="true"><use href="/icons.svg#review"/></svg></div>
+        <h2 id="empty-title">正在加载…</h2>
+        <p id="empty-text"></p>
+        <button class="button primary" type="button" id="empty-action" hidden></button>
+      </article>
+    </section>
+
+    <section id="add-view" aria-labelledby="add-title" hidden>
+      <header class="page-heading"><h1 id="add-title">添加单词</h1></header>
+      <form id="add-form" class="card section-card compose-card" data-validation="import-status">
+        <label class="section-title" for="add-input">英文单词或短语</label>
+        <p class="help" id="import-help">用英文逗号隔开，或每行一个。再次录入已存在的词会重置它的学习进度，确认前可预览。</p>
+        <textarea rows="7" id="add-input" aria-describedby="import-help" placeholder="crucial, abundance, sophisticated, forthright" required spellcheck="false"></textarea>
+        <div class="import-actions">
+          <button class="button outline" type="button" id="pick-txt"><svg class="icon" aria-hidden="true"><use href="/icons.svg#file"/></svg>读取词表文件</button>
+          <input id="txt-file" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" hidden>
+          <button class="button primary" type="submit" id="add-submit">预览导入<svg class="icon" aria-hidden="true"><use href="/icons.svg#right"/></svg></button>
+        </div>
+        <p class="form-status" id="import-status" role="status" hidden></p>
+        <p class="form-status" id="import-lookup" role="status" hidden></p>
+      </form>
+    </section>
+
+    <section id="library-view" aria-labelledby="library-title" hidden>
+      <header class="page-heading">
+        <h1 id="library-title">词库</h1>
+        <button class="button primary" type="button" id="open-add"><svg class="icon" aria-hidden="true"><use href="/icons.svg#add"/></svg>添加单词</button>
+      </header>
+      <div class="card library">
+        <div class="filters">
+          <label class="search-control">
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#search"/></svg>
+            <input type="search" id="search" placeholder="搜索英文或中文释义" aria-label="搜索词库">
+          </label>
+          <select id="filter" aria-label="筛选词库" data-styled>
+            <option value="">全部单词</option>
+            <option value="active">复习中</option>
+            <option value="mastered">已掌握</option>
+            <option value="recent">最近添加</option>
+            <option value="forgotten">曾经遗忘</option>
+            <option value="partial">资料不全</option>
+            <option value="trash">回收站</option>
+          </select>
+          <select id="sort" aria-label="排列方式" data-styled>
+            <option value="">按英文排序</option>
+            <option value="added">最近添加优先</option>
+            <option value="seen">最近复习优先</option>
+            <option value="reviews">复习次数最多</option>
+            <option value="forgot">遗忘次数最多</option>
+          </select>
+        </div>
+        <div class="batch-bar">
+          <div class="selection-actions">
+            <button class="quiet" type="button" id="select-all">全选结果</button>
+            <button class="quiet" type="button" id="clear-selection" hidden>取消选择</button>
+            <span id="selection-count" aria-live="polite"></span>
+          </div>
+          <select id="batch-action" aria-label="批量操作" data-styled disabled>
+            <option value="">批量操作</option>
+            <option value="remove">移入回收站</option>
+            <option value="reset">重新学习</option>
+            <option value="retry">联网补缺</option>
+            <option value="restore">从回收站恢复</option>
+            <option value="export">导出所选 CSV</option>
+          </select>
+          <button class="quiet" type="button" id="export-list"><svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg>导出当前结果</button>
+        </div>
+        <div class="lookup-bar" id="lookup-bar" hidden>
+          <span id="lookup-status" role="status"></span>
+          <button class="button outline small" type="button" id="retry-all" hidden>重试联网</button>
+        </div>
+        <div id="word-list" class="word-list"></div>
+        <div class="pagination">
+          <span id="results"></span>
+          <div><button id="prev-page" class="quiet" type="button">上一页</button><button id="next-page" class="quiet" type="button">下一页</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="stats-view" aria-labelledby="stats-title" hidden>
+      <header class="page-heading"><h1 id="stats-title">学习统计</h1></header>
+      <div class="card summary stats-summary" id="stats-counts" aria-label="学习概况"></div>
+      <div class="card stats-table">
+        <h2>最近 7 天</h2>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="最近七天的复习记录">
+          <table>
+            <thead><tr><th scope="col">日期</th><th scope="col">复习词数</th><th scope="col">当天过关</th><th scope="col">记住了</th><th scope="col">没记住</th></tr></thead>
+            <tbody id="stats-days"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="settings-view" aria-labelledby="settings-title" hidden>
+      <header class="page-heading">
+        <h1 id="settings-title" tabindex="-1">设置</h1>
+        <button class="button outline" type="button" id="settings-back"><svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-left"/></svg>返回</button>
+      </header>
+      <div class="settings-layout">
+        <form id="settings-form" class="settings-stack" data-validation="study-settings-status">
+          <section class="card settings-group" aria-labelledby="learning-settings-title">
+            <header><h2 id="learning-settings-title">学习</h2></header>
+            <div class="setting-row setting-limit">
+              <div class="setting-text"><label for="daily-limit">每日复习上限</label><p>同一个词当天重测不额外占名额。</p></div>
+              <div class="setting-control">
+                <select id="daily-limit" data-styled>
+                  <option value="10">10 个</option><option value="20">20 个</option><option value="40">40 个</option>
+                  <option value="100">100 个</option><option value="200">200 个</option>
+                  <option value="0">全部待复习单词</option><option value="custom">自定义</option>
+                </select>
+                <input type="number" inputmode="numeric" min="1" max="10000" id="custom-limit" aria-label="自定义每日复习数量" hidden>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-text"><label for="daily-goal">当天过关所需连对次数</label><p>待过关的词立即按新门槛计算。</p></div>
+              <div class="number-unit"><input type="number" inputmode="numeric" min="1" max="99" step="1" id="daily-goal" required><span aria-hidden="true">次</span></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-text"><label for="goal">长期掌握所需过关天数</label><p>新门槛在下一次当天过关时检查。</p></div>
+              <div class="number-unit"><input type="number" inputmode="numeric" min="1" max="99" step="1" id="goal" required><span aria-hidden="true">天</span></div>
+            </div>
+            <div class="setting-row">
+              <div class="setting-text"><label for="exam-mode">考试日期</label><p>按设备本地日历倒计时。</p></div>
+              <div class="setting-control">
+                <select id="exam-mode" data-styled><option value="annual">每年循环</option><option value="fixed">指定日期</option></select>
+              </div>
+            </div>
+            <div class="setting-row" id="exam-annual-row">
+              <div class="setting-text">每年考试日</div>
+              <div class="setting-control exam-annual">
+                <label>月<input id="exam-month" type="number" inputmode="numeric" min="1" max="12" step="1"></label>
+                <label>日<input id="exam-day" type="number" inputmode="numeric" min="1" max="31" step="1"></label>
+              </div>
+            </div>
+            <div class="setting-row" id="exam-fixed-row" hidden>
+              <label class="setting-text" for="exam-fixed">指定考试日</label>
+              <div class="setting-control"><input id="exam-fixed" type="date" min="1900-01-01" max="9999-12-31"></div>
+            </div>
+          </section>
+
+          <section class="card settings-group" aria-labelledby="appearance-title">
+            <header><h2 id="appearance-title">外观</h2></header>
+            <fieldset class="theme-field">
+              <legend>主题</legend>
+              <div class="theme-segments">
+                <label><input type="radio" name="appearance-theme" value="system" checked><span><svg class="icon" aria-hidden="true"><use href="/icons.svg#screen"/></svg>跟随系统</span></label>
+                <label><input type="radio" name="appearance-theme" value="light"><span><svg class="icon" aria-hidden="true"><use href="/icons.svg#sun"/></svg>浅色</span></label>
+                <label><input type="radio" name="appearance-theme" value="dark"><span><svg class="icon" aria-hidden="true"><use href="/icons.svg#moon"/></svg>深色</span></label>
+              </div>
+              <p id="theme-status" class="inline-status error" role="status" hidden></p>
+            </fieldset>
+            <label class="setting-row switch-row"><span>在复习卡显示音标</span><input type="checkbox" role="switch" id="show-ipa"><span class="switch-indicator" aria-hidden="true"></span></label>
+          </section>
+
+          <section class="card settings-group" aria-labelledby="dictionary-settings-title">
+            <header><h2 id="dictionary-settings-title">词典</h2></header>
+            <label class="setting-row switch-row"><span>联网补充缺失的词典资料</span><input type="checkbox" role="switch" id="online"><span class="switch-indicator" aria-hidden="true"></span></label>
+          </section>
+          <p id="study-settings-status" class="inline-status error" role="alert" hidden></p>
+        </form>
+
+        <div class="settings-stack">
+          <section class="card settings-group data-controls" aria-labelledby="data-title">
+            <header><h2 id="data-title">数据管理</h2><p>存储位置 <code id="storage-path">Data&#92;vocabulary.db</code></p></header>
+            <div class="data-actions">
+              <h3>跨设备迁移</h3>
+              <button class="settings-operation" id="transfer-export" type="button">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg><span>导出完整学习数据</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
+              </button>
+              <button class="settings-operation" id="transfer-import" type="button">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#upload"/></svg><span>导入完整学习数据<small>确认后覆盖本机数据</small></span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
+              </button>
+              <button class="settings-operation" id="transfer-recovery" type="button" hidden>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#history"/></svg><span>保存覆盖前的备份</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
+              </button>
+              <h3>本地备份</h3>
+              <a class="settings-operation" id="download-backup" href="/api/backup" download>
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#backup"/></svg><span>备份 JSON</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
+              </a>
+              <button class="settings-operation" id="pick-restore" type="button">
+                <svg class="icon" aria-hidden="true"><use href="/icons.svg#history"/></svg><span>从备份恢复<small>确认后覆盖本机数据</small></span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
+              </button>
+              <input id="restore-file" type="file" accept=".json,application/json" hidden>
+            </div>
+            <p id="settings-status" class="inline-status" role="status" hidden></p>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <footer class="app-footer">
+      <span>词库和复习记录保存在本机</span>
+      <a href="/licenses" id="open-licenses">第三方许可</a>
+    </footer>
+  </main>
+
+  <dialog id="edit-dialog" aria-labelledby="edit-title">
+    <form id="edit-form" class="dialog-form" data-validation="edit-status">
+      <header class="dialog-header"><h2 id="edit-title">编辑单词</h2><button class="icon-button" type="button" data-close aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="/icons.svg#close"/></svg></button></header>
+      <div class="dialog-body editor-fields">
+        <label for="edit-word">英文拼写</label><input type="text" id="edit-word" maxlength="96" required>
+        <label for="edit-meaning">中文释义</label><textarea rows="2" id="edit-meaning"></textarea>
+        <div class="form-columns">
+          <div><label for="edit-pos">词性</label><input type="text" id="edit-pos"></div>
+          <div><label for="edit-ipa">音标</label><input type="text" id="edit-ipa"></div>
+        </div>
+        <div class="form-columns">
+          <div><label for="edit-ipaUK">英式音标</label><input type="text" id="edit-ipaUK"></div>
+          <div><label for="edit-ipaUS">美式音标</label><input type="text" id="edit-ipaUS"></div>
+        </div>
+        <label for="edit-examples">例句</label><textarea rows="2" id="edit-examples"></textarea>
+        <label for="edit-exampleTranslation">例句翻译</label><textarea rows="2" id="edit-exampleTranslation"></textarea>
+        <label for="edit-etymology">词根和词源</label><textarea rows="2" id="edit-etymology"></textarea>
+        <label for="edit-collocations">搭配</label><textarea rows="2" id="edit-collocations"></textarea>
+        <label for="edit-note">记忆提示</label><textarea rows="2" id="edit-note"></textarea>
+        <label for="edit-personalNote">我的备注</label><textarea rows="2" id="edit-personalNote" maxlength="12000"></textarea>
+      </div>
+      <div class="dialog-footer">
+        <p id="edit-status" class="inline-status error" role="alert" hidden></p>
+        <div class="dialog-actions editor-actions">
+          <button class="button outline" type="button" id="retry-one">联网补缺</button>
+          <div class="right-actions">
+            <button class="button outline" type="button" data-close>完成</button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="action-dialog" aria-labelledby="action-title" aria-describedby="action-text">
+    <form id="action-form" class="dialog-form">
+      <header class="dialog-header"><h2 id="action-title"></h2></header>
+      <div class="dialog-body"><p id="action-text" class="preserve"></p><p id="action-status" class="inline-status error" role="alert" hidden></p></div>
+      <div class="dialog-footer">
+        <div class="dialog-actions">
+          <button class="button outline" type="button" data-close autofocus>取消</button>
+          <button class="button primary" type="submit" id="action-confirm"></button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="history-dialog" aria-labelledby="history-title">
+    <div class="dialog-form">
+      <header class="dialog-header"><h2 id="history-title">学习历史</h2><button class="icon-button" type="button" data-close aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="/icons.svg#close"/></svg></button></header>
+      <div class="dialog-body"><ol id="history-list" class="history-list"></ol></div>
+    </div>
+  </dialog>
+  <dialog id="license-dialog" aria-labelledby="license-title">
+    <div class="dialog-form">
+      <header class="dialog-header"><h2 id="license-title">第三方许可</h2><button class="icon-button" type="button" data-close aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="/icons.svg#close"/></svg></button></header>
+      <div class="dialog-body"><pre id="license-text" class="license-text" tabindex="0"></pre></div>
+    </div>
+  </dialog>
+</body>
+</html>
