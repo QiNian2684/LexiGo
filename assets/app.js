@@ -141,7 +141,7 @@ function renderReview() {
   el("flashcard").hidden = !current;
   el("review-start").hidden = !!practice || !!studying || !next.current;
   el("review-empty").hidden = !!practice || !!next.current;
-  el("start-summary").textContent = `还有 ${next.due} 个词待过关。`;
+  el("start-summary").textContent = `还有 ${next.due} 个词待过关`;
   el("vote-actions").hidden = !current || !!practice || (concealed && !windowsReview);
   document.body.classList.toggle("has-vote", !el("vote-actions").hidden);
   if (current) {
@@ -155,7 +155,7 @@ function renderReview() {
   if (!next.current) {
     if (!next.total) empty("词库还是空的", "先添加一批单词，再开始复习。", "add");
     else if (next.total === next.mastered && !next.remembered) empty("词库里的单词都掌握了", "可以在词库提前查看，也可以选词重新学习。", "library");
-    else empty("今天的复习任务已完成！", "", "", true);
+    else empty("今天的复习任务已完成", "", "", true);
   }
 }
 

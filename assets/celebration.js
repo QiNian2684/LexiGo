@@ -1,7 +1,6 @@
 (() => {
   "use strict";
 
-  const colors = ["#F2C66D", "#E9A45B", "#DF8957", "#CC655D"];
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
   const range = (start, end) => start + Math.random() * (end - start);
   let stopCurrent;
@@ -28,7 +27,10 @@
     const count = Math.random() < .52 ? 3 : 4;
     const columns = Array.from({length: count}, (_, index) => index);
     const compact = width < 560;
-    const distance = compact ? .79 : 1;
+    const spread = compact ? .9 : 1.09;
+    const colors = document.documentElement.dataset.theme === "dark"
+      ? ["#FFD45F", "#FFAA47", "#F6794C", "#ED6256"]
+      : ["#E9A019", "#F48921", "#F36B3B", "#E65245"];
     const gravity = compact ? 210 : 263;
     let delay = 0;
     const bursts = [];
@@ -41,11 +43,11 @@
       const rotation = range(0, Math.PI * 2);
       const particles = Array.from({length: size}, (_, i) => {
         const angle = rotation + (i + range(-.3, .3)) * Math.PI * 2 / size;
-        const speed = range(105, 295) * distance;
+        const speed = range(105, 295) * spread;
         return {
           x: Math.cos(angle), y: Math.sin(angle), speed,
-          lifetime: range(.96, 1.23), weight: range(.85, 2.2),
-          trail: Math.random() < .42 ? range(2, 6) : 0,
+          lifetime: range(.96, 1.23), weight: range(1.25, 2.85),
+          trail: Math.random() < .42 ? range(2.3, 6.6) : 0,
           color: colors[Math.floor(Math.random() * colors.length)],
         };
       });
@@ -87,7 +89,7 @@
           const travel = particle.speed * distance;
           const x = burst.x + particle.x * travel;
           const y = burst.y + particle.y * travel + drop;
-          context.globalAlpha = .91 * (1 - Math.pow(t / particle.lifetime, 1.35));
+          context.globalAlpha = .98 * (1 - (t / particle.lifetime) ** 2);
           context.beginPath();
           if (particle.trail) {
             const trail = particle.trail * (1 - t / particle.lifetime);
