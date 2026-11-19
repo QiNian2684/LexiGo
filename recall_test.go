@@ -10,9 +10,9 @@ import (
 func TestOldLearningHistoryRestoresLostPassDays(t *testing.T) {
 	s, path := newTestStore(t)
 	importTest(t, s, "2026-11-01", "apple")
-	passOne(t, s, "2026-11-01")
+	passWord(t, s, "2026-11-01", 3)
 	nextVote(t, s, "2026-11-03", false)
-	passOne(t, s, "2026-11-05")
+	passWord(t, s, "2026-11-05", 1)
 	card := s.db.Words["apple"]
 	s.db.CumulativePasses = false
 	card.Streak = 1 // Simulate the pre-2.2.3 counter that restarted after a failed day.

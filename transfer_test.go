@@ -165,7 +165,8 @@ func TestTransferDayBoundary(t *testing.T) {
 	location := time.FixedZone("source", -6*3600)
 	when := time.Date(2026, 11, 16, 21, 0, 0, 0, location)
 	importTest(t, s, "2026-11-15", "crucial")
-	passOne(t, s, "2026-11-15")
+	passWord(t, s, "2026-11-15", 3)
+	nextVote(t, s, "2026-11-16", false)
 	nextVote(t, s, "2026-11-16", true)
 	file, err := s.transferBytes(when)
 	if err != nil {
@@ -190,7 +191,7 @@ func TestTransferDayBoundary(t *testing.T) {
 	}
 	receiverStore := &store{db: p.Database}
 	next := receiverStore.review("2026-11-17")
-	if next.Current == nil || next.Current.DailyCount != 0 || next.Current.Streak != 1 {
+	if next.Current == nil || next.Current.DailyCount != 0 || next.Current.Streak != 1 || next.Current.DailyTarget != 1 {
 		t.Fatalf("past unfinished task was treated as present-day progress: %+v", next)
 	}
 }

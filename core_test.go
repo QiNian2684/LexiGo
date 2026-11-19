@@ -73,7 +73,11 @@ func TestGraduationReimportPreservesContentAndSameDayCredit(t *testing.T) {
 	card.PersonalNote = "我的记忆笔记\n不应被覆盖"
 	mustSave(t, s, card.Key)
 	for i, day := range []string{"2026-11-01", "2026-11-03", "2026-11-08", "2026-11-09", "2026-11-11", "2026-11-16"} {
-		result := passOne(t, s, day)
+		target := 1
+		if i == 0 {
+			target = 3
+		}
+		result := passWord(t, s, day, target)
 		if result.Graduated != (i == 5) || !result.Credited || result.Due != 0 {
 			t.Fatalf("day %s: %+v", day, result)
 		}
@@ -95,10 +99,10 @@ func TestGraduationReimportPreservesContentAndSameDayCredit(t *testing.T) {
 	if plan.Reset != 1 || plan.New != 0 || plan.Duplicates != 1 || len(s.db.Words) != 1 {
 		t.Fatalf("wrong reimport result: %+v", plan)
 	}
-	if card.Mastered || card.Streak != 0 || card.PersonalNote == "" || len(s.history(card)) != 20 || card.DailyCount != 0 || card.DailyDay != "" || card.LastPass != "" || card.Meaning == "" {
+	if card.Mastered || card.Streak != 0 || card.PersonalNote == "" || len(s.history(card)) != 10 || card.DailyCount != 0 || card.DailyDay != "" || card.LastPass != "" || card.Meaning == "" {
 		t.Fatalf("reset changed unrelated data: %+v", card)
 	}
-	if r := passOne(t, s, "2026-11-16"); r.Credited || r.Reviewed != 1 || r.Due != 0 || card.Streak != 0 {
+	if r := passWord(t, s, "2026-11-16", 3); r.Credited || r.Reviewed != 1 || r.Due != 0 || card.Streak != 0 {
 		t.Fatalf("reimport earned an extra credit: %+v", r)
 	}
 	if err := s.io.Close(); err != nil {
@@ -112,7 +116,7 @@ func TestGraduationReimportPreservesContentAndSameDayCredit(t *testing.T) {
 	if reloaded.db.Words["crucial"].PersonalNote != card.PersonalNote || reloaded.review("2026-11-16").Due != 0 {
 		t.Fatal("reopen did not preserve note and date")
 	}
-	if r := passOne(t, reloaded, "2026-11-20"); !r.Credited || reloaded.db.Words["crucial"].Streak != 1 {
+	if r := passWord(t, reloaded, "2026-11-20", 1); !r.Credited || reloaded.db.Words["crucial"].Streak != 1 {
 		t.Fatal("new study date did not credit")
 	}
 }

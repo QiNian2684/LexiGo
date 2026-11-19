@@ -8,33 +8,37 @@ import (
 	"testing"
 )
 
-func passOne(t *testing.T, s *store, day string) voteResult {
+func passWord(t *testing.T, s *store, day string, target int) voteResult {
 	t.Helper()
-	for i := 1; i <= 3; i++ {
+	for i := 1; i <= target; i++ {
 		result := nextVote(t, s, day, true)
-		if result.DailyCount != i || result.DailyTarget != 3 || result.DayPassed != (i == 3) {
+		if result.DailyCount != i || result.DailyTarget != target || result.DayPassed != (i == target) {
 			t.Fatalf("answer %d: %+v", i, result)
 		}
-		if i < 3 && (result.Credited || result.Remembered != 0 || result.Due != 1) {
+		if i < target && (result.Credited || result.Remembered != 0 || result.Due != 1) {
 			t.Fatalf("credited before daily pass: %+v", result)
 		}
-		if i == 3 {
+		if i == target {
 			return result
 		}
 	}
-	panic("three responses did not complete")
+	panic("no responses")
 }
 
-func TestThreePerDaySixLearningDays(t *testing.T) {
+func TestFirstPassThenFirstAnswerPassesOnLaterLearningDays(t *testing.T) {
 	s, _ := newTestStore(t)
 	importTest(t, s, "2026-11-01", "crucial")
 	days := []string{"2026-11-01", "2026-11-02", "2026-11-05", "2026-11-08", "2026-11-10", "2026-11-16"}
 	for i, day := range days {
+		target := 1
+		if i == 0 {
+			target = 3
+		}
 		state := s.review(day)
-		if state.Current.DailyCount != 0 || state.Current.Streak != i {
+		if state.Current.DailyCount != 0 || state.Current.Streak != i || state.Current.DailyTarget != target {
 			t.Fatalf("gap or new learning day: %+v", state)
 		}
-		result := passOne(t, s, day)
+		result := passWord(t, s, day, target)
 		card := s.db.Words["crucial"]
 		if !result.Credited || result.Due != 0 || result.Remembered != 1 || result.Reviewed != 1 ||
 			card.Streak != i+1 || card.Mastered != (i == 5) {
@@ -52,9 +56,12 @@ func TestThreePerDaySixLearningDays(t *testing.T) {
 func TestWrongAnswerAndRollover(t *testing.T) {
 	s, path := newTestStore(t)
 	importTest(t, s, "2026-11-01", "apple")
-	passOne(t, s, "2026-11-01")
+	passWord(t, s, "2026-11-01", 3)
 	const day = "2026-11-07"
-	nextVote(t, s, day, true)
+	first := nextVote(t, s, day, false)
+	if first.DayPassed || first.Credited || first.DailyTarget != 3 || first.Current.DailyTarget != 3 {
+		t.Fatalf("a first miss must restore the normal target: %+v", first)
+	}
 	nextVote(t, s, day, true)
 	wrong := nextVote(t, s, day, false)
 	if wrong.DailyCount != 0 || wrong.Current.Streak != 1 || wrong.Current.DailyCount != 0 {
@@ -74,12 +81,51 @@ func TestWrongAnswerAndRollover(t *testing.T) {
 	if r := nextVote(t, reopened, day, true); !r.Credited || reopened.db.Words["apple"].Streak != 2 {
 		t.Fatalf("wrong answer blocked a later legitimate pass: %+v", r)
 	}
+	nextVote(t, reopened, "2026-11-10", false)
 	nextVote(t, reopened, "2026-11-10", true)
 	if state := reopened.review("2026-11-16"); state.Current.Streak != 2 || state.Current.DailyCount != 0 {
 		t.Fatalf("an unfinished day changed the accumulated pass count: %+v", state)
 	}
-	if r := passOne(t, reopened, "2026-11-16"); !r.Credited || reopened.db.Words["apple"].Streak != 3 {
+	if r := passWord(t, reopened, "2026-11-16", 1); !r.Credited || reopened.db.Words["apple"].Streak != 3 {
 		t.Fatalf("did not accumulate a third day: %+v", r)
+	}
+}
+
+func TestLaterDayFallbackUsesConfiguredTargetAndUndoRestoresFirstAnswer(t *testing.T) {
+	s, _ := newTestStore(t)
+	const first, learned, review = "2026-11-01", "2026-11-02", "2026-11-03"
+	options := s.db.Settings
+	options.DailyGoal, options.Goal = 4, 2
+	if _, err := s.changeSettings(first, options); err != nil {
+		t.Fatal(err)
+	}
+	importTest(t, s, first, "apple")
+	nextVote(t, s, first, true)
+	// A partly studied word has yet to earn its first daily pass.
+	passWord(t, s, learned, 4)
+
+	current := s.review(review).Current
+	if current.DailyTarget != 1 {
+		t.Fatalf("expected one correct first answer after a pass: %+v", current)
+	}
+	hold, err := s.recordVote(review, current.Key, current.Reviews, current.Order, false, true, false)
+	if err != nil || !hold.Waiting || hold.DailyTarget != 4 || hold.Current.DailyCount != 0 {
+		t.Fatalf("held first miss did not switch to the configured goal: %+v (%v)", hold, err)
+	}
+	back, err := s.undo(review)
+	if err != nil || back.Waiting || back.Current == nil || *back.Current != *current {
+		t.Fatalf("undo of the first miss did not restore the one-answer target: %+v (%v)", back, err)
+	}
+	if r := passWord(t, s, review, 1); !r.Graduated || r.Due != 0 || !validDatabase(s.db) {
+		t.Fatalf("first correct answer did not credit the last day: %+v", r)
+	}
+	back, err = s.undo(review)
+	if err != nil || back.Mastered != 0 || back.Current == nil || *back.Current != *current {
+		t.Fatalf("undo of the quick pass did not restore progress: %+v (%v)", back, err)
+	}
+	nextVote(t, s, review, false)
+	if r := passWord(t, s, review, 4); !r.Graduated || r.Due != 0 {
+		t.Fatalf("fallback did not require four consecutive answers: %+v", r)
 	}
 }
 

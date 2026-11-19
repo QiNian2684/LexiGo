@@ -11,6 +11,9 @@ func (p progress) dailyState(day string, defaultTarget int) dailyReview {
 	if day == p.DailyDay {
 		return dailyReview{count: p.DailyCount, target: p.DailyTarget}
 	}
+	if p.LastPass != "" && p.LastPass < day {
+		return dailyReview{target: 1}
+	}
 	return dailyReview{target: defaultTarget}
 }
 
@@ -20,7 +23,11 @@ func (p progress) passedOn(day string) bool {
 
 func (p *progress) answer(day string, correct, passToday bool, options settings, dayAlreadyCredited bool, previousAnswers int, entry *event) {
 	if p.DailyDay != day {
-		p.DailyDay, p.DailyCount, p.DailyTarget = day, 0, options.DailyGoal
+		target := options.DailyGoal
+		if correct {
+			target = p.dailyState(day, target).target
+		}
+		p.DailyDay, p.DailyCount, p.DailyTarget = day, 0, target
 	}
 	p.recordAnswer(day, correct, entry)
 	if correct {
