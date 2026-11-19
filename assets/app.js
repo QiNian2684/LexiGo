@@ -134,13 +134,17 @@ function renderReview() {
   const concealed = el("answer").hidden;
   el("pass").disabled = busy || swiping || concealed || !!waiting;
   el("forgot").disabled = busy || swiping || concealed;
-  el("pass-today").hidden = !studying || !!practice || !next.current;
-  el("pass-today").disabled = busy || swiping;
+  el("pass-today").hidden = !studying || !!practice || !next.current || !!next.current.recall;
+  el("pass-today").disabled = busy || swiping || !!waiting;
   const current = practice || (studying && next.current);
   el("flashcard").hidden = !current;
   el("review-start").hidden = !!practice || !!studying || !next.current;
   el("review-empty").hidden = !!practice || !!next.current;
-  el("start-summary").textContent = `还有 ${next.due} 个词待过关`;
+  const recallDue = next.recallDue || 0;
+  const regularDue = next.due - recallDue;
+  el("start-summary").textContent = regularDue
+    ? `还有 ${regularDue} 个词待过关${recallDue ? " · " + recallDue + " 个易错词待回顾" : ""}`
+    : recallDue ? `${recallDue} 个易错词待回顾` : "";
   el("vote-actions").hidden = !current || !!practice || (concealed && !windowsReview);
   document.body.classList.toggle("has-vote", !el("vote-actions").hidden);
   if (current) {
@@ -148,7 +152,8 @@ function renderReview() {
     el("word").classList.toggle("long-word", current.word.length > 18);
     el("streak").hidden = !!practice;
     el("streak").textContent = practice ? "" :
-      `今日连对 ${current.dailyCount} / ${current.dailyTarget} · 连续过关 ${current.streak} / ${next.settings.goal} 天`;
+      current.recall ? `易错词回顾 · 已累计过关 ${current.streak} 天` :
+      `今日连对 ${current.dailyCount} / ${current.dailyTarget} · 累计过关 ${current.streak} / ${next.settings.goal} 天`;
     updateVoice();
   }
   if (!next.current) {
@@ -364,8 +369,8 @@ function noteInput(event) {
 }
 
 async function vote(remembered, {fromSwipe = false, passToday = false} = {}) {
-  if (!studying || practice || !state?.current || busy || (swiping && !fromSwipe) ||
-      (!passToday && (el("answer").hidden || state.waitingForNext))) return;
+  if (!studying || practice || !state?.current || busy || (swiping && !fromSwipe) || state.waitingForNext ||
+      (passToday ? state.current.recall : el("answer").hidden)) return;
   busy = true;
   renderReview();
   showError();
@@ -378,8 +383,8 @@ async function vote(remembered, {fromSwipe = false, passToday = false} = {}) {
     });
     applyState(result, remembered);
     if (remembered) el("review-title").scrollIntoView({block: "nearest"});
-    completed = remembered && result.dayPassed && result.date === date &&
-      due > 0 && passed < planned && result.planned > 0 && result.remembered === result.planned &&
+    completed = remembered && ((result.dayPassed && passed < planned) || current.recall) && result.date === date &&
+      due > 0 && result.planned > 0 && result.remembered === result.planned &&
       result.due === 0 && !result.current && !result.waitingForNext;
   } catch (error) {
     if (error.status === 409) await refreshState().catch(() => {});
@@ -395,16 +400,21 @@ async function vote(remembered, {fromSwipe = false, passToday = false} = {}) {
 async function undo(fromSwipe = false) {
   if (view !== "review" || !state?.canUndo || busy || (swiping && !fromSwipe) || practice) return;
   busy = true;
+  let revealAfterUndo = false;
   try {
     await flushNote();
     const wasWaiting = state.waitingForNext;
     const result = await api("/api/undo", {});
-    if (fromSwipe && result.current) studying = true;
+    if (fromSwipe && result.current) {
+      studying = true;
+      revealAfterUndo = !result.waitingForNext;
+    }
     applyState(result, !wasWaiting);
     if (fromSwipe) el("review-title").scrollIntoView({block: "nearest"});
   } catch (error) { showError(error); }
   finally { busy = false; renderReview(); }
   if (state?.waitingForNext) await resumeWaiting();
+  else if (revealAfterUndo && view === "review" && el("answer").hidden) await toggleReveal();
 }
 
 async function stopReview() {
@@ -631,7 +641,7 @@ async function refreshLibrary() {
     meaning.textContent = entry.meaning || (entry.lookup === "pending" ? "等待词典补充" : "暂无中文释义");
     const timing = document.createElement("small");
     const progress = entry.legacyMastered ? `旧规则连续 ${entry.legacyStreak || 0} 次` :
-      `连续过关 ${entry.streak}${entry.mastered ? "" : " / " + data.goal} 天`;
+      `累计过关 ${entry.streak}${entry.mastered ? "" : " / " + data.goal} 天`;
     const legacy = entry.legacyStreak && !entry.legacyMastered ? ` · 旧规则记录 ${entry.legacyStreak} 次` : "";
     timing.textContent = `${progress}${legacy} · 最近复习 ${entry.lastTry || "—"}`;
     main.append(title, meaning, timing);
@@ -679,7 +689,7 @@ async function confirmAction(event) {
 function batchAction(action, items, count) {
   const actions = {
     remove: ["移入回收站", "词条、备注和学习历史会一并移入回收站，可以恢复。"],
-    reset: ["重新学习", "当天连对次数和连续过关天数会清零，备注和历史保留。"],
+    reset: ["重新学习", "当天连对次数和累计过关天数会清零，备注和历史保留。"],
     restore: ["恢复词条", "卡片会恢复到词库，保留移入回收站前的学习进度。"],
     retry: ["联网补缺", "词典只填写空白字段。"],
   };
@@ -711,14 +721,17 @@ async function exportCSV(items) {
 
 async function openHistory(entry) {
   const history = await api("/api/history/" + keyPath(entry.key));
+  const answers = history.filter(row => !row.undone && !row.practice && (row.kind === "yes" || row.kind === "no"));
+  const wrong = answers.filter(row => row.kind === "no").length;
   el("history-title").textContent = entry.word + " · 学习历史";
+  el("history-answer-count").textContent = `答错 ${wrong} / ${answers.length} 次`;
   const items = {
     add: "添加单词", reimport: "因重复录入重新学习", reset: "手动重新学习",
     yes: "记住了", no: "没记住", remove: "移入回收站", restore: "恢复到词库",
   };
   el("history-list").replaceChildren(...history.map(row => {
     const item = document.createElement("li");
-    const rule = row.legacy ? "（旧规则）" : row.dayPassed ? (row.credit ? "（当日过关）" : "（当日重过）") : "";
+    const rule = row.legacy ? "（旧规则）" : row.recall ? "（易错词回顾）" : row.dayPassed ? (row.credit ? "（当日过关）" : "（当日重过）") : "";
     const suffix = rule + (row.undone ? "（已撤销）" : "");
     item.textContent = [row.day, items[row.kind] + suffix].join(" · ");
     return item;
@@ -812,7 +825,7 @@ async function submitWords(event) {
     }
     const parts = [numbers];
     if (plan.reset) parts.push("将重新学习：" + plan.resetWords.join("、") + (plan.reset > plan.resetWords.length ? " 等" : ""),
-      "连续记住次数清零，资料、备注和历史保留。");
+      "复习进度清零，资料、备注和历史保留。");
     if (plan.invalid.length) parts.push("将跳过无效项：" + plan.invalid.slice(0, 8).join("、"));
     ask("确认批量导入", parts.join("\n"), "确认导入", async () => {
       const result = await api("/api/import", {...payload, token: plan.token});

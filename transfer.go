@@ -21,7 +21,7 @@ import (
 
 const (
 	transferFormat  = "wordreview.learning-state"
-	transferVersion = 2
+	transferVersion = 3
 	maxTransfer     = 128 << 20
 )
 
@@ -33,12 +33,13 @@ type transferEnvelope struct {
 }
 
 type transferTask struct {
-	Day      string   `json:"day"`
-	Pending  []uint64 `json:"pending"`
-	Passed   []uint64 `json:"passed"`
-	Ranked   []uint64 `json:"ranked"`
-	Reviewed int      `json:"reviewed"`
-	Current  uint64   `json:"current,omitempty"`
+	Day           string   `json:"day"`
+	Pending       []uint64 `json:"pending"`
+	Passed        []uint64 `json:"passed"`
+	Ranked        []uint64 `json:"ranked"`
+	Reviewed      int      `json:"reviewed"`
+	Current       uint64   `json:"current,omitempty"`
+	CurrentRecall bool     `json:"currentRecall,omitempty"`
 }
 
 type transferPayload struct {
@@ -78,7 +79,7 @@ func (s *store) captureTask(day string) transferTask {
 func (s *store) captureTaskRules(day string, legacy bool) transferTask {
 	plan := s.planReviewRules(day, legacy)
 	task := transferTask{Day: day, Pending: []uint64{}, Passed: []uint64{}, Ranked: []uint64{}, Reviewed: plan.state.Reviewed}
-	for _, group := range [][]*wordCard{plan.old, plan.new, plan.extras, plan.repeats} {
+	for _, group := range [][]*wordCard{plan.old, plan.new, plan.extras, plan.repeats, plan.recall} {
 		for _, card := range group {
 			task.Pending = append(task.Pending, card.ID)
 		}
@@ -88,8 +89,9 @@ func (s *store) captureTaskRules(day string, legacy bool) transferTask {
 			task.Passed = append(task.Passed, card.ID)
 		}
 	}
-	if card := s.pinnedCard(day); !legacy && card != nil {
+	if card := s.pinnedCard(day); !legacy && card != nil && (!s.presented.recall || slices.Contains(plan.recall, card)) {
 		task.Current = card.ID
+		task.CurrentRecall = s.presented.recall
 	}
 	slices.Sort(task.Pending)
 	slices.Sort(task.Passed)
@@ -143,7 +145,7 @@ func parseTransfer(file []byte) (transferPayload, error) {
 		envelope.Format != transferFormat {
 		return p, errors.New("请选择由「导出数据」「分享数据」或「保存到本机」生成的学习数据文件。文件可能已经损坏或超过 128 MB。")
 	}
-	if envelope.Version != 1 && envelope.Version != transferVersion {
+	if envelope.Version < 1 || envelope.Version > transferVersion {
 		return p, errors.New("此文件的数据交换版本不兼容。请使用支持该版本的LexiGo。")
 	}
 	digest := sha256.Sum256(envelope.Payload)
@@ -165,7 +167,7 @@ func parseTransfer(file []byte) (transferPayload, error) {
 	if !p.legacy && p.Task.Current != 0 {
 		for _, card := range p.Database.Words {
 			if card.ID == p.Task.Current {
-				check.presented = presentedCard{day, card.Key, card.Order}
+				check.presented = presentedCard{day, card.Key, card.Order, p.Task.CurrentRecall}
 				break
 			}
 		}
@@ -175,7 +177,8 @@ func parseTransfer(file []byte) (transferPayload, error) {
 	}
 	expected := check.captureTaskRules(day, p.legacy)
 	if !slices.Equal(expected.Pending, p.Task.Pending) || !slices.Equal(expected.Passed, p.Task.Passed) ||
-		expected.Reviewed != p.Task.Reviewed || expected.Current != p.Task.Current || !validRanks(p.Task.Pending, p.Task.Ranked) {
+		expected.Reviewed != p.Task.Reviewed || expected.Current != p.Task.Current ||
+		expected.CurrentRecall != p.Task.CurrentRecall || !validRanks(p.Task.Pending, p.Task.Ranked) {
 		return transferPayload{}, errors.New("文件中的复习队列与学习记录不一致。")
 	}
 	return p, nil
@@ -201,6 +204,9 @@ func (p transferPayload) dateConflict(now time.Time) string {
 	}
 	if p.CreatedAt.After(now.Add(5*time.Minute)) || p.Task.Day > day {
 		return "文件日期晚于本机。请核对两台设备的日期与时区，再导入。"
+	}
+	if batch := p.Database.RecallBatch; batch != nil && batch.Day > day {
+		return "文件中的易错词回顾日期晚于本机。请核对两台设备日期与时区。"
 	}
 	if p.Task.Day != day && now.Before(p.DayEnds) {
 		return "两台设备的学习日期不同，导出端的当天还未结束。请统一时区，或等导出端过了当天再恢复。"
@@ -304,7 +310,7 @@ func (a *application) commitTransfer(w http.ResponseWriter, r *http.Request) {
 			a.store.display = reviewDisplay{day: draft.payload.Task.Day, ranks: ranks}
 			for _, card := range a.store.db.Words {
 				if card.ID == draft.payload.Task.Current {
-					a.store.presented = presentedCard{draft.payload.Task.Day, card.Key, card.Order}
+					a.store.presented = presentedCard{draft.payload.Task.Day, card.Key, card.Order, draft.payload.Task.CurrentRecall}
 					break
 				}
 			}

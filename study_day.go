@@ -29,6 +29,7 @@ func localDay() string { return studyDay(time.Now()) }
 type presentedCard struct {
 	day, key string
 	order    uint64
+	recall   bool
 }
 
 // Only an actively displayed question may finish on the previous day. A
@@ -49,7 +50,8 @@ func (s *store) pinnedCard(day string) *wordCard {
 		return nil
 	}
 	card := s.db.Words[s.presented.key]
-	if card == nil || card.Order != s.presented.order || card.Deleted || card.Mastered || card.passedOn(day) || card.DailyDay > day {
+	if card == nil || card.Order != s.presented.order || card.Deleted ||
+		(card.Mastered && !s.presented.recall) || card.passedOn(day) || card.DailyDay > day {
 		return nil
 	}
 	return card
@@ -57,7 +59,7 @@ func (s *store) pinnedCard(day string) *wordCard {
 
 func (s *store) pinReview(state reviewState) {
 	s.presented = presentedCard{}
-	if state.Current != nil {
-		s.presented = presentedCard{state.Date, state.Current.Key, state.Current.Order}
+	if state.Current != nil && !(state.Waiting && state.Current.Recall) {
+		s.presented = presentedCard{state.Date, state.Current.Key, state.Current.Order, state.Current.Recall}
 	}
 }

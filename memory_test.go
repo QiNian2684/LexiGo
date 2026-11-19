@@ -75,11 +75,11 @@ func TestWrongAnswerAndRollover(t *testing.T) {
 		t.Fatalf("wrong answer blocked a later legitimate pass: %+v", r)
 	}
 	nextVote(t, reopened, "2026-11-10", true)
-	if state := reopened.review("2026-11-16"); state.Current.Streak != 0 || state.Current.DailyCount != 0 {
-		t.Fatalf("an unfinished day did not interrupt consecutive passes: %+v", state)
+	if state := reopened.review("2026-11-16"); state.Current.Streak != 2 || state.Current.DailyCount != 0 {
+		t.Fatalf("an unfinished day changed the accumulated pass count: %+v", state)
 	}
-	if r := passOne(t, reopened, "2026-11-16"); !r.Credited || reopened.db.Words["apple"].Streak != 1 {
-		t.Fatalf("did not restart day streak: %+v", r)
+	if r := passOne(t, reopened, "2026-11-16"); !r.Credited || reopened.db.Words["apple"].Streak != 3 {
+		t.Fatalf("did not accumulate a third day: %+v", r)
 	}
 }
 

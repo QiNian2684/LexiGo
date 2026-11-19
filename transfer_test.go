@@ -138,7 +138,7 @@ func TestTransferRejectsCorruptionAndPreservesDatabaseOnFailure(t *testing.T) {
 	before, _ := json.Marshal(dest.db)
 	a := &application{store: dest}
 	damaged := bytes.Replace(file, []byte("stageaa"), []byte("stagete"), 1)
-	version := bytes.Replace(file, []byte(`"version":2`), []byte(`"version":999`), 1)
+	version := bytes.Replace(file, []byte(`"version":3`), []byte(`"version":999`), 1)
 	for _, bad := range [][]byte{damaged, version, file[:len(file)-5], []byte(`{"words":[]}`)} {
 		w := httptest.NewRecorder()
 		a.previewTransfer(w, bad)
@@ -190,7 +190,7 @@ func TestTransferDayBoundary(t *testing.T) {
 	}
 	receiverStore := &store{db: p.Database}
 	next := receiverStore.review("2026-11-17")
-	if next.Current == nil || next.Current.DailyCount != 0 || next.Current.Streak != 0 {
+	if next.Current == nil || next.Current.DailyCount != 0 || next.Current.Streak != 1 {
 		t.Fatalf("past unfinished task was treated as present-day progress: %+v", next)
 	}
 }

@@ -78,6 +78,7 @@ type event struct {
 	DayPassed  bool       `json:"dayPassed,omitempty"`
 	Credit     bool       `json:"credit,omitempty"`
 	Practice   bool       `json:"practice,omitempty"`
+	Recall     bool       `json:"recall,omitempty"`
 	Undone     bool       `json:"undone,omitempty"`
 	Waiting    bool       `json:"waitingForNext,omitempty"`
 	OccurredAt *time.Time `json:"occurredAt,omitempty"`
@@ -85,9 +86,11 @@ type event struct {
 }
 
 type metadata struct {
-	Version   int      `json:"version"`
-	Settings  settings `json:"settings"`
-	NextOrder uint64   `json:"nextOrder"`
+	Version          int          `json:"version"`
+	Settings         settings     `json:"settings"`
+	NextOrder        uint64       `json:"nextOrder"`
+	CumulativePasses bool         `json:"cumulativePasses,omitempty"`
+	RecallBatch      *recallBatch `json:"recallBatch,omitempty"`
 }
 
 type database struct {
@@ -150,7 +153,7 @@ func (s *store) recordVote(day, key string, version int, order uint64, remembere
 	defer s.mu.Unlock()
 	plan := s.planReview(day)
 	state := s.reviewState(plan)
-	if (state.Waiting && !passToday) || state.Current == nil || state.Current.Key != key ||
+	if state.Current == nil || state.Waiting || (passToday && state.Current.Recall) || state.Current.Key != key ||
 		state.Current.Reviews != version || state.Current.Order != order {
 		return voteResult{}, errStaleReview
 	}
@@ -159,9 +162,13 @@ func (s *store) recordVote(day, key string, version int, order uint64, remembere
 	s.advance(card)
 	session := plan.session
 	now := time.Now().UTC()
-	entry := event{Day: day, OccurredAt: &now, Card: card.ID, Word: card.Word, Tick: card.Order, Before: &before, Extra: card.ExtraDay == day,
+	entry := event{Day: day, OccurredAt: &now, Card: card.ID, Word: card.Word, Tick: card.Order, Before: &before, Extra: card.ExtraDay == day, Recall: state.Current.Recall,
 		Waiting: hold && !remembered}
-	card.answer(day, remembered, passToday, s.db.Settings, session.credited[card.ID], session.votes, &entry)
+	if entry.Recall {
+		card.recordAnswer(day, remembered, &entry)
+	} else {
+		card.answer(day, remembered, passToday, s.db.Settings, session.credited[card.ID], session.votes, &entry)
+	}
 
 	s.db.Events = append(s.db.Events, entry)
 	if err := s.save([]string{key}, count); err != nil {
@@ -169,7 +176,7 @@ func (s *store) recordVote(day, key string, version int, order uint64, remembere
 		return voteResult{}, err
 	}
 	return voteResult{
-		reviewState: s.review(day), Graduated: card.Mastered, Credited: entry.Credit,
+		reviewState: s.review(day), Graduated: !before.Mastered && card.Mastered, Credited: entry.Credit,
 		DayPassed: entry.DayPassed, DailyCount: card.DailyCount, DailyTarget: card.DailyTarget,
 	}, nil
 }
@@ -231,13 +238,14 @@ func (s *store) undo(day string) (reviewState, error) {
 	item := &s.db.Events[index]
 	old := card.progress
 	card.progress = *item.Before
+	card.Mastered = card.Mastered || card.Streak >= s.db.Settings.Goal
 	wasWaiting := item.Waiting
 	item.Waiting = false
 	item.Undone = true
 	firstEvent := index
 	var adjusted *event
 	var previous event
-	if card.DailyDay == day && card.DailyTarget != s.db.Settings.DailyGoal {
+	if !item.Recall && card.DailyDay == day && card.DailyTarget != s.db.Settings.DailyGoal {
 		last := s.latestAnswerIndexes(day)
 		if i, ok := last[card.ID]; ok {
 			firstEvent, adjusted = i, &s.db.Events[i]
@@ -255,19 +263,17 @@ func (s *store) undo(day string) (reviewState, error) {
 		return reviewState{}, err
 	}
 	s.presented = presentedCard{}
-	if wasWaiting {
-		if s.display.day != day {
-			s.display = reviewDisplay{day: day}
-		}
-		s.display.undoCard, s.display.undoOrder = card.ID, card.Order
+	if s.display.day != day {
+		s.display = reviewDisplay{day: day}
 	}
+	s.display.undoCard, s.display.undoOrder = card.ID, card.Order
 	return s.review(day), nil
 }
 
 func (s *store) latestAnswerIndexes(day string) map[uint64]int {
 	last := make(map[uint64]int)
 	for i, item := range s.db.Events {
-		if item.Day == day && !item.Undone && !item.Legacy && !item.Practice && (item.Kind == "yes" || item.Kind == "no") {
+		if item.Day == day && !item.Undone && !item.Legacy && !item.Practice && !item.Recall && (item.Kind == "yes" || item.Kind == "no") {
 			last[item.Card] = i
 		}
 	}
@@ -286,6 +292,11 @@ func (s *store) changeSettings(day string, target settings) (reviewState, error)
 	var last map[uint64]int
 	var credited map[uint64]bool
 	for key, card := range s.db.Words {
+		if !card.Mastered && target.Goal < old.Goal && card.Streak >= target.Goal {
+			keys = append(keys, key)
+			oldProgress[key] = card.progress
+			card.Mastered = true
+		}
 		if card.Deleted || card.Mastered || card.DailyDay != day || card.passedOn(day) || card.DailyTarget == target.DailyGoal {
 			continue
 		}
@@ -433,7 +444,7 @@ func (s *store) list(selecting selection, page int) listResult {
 		}
 		result.Rows = append(result.Rows, cardRow{
 			item.Key, item.Word, meaning, item.Lookup, item.Mastered, item.needsOnline(),
-			item.Deleted, item.effectiveStreak(localDay()), item.LegacyStreak, item.LegacyMastered, item.LastTry,
+			item.Deleted, item.Streak, item.LegacyStreak, item.LegacyMastered, item.LastTry,
 		})
 	}
 	return result

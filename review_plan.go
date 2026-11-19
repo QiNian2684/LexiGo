@@ -11,6 +11,7 @@ type reviewState struct {
 	Exam        examCountdown `json:"exam"`
 	Settings    settings      `json:"settings"`
 	Due         int           `json:"due"`
+	RecallDue   int           `json:"recallDue,omitempty"`
 	OverflowNew int           `json:"overflowNew"`
 	Reviewed    int           `json:"reviewed"`
 	Remembered  int           `json:"remembered"`
@@ -30,6 +31,7 @@ type cardFace struct {
 	DailyTarget int    `json:"dailyTarget"`
 	Reviews     int    `json:"reviews"`
 	Order       uint64 `json:"order"`
+	Recall      bool   `json:"recall,omitempty"`
 }
 
 const (
@@ -41,6 +43,8 @@ const (
 
 type attendance struct {
 	lastShown map[uint64]int
+	reviewed  map[uint64]bool
+	recalled  map[uint64]bool
 	regular   map[uint64]bool
 	credited  map[uint64]bool
 	imports   map[uint64]bool
@@ -49,22 +53,40 @@ type attendance struct {
 }
 
 func (s *store) attendance(day string) attendance {
+	return s.attendanceSince(day, "")
+}
+
+func (s *store) attendanceSince(day, recallFrom string) attendance {
 	result := attendance{
-		lastShown: make(map[uint64]int),
-		regular:   make(map[uint64]bool), credited: make(map[uint64]bool), imports: make(map[uint64]bool),
+		lastShown: make(map[uint64]int), reviewed: make(map[uint64]bool),
+		regular: make(map[uint64]bool), credited: make(map[uint64]bool), imports: make(map[uint64]bool),
+	}
+	if recallFrom != "" {
+		result.recalled = make(map[uint64]bool)
 	}
 	for _, item := range s.db.Events {
-		if item.Day != day || item.Legacy || item.Undone || item.Practice {
+		if item.Legacy || item.Undone || item.Practice {
+			continue
+		}
+		answer := item.Kind == "yes" || item.Kind == "no"
+		if recallFrom != "" && answer && item.Day >= recallFrom && item.Day <= day {
+			result.recalled[item.Card] = true
+		}
+		if item.Day != day {
 			continue
 		}
 		if item.Kind == "add" || item.Kind == "reimport" {
 			result.imports[item.Card] = true
 		}
-		if item.Kind != "yes" && item.Kind != "no" {
+		if !answer {
 			continue
 		}
 		result.recent[result.votes%len(result.recent)] = item.Card
 		result.votes++
+		result.reviewed[item.Card] = true
+		if item.Recall {
+			continue
+		}
 		if item.Credit {
 			result.credited[item.Card] = true
 		}
@@ -105,6 +127,7 @@ type reviewPlan struct {
 	extras   []*wordCard
 	repeats  []*wordCard
 	carry    []*wordCard
+	recall   []*wordCard
 	session  attendance
 	previous attendance
 }
@@ -121,9 +144,13 @@ func (s *store) planReview(day string) reviewPlan {
 }
 
 func (s *store) planReviewRules(day string, legacy bool) reviewPlan {
-	session := s.attendance(day)
+	recallFrom := ""
+	if !legacy && s.db.RecallBatch.available(day) {
+		recallFrom = s.db.RecallBatch.Day
+	}
+	session := s.attendanceSince(day, recallFrom)
 	plan := reviewPlan{
-		state:   reviewState{Date: day, Exam: countdown(day, s.db.Settings.ExamDate), Settings: s.db.Settings, Reviewed: len(session.lastShown)},
+		state:   reviewState{Date: day, Exam: countdown(day, s.db.Settings.ExamDate), Settings: s.db.Settings, Reviewed: len(session.reviewed)},
 		session: session,
 	}
 	usedNew := 0
@@ -131,6 +158,9 @@ func (s *store) planReviewRules(day string, legacy bool) reviewPlan {
 	freshCount := 0
 	yesterday := priorStudyDay(day)
 	pinned := s.pinnedCard(day)
+	if s.presented.recall {
+		pinned = nil
+	}
 	for _, card := range s.db.Words {
 		if card.AddedDay == day && session.regular[card.ID] {
 			usedNew++
@@ -223,6 +253,10 @@ func (s *store) planReviewRules(day string, legacy bool) reviewPlan {
 	plan.state.Due = len(plan.old) + len(plan.new) + len(plan.extras) + len(plan.repeats)
 	plan.state.OverflowNew = len(plan.overflow)
 	plan.state.Planned = plan.state.Remembered + plan.state.Due
+	if recallFrom != "" {
+		plan.addRecall(s.db)
+		plan.state.Due += plan.state.RecallDue
+	}
 	return plan
 }
 
@@ -263,10 +297,14 @@ func presentationOrder(plan reviewPlan, prior map[uint64]int) []*wordCard {
 	}
 	shuffleGroup(fresh, prior)
 	shuffleGroup(extras, prior)
-	ordered := make([]*wordCard, 0, len(old)+len(fresh)+len(extras))
+	ordered := make([]*wordCard, 0, len(old)+len(fresh)+len(extras)+len(plan.recall))
 	ordered = append(ordered, fresh...)
 	ordered = append(ordered, extras...)
-	return append(ordered, old...)
+	ordered = append(ordered, old...)
+	for _, card := range plan.recall {
+		ordered = slices.Insert(ordered, rand.IntN(len(ordered)+1), card)
+	}
+	return ordered
 }
 
 func (s *store) shuffleReview(day string) reviewState {
@@ -378,9 +416,15 @@ func (s *store) reviewState(plan reviewPlan) reviewState {
 			// card. With multiple cards this cannot be the most recent one.
 			next = plan.repeats[0]
 		}
+		// Shuffle the extra checks into the queue without displacing ready
+		// repeats or changing the order of the normal groups.
+		if recall := preferred(ranks, plan.recall); recall != nil &&
+			(next == nil || (ranks[recall.ID] > 0 && (ranks[next.ID] == 0 || ranks[recall.ID] < ranks[next.ID]))) {
+			next = recall
+		}
 	}
 	if s.display.day == state.Date && s.display.undoCard != 0 {
-		for _, group := range [][]*wordCard{plan.old, plan.new, plan.extras, plan.repeats} {
+		for _, group := range [][]*wordCard{plan.old, plan.new, plan.extras, plan.repeats, plan.recall} {
 			for _, card := range group {
 				if card.ID == s.display.undoCard && card.Order == s.display.undoOrder {
 					next = card
@@ -389,19 +433,21 @@ func (s *store) reviewState(plan reviewPlan) reviewState {
 			}
 		}
 	}
-	if pinned := s.pinnedCard(state.Date); pinned != nil {
+	if pinned := s.pinnedCard(state.Date); pinned != nil && (!s.presented.recall || slices.Contains(plan.recall, pinned)) {
 		next = pinned
 	}
+	recall := slices.Contains(plan.recall, next) && next != nil
 	index, previous := s.undoCandidate(state.Date)
 	state.CanUndo = index >= 0
 	if state.CanUndo && s.db.Events[index].Waiting {
 		state.Waiting = true
 		next = previous
+		recall = s.db.Events[index].Recall
 	}
 	if next != nil {
 		daily := next.dailyState(state.Date, state.Settings.DailyGoal)
 		state.Current = &cardFace{
-			Key: next.Key, Word: next.Word, Streak: next.effectiveStreak(state.Date),
+			Key: next.Key, Word: next.Word, Streak: next.Streak, Recall: recall,
 			DailyCount: daily.count, DailyTarget: daily.target, Reviews: next.Reviews, Order: next.Order,
 		}
 	}

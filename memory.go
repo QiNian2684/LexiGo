@@ -18,25 +18,12 @@ func (p progress) passedOn(day string) bool {
 	return p.DailyDay == day && p.LastPass == day
 }
 
-func (p progress) effectiveStreak(day string) int {
-	// An answer starts a learning day. A later calendar date ends it, but
-	// calendar dates where no answer happened do not create failures.
-	if !p.Mastered && p.DailyDay != "" && p.DailyDay < day && !p.passedOn(p.DailyDay) {
-		return 0
-	}
-	return p.Streak
-}
-
 func (p *progress) answer(day string, correct, passToday bool, options settings, dayAlreadyCredited bool, previousAnswers int, entry *event) {
 	if p.DailyDay != day {
-		p.Streak = p.effectiveStreak(day)
 		p.DailyDay, p.DailyCount, p.DailyTarget = day, 0, options.DailyGoal
 	}
-	p.LastTry = day
-	p.Reviews++
+	p.recordAnswer(day, correct, entry)
 	if correct {
-		entry.Kind = "yes"
-		p.LastYes = day
 		if passToday {
 			p.DailyCount = p.DailyTarget
 		} else {
@@ -47,15 +34,25 @@ func (p *progress) answer(day string, correct, passToday bool, options settings,
 			return
 		}
 	} else {
-		entry.Kind = "no"
-		p.LastNo = day
-		p.Forgot++
 		p.DailyCount = 0
 	}
 	p.RepeatAt = uint64(previousAnswers + 1)
 	// Keep the existing persisted range for backups. The review planner
 	// combines this salt with today's answer position to choose its delay.
 	p.RetryGap = 2 + rand.IntN(4)
+}
+
+func (p *progress) recordAnswer(day string, correct bool, entry *event) {
+	p.LastTry = day
+	p.Reviews++
+	if correct {
+		entry.Kind = "yes"
+		p.LastYes = day
+	} else {
+		entry.Kind = "no"
+		p.LastNo = day
+		p.Forgot++
+	}
 }
 
 func (p *progress) passDaily(day string, options settings, dayAlreadyCredited bool, entry *event) {

@@ -47,13 +47,19 @@ func openStore(file string) (*store, error) {
 			return nil, fmt.Errorf("无法升级复习规则，旧数据已保留：%w", err)
 		}
 	}
+	if !s.db.CumulativePasses {
+		keys, first := upgradePassCounts(&s.db)
+		if err := s.save(keys, first); err != nil {
+			return nil, fmt.Errorf("无法升级累计过关记录：%w", err)
+		}
+	}
 	ok = true
 	return s, nil
 }
 
 func readDatabase(disk *sql.DB) (database, error) {
 	db := database{
-		metadata: metadata{Version: 3, Settings: settings{Limit: defaultLimit, Goal: defaultGoal, DailyGoal: defaultDailyGoal, Online: true, ShowIPA: true}},
+		metadata: metadata{Version: 3, CumulativePasses: true, Settings: settings{Limit: defaultLimit, Goal: defaultGoal, DailyGoal: defaultDailyGoal, Online: true, ShowIPA: true}},
 		Words:    make(map[string]*wordCard),
 		Events:   []event{},
 	}
@@ -185,6 +191,7 @@ func upgradedRules(old database) database {
 	}
 	current := old
 	current.Version = 3
+	current.CumulativePasses = true
 	current.Settings.DailyGoal = defaultDailyGoal
 	current.Words = make(map[string]*wordCard, len(old.Words))
 	for key, previous := range old.Words {
@@ -243,6 +250,9 @@ func (s *store) restoreLocked(incoming database) error {
 }
 
 func (s *store) replaceLocked(incoming database, backupName string, backup []byte) error {
+	if !incoming.CumulativePasses {
+		upgradePassCounts(&incoming)
+	}
 	keys := make([]string, 0, len(incoming.Words))
 	for key := range incoming.Words {
 		keys = append(keys, key)
@@ -326,7 +336,8 @@ func validDatabase(db database) bool {
 		case "yes", "no":
 			if item.Before == nil || (db.Version == 3 && !item.Legacy &&
 				(!item.Before.validDailyState() || (item.Credit && !item.DayPassed) ||
-					(item.DayPassed && item.Kind != "yes"))) {
+					(item.DayPassed && item.Kind != "yes"))) ||
+				(item.Recall && (item.Credit || item.DayPassed || item.Legacy || item.Practice)) {
 				return false
 			}
 		case "add", "reimport", "reset", "remove", "restore":
@@ -334,5 +345,58 @@ func validDatabase(db database) bool {
 			return false
 		}
 	}
+	if batch := db.RecallBatch; batch != nil {
+		if !db.CumulativePasses || !validDate(batch.Day) || len(batch.Cards) > recallBatchLimit {
+			return false
+		}
+		seen := make(map[uint64]bool, len(batch.Cards))
+		for _, id := range batch.Cards {
+			if !ids[id] || seen[id] {
+				return false
+			}
+			seen[id] = true
+		}
+	}
 	return true
+}
+
+// The old counter could lose earlier days, but credited answers remain in
+// the history. Preserve explicit resets and the snapshots used by Undo.
+func upgradePassCounts(db *database) ([]string, int) {
+	db.CumulativePasses = true
+	days := make(map[uint64]map[string]bool)
+	first := len(db.Events)
+	for i := range db.Events {
+		item := &db.Events[i]
+		switch item.Kind {
+		case "reimport", "reset":
+			delete(days, item.Card)
+		case "yes", "no":
+			if item.Legacy || item.Practice {
+				continue
+			}
+			if item.Before != nil && item.Before.Streak < len(days[item.Card]) {
+				before := *item.Before
+				before.Streak = len(days[item.Card])
+				item.Before = &before
+				first = min(first, i)
+			}
+			if item.Credit && !item.Undone {
+				if days[item.Card] == nil {
+					days[item.Card] = make(map[string]bool)
+				}
+				days[item.Card][item.Day] = true
+			}
+		}
+	}
+	var keys []string
+	for key, card := range db.Words {
+		total := max(card.Streak, len(days[card.ID]))
+		mastered := card.Mastered || total >= db.Settings.Goal
+		if total != card.Streak || mastered != card.Mastered {
+			card.Streak, card.Mastered = total, mastered
+			keys = append(keys, key)
+		}
+	}
+	return keys, first
 }

@@ -90,7 +90,11 @@ func (a *application) reviewResponse(now time.Time, pin bool) reviewState {
 	s := a.store
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	state := s.review(s.activeReviewDay(studyDay(now)))
+	day := s.activeReviewDay(studyDay(now))
+	if err := s.refreshRecall(day); err != nil {
+		log.Printf("saving recall batch: %v", err)
+	}
+	state := s.review(day)
 	if pin {
 		s.pinReview(state)
 	}
@@ -298,6 +302,11 @@ func (a *application) handler() http.Handler {
 		now := time.Now()
 		a.store.mu.Lock()
 		day := a.store.activeReviewDay(studyDay(now))
+		if err := a.store.refreshRecall(day); err != nil {
+			a.store.mu.Unlock()
+			saveError(w, err)
+			return
+		}
 		plan := a.store.planReview(day)
 		state := a.store.reviewState(plan)
 		if !state.Waiting && a.store.pinnedCard(day) == nil {

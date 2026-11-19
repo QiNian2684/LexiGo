@@ -34,7 +34,7 @@ func TestPassTodayCompletesDailyGoalWithOneUndoableReview(t *testing.T) {
 	}
 }
 
-func TestPassTodayOnForgottenCardCanRestoreHeldAnswer(t *testing.T) {
+func TestPassTodayIsBlockedUntilHeldAnswerIsUndone(t *testing.T) {
 	const day = "2026-11-19"
 	s, _ := newTestStore(t)
 	importTest(t, s, day, "crucial")
@@ -44,12 +44,15 @@ func TestPassTodayOnForgottenCardCanRestoreHeldAnswer(t *testing.T) {
 		t.Fatalf("forget answer not held: %+v (%v)", hold, err)
 	}
 	card := hold.Current
-	pass, err := s.recordVote(day, card.Key, card.Reviews, card.Order, true, false, true)
-	if err != nil || pass.Waiting || pass.Due != 0 || !pass.DayPassed {
-		t.Fatalf("direct pass did not clear held review: %+v (%v)", pass, err)
+	if _, err := s.recordVote(day, card.Key, card.Reviews, card.Order, true, false, true); !errors.Is(err, errStaleReview) {
+		t.Fatalf("direct pass should be blocked when a wrong answer is held: %v", err)
 	}
 	back, err := s.undo(day)
-	if err != nil || !back.Waiting || back.Current == nil || *back.Current != *card || back.Remembered != 0 {
-		t.Fatalf("undo did not restore the held wrong answer: %+v (%v)", back, err)
+	if err != nil || back.Waiting || back.Current == nil || *back.Current != *first || back.Remembered != 0 {
+		t.Fatalf("undo did not restore the unanswered card: %+v (%v)", back, err)
+	}
+	pass, err := s.recordVote(day, first.Key, first.Reviews, first.Order, true, false, true)
+	if err != nil || pass.Waiting || pass.Due != 0 || !pass.DayPassed {
+		t.Fatalf("direct pass was not available after undo: %+v (%v)", pass, err)
 	}
 }

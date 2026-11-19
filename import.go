@@ -277,7 +277,7 @@ func asCSV(cards []*wordCard) ([]byte, error) {
 			status = "回收站"
 		}
 		values := []string{c.Word, c.Meaning, c.POS, c.IPA, c.IPAUK, c.IPAUS, c.Examples,
-			c.ExampleTranslation, c.Etymology, c.Collocations, c.Note, c.PersonalNote, status, strconv.Itoa(c.effectiveStreak(localDay())), c.LastTry}
+			c.ExampleTranslation, c.Etymology, c.Collocations, c.Note, c.PersonalNote, status, strconv.Itoa(c.Streak), c.LastTry}
 		for i, value := range values {
 			if trimmed := strings.TrimLeft(value, " \r\n\t"); trimmed != "" && strings.ContainsRune("=+-@", rune(trimmed[0])) {
 				values[i] = "'" + value
