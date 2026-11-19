@@ -6,6 +6,7 @@ const mobile = document.body.classList.contains("platform-android");
 const windowsReview = document.documentElement.dataset.reviewShortcuts === "windows";
 const shell = document.querySelector(".shell");
 const controls = window.WordReviewControls;
+const wordPreview = el("word-preview");
 const views = ["review", "add", "library", "stats", "settings"];
 const editFields = ["word", "meaning", "pos", "ipa", "ipaUK", "ipaUS", "examples",
   "exampleTranslation", "etymology", "collocations", "note", "personalNote"];
@@ -33,6 +34,7 @@ let listRequest = 0;
 let listTotal = 0;
 let listSignature;
 let searchTimer;
+let preview, previewStart, previewDismiss;
 let selectedAll = false;
 const selected = new Set();
 
@@ -208,11 +210,11 @@ function group(title, value, fallback, kind = "") {
 
 function ipa(text) { return "/" + text.replace(/^\/+|\/+$/g, "") + "/"; }
 
-function renderDetails(card) {
+function cardDetailSections(card, showIPA) {
   const missing = card.lookup === "pending" && state?.settings.online
     ? "等待在线词典补充。" : "暂无资料，可手动编辑。";
   const sound = [];
-  if (state?.settings.showIPA) {
+  if (showIPA) {
     if (card.ipaUK) sound.push("英 " + ipa(card.ipaUK));
     if (card.ipaUS) sound.push("美 " + ipa(card.ipaUS));
     if (!sound.length && card.ipa) sound.push(ipa(card.ipa));
@@ -257,6 +259,11 @@ function renderDetails(card) {
     }
     sources.append(link("CC BY 2.0 FR", "https://creativecommons.org/licenses/by/2.0/fr/"));
   }
+  return {fields, sound, sources};
+}
+
+function renderDetails(card) {
+  const {fields, sound, sources} = cardDetailSections(card, state?.settings.showIPA);
   sources.append(button("编辑卡片资料", async () => {
     try {
       await flushNote();
@@ -433,6 +440,7 @@ async function stopReview() {
 }
 
 function displayView(next) {
+  if (next !== "library") closeWordPreview();
   view = next;
   document.body.dataset.view = next;
   for (const id of views) el(id + "-view").hidden = id !== next;
@@ -532,11 +540,132 @@ function showSelection() {
   controls.syncSelect(el("batch-action"));
 }
 
-function addWordActions(row, entry) {
+function cancelPreviewStart() {
+  clearTimeout(previewStart?.timer);
+  previewStart = undefined;
+}
+
+function hideWordPreview() {
+  clearTimeout(previewDismiss);
+  preview = undefined;
+  if (wordPreview.open) wordPreview.close();
+}
+
+function closeWordPreview() {
+  cancelPreviewStart();
+  hideWordPreview();
+}
+
+function delayPreviewClose() {
+  const leaving = preview;
+  if (!leaving?.point) return;
+  clearTimeout(previewDismiss);
+  previewDismiss = setTimeout(() => {
+    if (preview === leaving) hideWordPreview();
+  }, 260);
+}
+
+function placeWordPreview({x, y}) {
+  const viewport = window.visualViewport;
+  const left = viewport?.offsetLeft || 0;
+  const top = viewport?.offsetTop || 0;
+  const right = left + (viewport?.width || window.innerWidth);
+  const bottom = top + (viewport?.height || window.innerHeight);
+  const gap = 10;
+  const below = bottom - y - 2 * gap;
+  const above = y - top - 2 * gap;
+  wordPreview.style.setProperty("--preview-width", right - left - 2 * gap + "px");
+  wordPreview.style.setProperty("--preview-height", Math.max(below, above) + "px");
+  const {width, height} = wordPreview.getBoundingClientRect();
+  const showBelow = height <= below || below >= above;
+  wordPreview.style.left = Math.max(left + gap, Math.min(x + gap, right - width - gap)) + "px";
+  wordPreview.style.top = (showBelow ? y + gap : y - gap - height) + "px";
+}
+
+async function openWordPreview(row, entry, progress, point) {
+  if (view !== "library" || !row.isConnected || controls.isOpen() ||
+      document.querySelector("dialog[open]:not(#word-preview)")) return;
+  closeWordPreview();
+  const pending = {row, point};
+  preview = pending;
+  try {
+    const card = await api("/api/card/" + keyPath(entry.key));
+    if (preview !== pending || !row.isConnected || view !== "library" ||
+        controls.isOpen() || document.querySelector("dialog[open]:not(#word-preview)")) return;
+    const {fields, sound, sources} = cardDetailSections(card, true);
+    const timing = document.createElement("p");
+    timing.className = "preview-progress";
+    timing.textContent = progress;
+    const body = el("word-preview-content");
+    body.replaceChildren(timing, ...fields, group("我的备注", card.personalNote, "暂无备注。"));
+    for (const [label, value] of [["词性", card.pos], ["音标", sound.join(" · ")],
+      ["词根和词源", card.etymology], ["搭配", card.collocations], ["记忆提示", card.note]]) {
+      if (value) body.append(group(label, value));
+    }
+    if (sources.childElementCount) body.append(sources);
+    el("word-preview-title").textContent = card.word;
+    wordPreview.classList.toggle("floating-preview", !!point);
+    if (point) {
+      const focus = document.activeElement;
+      wordPreview.show();
+      placeWordPreview(point);
+      if (focus === document.body) document.activeElement.blur();
+      else focus?.focus({preventScroll: true});
+    } else wordPreview.showModal();
+    body.scrollTop = 0;
+  } catch (error) {
+    if (preview === pending) {
+      hideWordPreview();
+      showError(error);
+    }
+  }
+}
+
+function addWordPreview(target, row, entry, progress) {
+  const arm = (event, hover) => {
+    cancelPreviewStart();
+    const start = {row, target, id: event.pointerId, hover, x: event.clientX, y: event.clientY};
+    start.timer = setTimeout(() => {
+      if (previewStart === start && (!hover || target.matches(":hover")) && !window.getSelection()?.toString()) {
+        openWordPreview(row, entry, progress, hover ? {x: start.x, y: start.y} : undefined);
+      }
+      if (previewStart === start) cancelPreviewStart();
+    }, hover ? 650 : 475);
+    previewStart = start;
+  };
+  target.addEventListener("pointerenter", event => {
+    if (mobile || event.pointerType !== "mouse" || event.buttons) return;
+    if (preview?.row === row) clearTimeout(previewDismiss);
+    else arm(event, true);
+  });
+  target.addEventListener("pointerdown", event => {
+    cancelPreviewStart();
+    if (mobile && event.pointerType === "touch" && event.isPrimary) arm(event, false);
+  });
+  target.addEventListener("pointermove", event => {
+    const start = previewStart;
+    if (start?.row !== row || event.pointerId !== start.id) return;
+    if (start.hover) {
+      start.x = event.clientX;
+      start.y = event.clientY;
+    } else if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) {
+      cancelPreviewStart();
+    }
+  });
+  for (const type of ["pointerup", "pointercancel", "pointerleave"]) target.addEventListener(type, event => {
+    if (previewStart?.row === row && previewStart.id === event.pointerId) cancelPreviewStart();
+    if (type === "pointerleave" && preview?.row === row && !wordPreview.contains(event.relatedTarget)) delayPreviewClose();
+  });
+}
+
+function addWordActions(row, entry, progress) {
   const edit = () => openEditor(entry.key).catch(showError);
   const act = name => () => batchAction(name, {keys: [entry.key]}, 1);
   const restore = act("restore");
-  const items = [{label: "学习历史", icon: "history", pick: () => openHistory(entry).catch(showError)}];
+  const items = [
+    {label: "预览词条", icon: "review", pick: () => openWordPreview(row, entry, progress)},
+    {label: "学习历史", icon: "history", pick: () => openHistory(entry).catch(showError)},
+  ];
   if (entry.deleted) items.push({label: "恢复", icon: "backup", pick: restore});
   else {
     items.push({label: "编辑", icon: "edit", pick: edit});
@@ -556,7 +685,10 @@ function addWordActions(row, entry) {
   more.setAttribute("aria-controls", "popup-list");
   more.setAttribute("aria-expanded", "false");
   more.append(controls.icon("more"));
-  const show = point => controls.context(more, entry.word, items, point);
+  const show = point => {
+    closeWordPreview();
+    controls.context(more, entry.word, items, point);
+  };
   more.onclick = () => show();
   more.onkeydown = event => {
     if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
@@ -568,23 +700,9 @@ function addWordActions(row, entry) {
   row.addEventListener("contextmenu", event => {
     if (!acceptsMenu(event.target)) return;
     event.preventDefault();
-    if (mobile && controls.isOpen()) return;
+    if (mobile && event.pointerType !== "mouse") return;
     show(event.clientX || event.clientY ? {x: event.clientX, y: event.clientY} : undefined);
   });
-  if (mobile) {
-    let press;
-    let start;
-    const cancel = () => { clearTimeout(press); press = undefined; };
-    row.addEventListener("pointerdown", event => {
-      if (event.pointerType !== "touch" || !acceptsMenu(event.target)) return;
-      start = {x: event.clientX, y: event.clientY};
-      press = setTimeout(() => { cancel(); if (row.isConnected) show(); }, 475);
-    });
-    row.addEventListener("pointermove", event => {
-      if (press && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) cancel();
-    });
-    for (const type of ["pointerup", "pointercancel", "pointerleave"]) row.addEventListener(type, cancel);
-  }
   actions.append(more);
   return actions;
 }
@@ -606,6 +724,7 @@ async function refreshLibrary() {
   const signature = JSON.stringify([data.rows, data.total, data.goal, listPage, selectedAll, [...selected]]);
   if (signature === listSignature) return;
   listSignature = signature;
+  closeWordPreview();
   el("word-list").replaceChildren();
   if (!data.rows.length) {
     const paragraph = document.createElement("p");
@@ -646,7 +765,8 @@ async function refreshLibrary() {
     const legacy = entry.legacyStreak && !entry.legacyMastered ? ` · 旧规则记录 ${entry.legacyStreak} 次` : "";
     timing.textContent = `${progress}${legacy} · 最近复习 ${entry.lastTry || "—"}`;
     main.append(title, meaning, timing);
-    row.append(checkTarget, main, addWordActions(row, entry));
+    addWordPreview(main, row, entry, timing.textContent);
+    row.append(checkTarget, main, addWordActions(row, entry, timing.textContent));
     el("word-list").append(row);
   }
   el("results").textContent = data.total ? `共 ${data.total} 个 · 第 ${listPage + 1} 页` : "共 0 个";
@@ -741,6 +861,7 @@ async function openHistory(entry) {
 }
 
 async function openEditor(key) {
+  closeWordPreview();
   editing = await api("/api/card/" + keyPath(key));
   el("edit-title").textContent = "编辑 " + editing.word;
   for (const field of editFields) el("edit-" + field).value = editing[field] || "";
@@ -907,35 +1028,24 @@ function customLimit() {
   if (!custom) el("custom-limit").removeAttribute("aria-invalid");
 }
 
-function examMode() {
-  const fixed = el("exam-mode").value === "fixed";
-  el("exam-annual-row").hidden = fixed;
-  el("exam-fixed-row").hidden = !fixed;
-  for (const id of ["exam-month", "exam-day", "exam-fixed"]) el(id).removeAttribute("aria-invalid");
-  return fixed;
-}
-
-function renderFixedExamDate() {
-  const input = el("exam-fixed");
-  const [year, month, day] = input.value.split("-").map(Number);
-  const label = input.value ? `${month} 月 ${day} 日` : "选择日期";
-  el("exam-fixed-display").textContent = label;
-  input.title = input.value ? `${year} 年 ${label}` : "";
+function renderExamDate() {
+  const date = el("exam-date");
+  const [year, month, day] = date.value.split("-").map(Number);
+  const label = date.value ? `${month} 月 ${day} 日` : "选择日期";
+  el("exam-date-display").textContent = label;
+  date.title = date.value && el("exam-mode").value === "fixed" ? `${year} 年 ${label}` : label;
 }
 
 function commitExamDate() {
-  const fixed = examMode();
-  const fields = fixed ? [el("exam-fixed")] : [el("exam-month"), el("exam-day")];
-  if (fixed) renderFixedExamDate();
-  const date = fixed ? fields[0].value : fields.map(field => field.value.padStart(2, "0")).join("-");
-  const calendarDate = fixed ? date : "2000-" + date;
-  const instant = new Date(calendarDate + "T00:00:00Z");
-  if (fields.some(field => !field.value || !field.validity.valid) ||
-      !Number.isFinite(+instant) || instant.toISOString().slice(0, 10) !== calendarDate) {
-    fields.forEach(field => field.setAttribute("aria-invalid", "true"));
+  const field = el("exam-date");
+  renderExamDate();
+  if (!field.value || !field.validity.valid) {
+    field.setAttribute("aria-invalid", "true");
     message("study-settings-status", "请输入有效的考试日期。此前的日期已保留。");
     return;
   }
+  field.removeAttribute("aria-invalid");
+  const date = el("exam-mode").value === "fixed" ? field.value : field.value.slice(5);
   message("study-settings-status");
   settingsDraft.examDate = date === "12-20" ? undefined : date;
 }
@@ -955,13 +1065,9 @@ async function openSettings() {
     el("online").checked = prefs.online;
     el("show-ipa").checked = prefs.showIPA;
     const fixed = prefs.examDate?.length === 10;
-    const annual = !fixed && prefs.examDate ? prefs.examDate : "12-20";
     el("exam-mode").value = fixed ? "fixed" : "annual";
-    el("exam-fixed").value = fixed ? prefs.examDate : state.exam.date;
-    renderFixedExamDate();
-    el("exam-month").value = Number(annual.slice(0, 2));
-    el("exam-day").value = Number(annual.slice(3));
-    examMode();
+    el("exam-date").value = fixed ? prefs.examDate : state.exam.date;
+    renderExamDate();
     customLimit();
     controls.syncSelect(el("daily-limit"));
     controls.syncSelect(el("exam-mode"));
@@ -996,7 +1102,7 @@ async function closeSettings() {
 
 function commitSetting(input) {
   if (view !== "settings" || !settingsDraft) return;
-  if (["exam-mode", "exam-month", "exam-day", "exam-fixed"].includes(input.id)) {
+  if (input.id === "exam-mode" || input.id === "exam-date") {
     commitExamDate();
     return;
   }
@@ -1173,6 +1279,11 @@ function reviewKeyAllowed(event) {
 }
 
 function keyboard(event) {
+  if (event.key === "Escape" && (preview || previewStart) && !controls.isOpen()) {
+    event.preventDefault();
+    closeWordPreview();
+    return;
+  }
   if (view === "settings" && event.key === "Escape" && !controls.isOpen() && !document.querySelector("dialog[open]")) {
     event.preventDefault();
     closeSettings();
@@ -1370,6 +1481,36 @@ if (mobile) {
 }
 
 for (const item of all("button[data-view]")) item.addEventListener("click", () => changeView(item.dataset.view));
+wordPreview.addEventListener("pointerenter", () => clearTimeout(previewDismiss));
+wordPreview.addEventListener("pointerleave", event => {
+  if (!preview?.row.contains(event.relatedTarget)) delayPreviewClose();
+});
+let previewBackdropDown = false;
+wordPreview.addEventListener("pointerdown", event => {
+  previewBackdropDown = event.target === wordPreview && !preview?.point;
+});
+wordPreview.addEventListener("click", event => {
+  if (previewBackdropDown && event.target === wordPreview) closeWordPreview();
+  previewBackdropDown = false;
+});
+wordPreview.addEventListener("close", () => {
+  if (!wordPreview.open) {
+    preview = undefined;
+    previewBackdropDown = false;
+    clearTimeout(previewDismiss);
+  }
+});
+document.addEventListener("pointerdown", event => {
+  if (preview?.point && !wordPreview.contains(event.target)) hideWordPreview();
+});
+document.addEventListener("scroll", event => {
+  if (view !== "library" || wordPreview.contains(event.target)) return;
+  if (!previewStart?.hover || !previewStart.target.matches(":hover")) cancelPreviewStart();
+  if (preview?.point) hideWordPreview();
+}, {capture: true, passive: true});
+window.addEventListener("resize", () => {
+  if (preview?.point) hideWordPreview();
+});
 for (const item of all("[data-close]")) item.addEventListener("click", () => {
   const dialog = item.closest("dialog");
   if (dialog.id === "edit-dialog") closeEditor();
@@ -1396,7 +1537,7 @@ el("settings-form").addEventListener("keydown", event => {
   event.preventDefault();
   event.target.blur();
 });
-const examDateInput = el("exam-fixed");
+const examDateInput = el("exam-date");
 const showExamPicker = event => {
   if (!examDateInput.showPicker) return;
   try {
@@ -1407,7 +1548,7 @@ const showExamPicker = event => {
   }
 };
 examDateInput.addEventListener("click", showExamPicker);
-examDateInput.addEventListener("input", renderFixedExamDate);
+examDateInput.addEventListener("input", renderExamDate);
 examDateInput.addEventListener("keydown", event => {
   if (["Enter", " "].includes(event.key) && !event.isComposing && event.keyCode !== 229) showExamPicker(event);
 });

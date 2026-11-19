@@ -142,8 +142,8 @@ body.platform-android {
 .platform-android .setting-row { min-height: 3.4rem; padding-block: .58rem; }
 .platform-android .setting-control { width: clamp(7.55rem, 35vw, 10rem); }
 .platform-android .setting-text label { font-size: .94rem; }
-.platform-android :is(#exam-annual-row, #exam-fixed-row) { grid-template-columns: minmax(0, 1fr); gap: .42rem; }
-.platform-android :is(#exam-annual-row, #exam-fixed-row) .setting-control { width: 100%; }
+.platform-android #exam-date-row { grid-template-columns: minmax(0, 1fr); gap: .42rem; }
+.platform-android #exam-date-row .setting-control { width: 100%; }
 .platform-android .number-unit { width: 4.5rem; }
 .platform-android .theme-segments label > span { min-height: 3rem; }
 .platform-android .settings-actions { margin: -.05rem 0 .28rem; }

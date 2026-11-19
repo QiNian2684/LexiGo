@@ -219,20 +219,12 @@
                 <select id="exam-mode" data-styled><option value="annual">每年循环</option><option value="fixed">指定日期</option></select>
               </div>
             </div>
-            <div class="setting-row" id="exam-annual-row">
-              <div class="setting-text" id="exam-annual-label">每年考试日</div>
-              <div class="setting-control exam-date-box exam-annual" role="group" aria-labelledby="exam-annual-label">
-                <label><input id="exam-month" type="number" inputmode="numeric" min="1" max="12" step="1"><span>月</span></label>
-                <label><input id="exam-day" type="number" inputmode="numeric" min="1" max="31" step="1"><span>日</span></label>
-                <svg class="icon" aria-hidden="true" focusable="false"><use href="/icons.svg#calendar"/></svg>
-              </div>
-            </div>
-            <div class="setting-row" id="exam-fixed-row" hidden>
-              <label class="setting-text" for="exam-fixed">指定考试日</label>
-              <div class="setting-control exam-fixed-control">
-                <input id="exam-fixed" type="date" min="1900-01-01" max="9999-12-31">
+            <div class="setting-row" id="exam-date-row">
+              <label class="setting-text" for="exam-date">考试日</label>
+              <div class="setting-control exam-date-control">
+                <input id="exam-date" type="date" min="1900-01-01" max="9999-12-31">
                 <div class="exam-date-box" aria-hidden="true">
-                  <span id="exam-fixed-display">选择日期</span>
+                  <span id="exam-date-display">选择日期</span>
                   <svg class="icon" focusable="false"><use href="/icons.svg#down"/></svg>
                 </div>
               </div>
@@ -296,6 +288,16 @@
       </footer>
     </section>
   </main>
+
+  <dialog id="word-preview" aria-labelledby="word-preview-title">
+    <div class="dialog-form">
+      <header class="dialog-header">
+        <h2 id="word-preview-title" lang="en"></h2>
+        <button class="icon-button" type="button" data-close aria-label="关闭词条预览"><svg class="icon" aria-hidden="true"><use href="/icons.svg#close"/></svg></button>
+      </header>
+      <div id="word-preview-content" class="dialog-body" tabindex="0"></div>
+    </div>
+  </dialog>
 
   <dialog id="edit-dialog" aria-labelledby="edit-title">
     <form id="edit-form" class="dialog-form" data-validation="edit-status">
