@@ -216,9 +216,8 @@ func (s *store) add(day string, items []importedWord, token string, dict *dictio
 		}
 		details := item.cardDetails
 		exampleBy := ""
-		hadExample := details.Examples != ""
 		details.fill(offline.cardDetails)
-		if !hadExample && details.Examples != "" {
+		if details.Examples != item.Examples || details.ExampleTranslation != item.ExampleTranslation {
 			exampleBy = offline.ExampleBy
 		}
 		card := &wordCard{Key: key, Word: item.Word, cardDetails: details,

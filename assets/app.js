@@ -237,7 +237,8 @@ function renderDetails(card) {
   const fields = [
     meaning,
     group("英文例句", card.examples, missing, "example"),
-    group("例句翻译", card.exampleTranslation, "暂无对应译文。", "translation"),
+    group(card.exampleBy === "simple-mt" ? "例句翻译（机译）" : "例句翻译",
+      card.exampleTranslation, "暂无对应译文。", "translation"),
   ];
   const sources = document.createElement("div");
   sources.className = "sources";
@@ -245,7 +246,7 @@ function renderDetails(card) {
   if (/^https:\/\/en\.wiktionary\.org\/wiki\/Special:PermanentLink\/\d+#English$/.test(card.wikiSource || "")) {
     sources.append(link("Wiktionary", card.wikiSource), link("CC BY-SA 4.0", "https://creativecommons.org/licenses/by-sa/4.0/"));
   }
-  if (card.exampleBy === "simple") {
+  if (["simple", "simple-mt", "simple-edited"].includes(card.exampleBy)) {
     sources.append(link("例句 · Simple Wiktionary", "https://simple.wiktionary.org/wiki/" + encodeURIComponent(card.key)),
       link("CC BY-SA 4.0", "https://creativecommons.org/licenses/by-sa/4.0/"));
   }
@@ -743,7 +744,7 @@ async function openEditor(key) {
   editing = await api("/api/card/" + keyPath(key));
   el("edit-title").textContent = "编辑 " + editing.word;
   for (const field of editFields) el("edit-" + field).value = editing[field] || "";
-  el("retry-one").hidden = !!(editing.meaning && editing.pos && editing.examples && editing.etymology);
+  el("retry-one").hidden = !!(editing.meaning && editing.pos && editing.examples && editing.exampleTranslation && editing.etymology);
   el("retry-one").disabled = !state?.settings.online;
   message("edit-status");
   el("edit-dialog").showModal();
@@ -770,9 +771,14 @@ async function flushEdit(commitWord = false, background = false) {
     throw new Error("请输入有效的英文拼写。");
   }
   const key = editing.key;
+  const submittedTranslation = el("edit-exampleTranslation").value;
   const job = (async () => {
     const card = await api("/api/card/" + keyPath(key), updates, {keepalive: background && JSON.stringify(updates).length < 16000});
     editing = card;
+    const translation = el("edit-exampleTranslation");
+    if (translation.value === submittedTranslation && card.exampleTranslation !== submittedTranslation) {
+      translation.value = card.exampleTranslation || "";
+    }
     if (updates.word !== undefined && el("edit-word").value === updates.word) el("edit-word").value = card.word;
     el("edit-title").textContent = "编辑 " + card.word;
     if (revealed?.key === key) {
@@ -912,9 +918,9 @@ function examMode() {
 function renderFixedExamDate() {
   const input = el("exam-fixed");
   const [year, month, day] = input.value.split("-").map(Number);
-  const label = input.value ? `${month}月${day}日` : "选择日期";
+  const label = input.value ? `${month} 月 ${day} 日` : "选择日期";
   el("exam-fixed-display").textContent = label;
-  input.title = input.value ? `${year}年${label}` : "";
+  input.title = input.value ? `${year} 年 ${label}` : "";
 }
 
 function commitExamDate() {

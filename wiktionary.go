@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"golang.org/x/net/html"
@@ -122,6 +123,44 @@ func plainText(node *html.Node) string {
 	return strings.Join(strings.Fields(text.String()), " ")
 }
 
+func chineseUsageTranslation(example *html.Node) string {
+	parent := example.Parent
+	for parent != nil && !hasClass(parent, "h-usage-example") {
+		parent = parent.Parent
+	}
+	if parent == nil {
+		return ""
+	}
+	var text string
+	examples := 0
+	walkHTML(parent, func(node *html.Node) bool {
+		if node != parent && hasClass(node, "h-usage-example") {
+			return false
+		}
+		if hasClass(node, "e-example") {
+			examples++
+		}
+		if text == "" && hasClass(node, "e-translation") {
+			walkHTML(node, func(part *html.Node) bool {
+				lang, _, _ := strings.Cut(attribute(part, "lang"), "-")
+				if text != "" || (lang != "zh" && lang != "cmn") {
+					return text == ""
+				}
+				p := plainText(part)
+				if utf8.RuneCountInString(p) <= 255 && strings.ContainsFunc(p, func(r rune) bool { return unicode.Is(unicode.Han, r) }) {
+					text = p
+				}
+				return false
+			})
+		}
+		return true
+	})
+	if examples != 1 {
+		return ""
+	}
+	return text
+}
+
 func parseWiktionary(source string) cardDetails {
 	root, err := html.Parse(strings.NewReader(source))
 	if err != nil {
@@ -129,6 +168,7 @@ func parseWiktionary(source string) cardDetails {
 	}
 	var result cardDetails
 	var pos, examples, etymologies, chinese []string
+	var pairedExamples, pairedTranslations []string
 	var inEnglish, inEtymology, inTranslations bool
 	walkHTML(root, func(node *html.Node) bool {
 		if node.Type != html.ElementNode {
@@ -158,10 +198,16 @@ func parseWiktionary(source string) cardDetails {
 				etymologies = append(etymologies, p)
 			}
 		}
-		if len(examples) < 2 && hasClass(node, "e-example") && attribute(node, "lang") == "en" {
+		if len(pairedExamples) < 2 && hasClass(node, "e-example") && attribute(node, "lang") == "en" {
 			p := plainText(node)
-			if len(p) > 0 && utf8.RuneCountInString(p) <= 255 && !slices.Contains(examples, p) {
-				examples = append(examples, p)
+			if len(p) > 0 && utf8.RuneCountInString(p) <= 255 {
+				if len(examples) < 2 && !slices.Contains(examples, p) {
+					examples = append(examples, p)
+				}
+				if translation := chineseUsageTranslation(node); translation != "" && !slices.Contains(pairedExamples, p) {
+					pairedExamples = append(pairedExamples, p)
+					pairedTranslations = append(pairedTranslations, translation)
+				}
 			}
 		}
 		if inTranslations && len(chinese) < 6 && hasClass(node, "Hans") && attribute(node, "lang") == "cmn" {
@@ -195,6 +241,10 @@ func parseWiktionary(source string) cardDetails {
 	})
 	result.Meaning = strings.Join(chinese, "；")
 	result.POS = strings.Join(pos, "、")
+	if len(pairedExamples) > 0 {
+		examples = pairedExamples
+		result.ExampleTranslation = strings.Join(pairedTranslations, "\n\n")
+	}
 	result.Examples = strings.Join(examples, "\n\n")
 	result.Etymology = strings.Join(etymologies, "\n\n")
 	return result

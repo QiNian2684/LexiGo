@@ -555,6 +555,7 @@ func (a *application) handler() http.Handler {
 			return
 		}
 		a.updateCard(w, r.PathValue("key"), func(c *wordCard) error {
+			oldExample, oldTranslation := c.Examples, c.ExampleTranslation
 			fields := map[string]*string{
 				"meaning": &c.Meaning, "pos": &c.POS, "ipa": &c.IPA, "ipaUK": &c.IPAUK, "ipaUS": &c.IPAUS,
 				"examples": &c.Examples, "exampleTranslation": &c.ExampleTranslation, "etymology": &c.Etymology,
@@ -577,6 +578,17 @@ func (a *application) handler() http.Handler {
 			}
 			if c.cardDetails.size() > 12000 || utf8.RuneCountInString(c.PersonalNote) > 12000 {
 				return errors.New("卡片资料及备注各最多 12,000 字。")
+			}
+			switch c.ExampleBy {
+			case "simple", "simple-mt", "simple-edited":
+				if c.Examples != oldExample {
+					if c.ExampleBy == "simple-mt" && c.ExampleTranslation == oldTranslation {
+						c.ExampleTranslation = ""
+					}
+					c.ExampleBy = ""
+				} else if c.ExampleTranslation != oldTranslation {
+					c.ExampleBy = "simple-edited"
+				}
 			}
 			return nil
 		})

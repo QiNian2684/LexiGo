@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -21,6 +22,12 @@ var learningJSON []byte
 
 //go:embed assets/examples.json.gz
 var exampleBytes []byte
+
+//go:embed assets/example-pairs.json.gz
+var examplePairBytes []byte
+
+//go:embed assets/example-translations.json.gz
+var exampleTranslationBytes []byte
 
 type cardDetails struct {
 	Meaning            string `json:"meaning"`
@@ -58,18 +65,47 @@ type dictionary struct {
 	index    []int
 	notes    map[string]cardDetails
 	examples map[string]sourcedExample
+	pairs    map[string]sourcedExample
 	err      error
 }
 
 var bundledExamples = sync.OnceValues(func() (map[string]sourcedExample, error) {
-	data, err := expand(exampleBytes)
+	return readExamples(exampleBytes)
+})
+
+var bundledExamplePairs = sync.OnceValues(func() (map[string]sourcedExample, error) {
+	pairs, err := readExamples(examplePairBytes)
+	if err != nil {
+		return nil, err
+	}
+	machine, err := readExamples(exampleTranslationBytes)
+	if err != nil {
+		return nil, err
+	}
+	originals, err := bundledExamples()
+	if err != nil {
+		return nil, err
+	}
+	for word, pair := range machine {
+		original := originals[word]
+		if _, exists := pairs[word]; !exists && original.By == "simple" &&
+			original.ExampleTranslation == "" && original.Examples == pair.Examples {
+			pair.By = "simple-mt"
+			pairs[word] = pair
+		}
+	}
+	return pairs, nil
+})
+
+func readExamples(packed []byte) (map[string]sourcedExample, error) {
+	data, err := expand(packed)
 	if err != nil {
 		return nil, err
 	}
 	var examples map[string]sourcedExample
 	err = json.Unmarshal(data, &examples)
 	return examples, err
-})
+}
 
 func expand(data []byte) ([]byte, error) {
 	input, err := gzip.NewReader(bytes.NewReader(data))
@@ -99,6 +135,9 @@ func (d *dictionary) load() {
 			return
 		}
 		d.examples, d.err = bundledExamples()
+		if d.err == nil {
+			d.pairs, d.err = bundledExamplePairs()
+		}
 	})
 }
 
@@ -129,6 +168,9 @@ func (d *dictionary) lookup(word string) (offlineEntry, error) {
 		result.cardDetails = override
 		result.IPA = ipa
 	} else if example, ok := d.examples[word]; ok {
+		if pair, ok := d.pairs[word]; ok {
+			example = pair
+		}
 		result.Examples = example.Examples
 		result.ExampleTranslation = example.ExampleTranslation
 		result.ExampleBy = example.By
@@ -137,16 +179,19 @@ func (d *dictionary) lookup(word string) (offlineEntry, error) {
 }
 
 func (c cardDetails) needsOnline() bool {
-	return c.Meaning == "" || c.POS == "" || c.Examples == "" || c.Etymology == ""
+	return c.Meaning == "" || c.POS == "" || c.Examples == "" || c.ExampleTranslation == "" || c.Etymology == ""
 }
 
 func (c *cardDetails) fill(from cardDetails) (used bool) {
-	if c.Examples == "" && from.Examples != "" {
+	if c.Examples == "" && c.ExampleTranslation == "" && from.Examples != "" {
 		c.Examples = from.Examples
-		if c.ExampleTranslation == "" {
-			c.ExampleTranslation = simplifyExampleTranslation(from.ExampleTranslation)
-		}
 		used = true
+	}
+	if c.ExampleTranslation == "" {
+		if translation := matchingExampleTranslation(c.Examples, from); translation != "" {
+			c.ExampleTranslation = simplifyExampleTranslation(translation)
+			used = true
+		}
 	}
 	for _, pair := range [][2]*string{
 		{&c.Meaning, &from.Meaning}, {&c.POS, &from.POS}, {&c.IPA, &from.IPA},
@@ -159,4 +204,27 @@ func (c *cardDetails) fill(from cardDetails) (used bool) {
 		}
 	}
 	return used
+}
+
+func matchingExampleTranslation(examples string, source cardDetails) string {
+	if examples == "" || source.ExampleTranslation == "" {
+		return ""
+	}
+	if examples == source.Examples {
+		return source.ExampleTranslation
+	}
+	sentences := strings.Split(source.Examples, "\n\n")
+	translations := strings.Split(source.ExampleTranslation, "\n\n")
+	if len(sentences) != len(translations) {
+		return ""
+	}
+	var matched []string
+	for _, sentence := range strings.Split(examples, "\n\n") {
+		index := slices.Index(sentences, sentence)
+		if index < 0 || translations[index] == "" {
+			return ""
+		}
+		matched = append(matched, translations[index])
+	}
+	return strings.Join(matched, "\n\n")
 }

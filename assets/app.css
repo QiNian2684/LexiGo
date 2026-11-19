@@ -542,8 +542,8 @@ td:first-child, th:first-child { min-width: 7.4rem; }
   border-radius: var(--radius-control); font-size: 1rem; line-height: 1.4;
   font-variant-numeric: tabular-nums;
 }
-.exam-annual label { display: flex; align-items: center; gap: .08em; }
-.exam-annual label span { font-size: .875em; }
+.exam-annual, .exam-annual label { gap: .25em; }
+.exam-annual label { display: flex; align-items: center; }
 .exam-annual :is(#exam-month, #exam-day) {
   width: 1.5em; min-height: 0; padding: 0 .06em;
   background: transparent; border: 0; border-radius: var(--radius-small);
