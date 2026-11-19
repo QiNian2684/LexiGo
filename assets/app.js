@@ -122,7 +122,7 @@ function renderReview() {
   el("day-meter").max = Math.max(1, next.planned);
   el("day-meter").value = next.remembered;
   el("review-empty").removeAttribute("aria-busy");
-  el("session-tools").hidden = !studying || !!practice;
+  el("session-tools").hidden = mobile || !studying || !!practice;
   el("undo").disabled = !next.canUndo || busy || swiping;
   const waiting = !practice && next.waitingForNext;
   el("session-hint").textContent = next.current
@@ -134,9 +134,8 @@ function renderReview() {
   const concealed = el("answer").hidden;
   el("pass").disabled = busy || swiping || concealed || !!waiting;
   el("forgot").disabled = busy || swiping || concealed;
-  el("flashcard").classList.toggle("can-swipe", !!(mobile && studying && !practice && !busy && next.current && !el("answer").hidden));
-  el("swipe-label").textContent = waiting ? "下一单词" : "记住了";
-  el("swipe-icon").setAttribute("href", waiting ? "/icons.svg#right" : "/icons.svg#check");
+  el("pass-today").hidden = !studying || !!practice || !next.current;
+  el("pass-today").disabled = busy || swiping;
   const current = practice || (studying && next.current);
   el("flashcard").hidden = !current;
   el("review-start").hidden = !!practice || !!studying || !next.current;
@@ -364,17 +363,18 @@ function noteInput(event) {
   if (noteDirty() && !event?.isComposing) noteTimer = setTimeout(() => flushNote().catch(showError), 600);
 }
 
-async function vote(remembered, fromSwipe = false) {
-  if (!studying || practice || el("answer").hidden || !state?.current || state.waitingForNext || busy || (swiping && !fromSwipe)) return;
+async function vote(remembered, {fromSwipe = false, passToday = false} = {}) {
+  if (!studying || practice || !state?.current || busy || (swiping && !fromSwipe) ||
+      (!passToday && (el("answer").hidden || state.waitingForNext))) return;
   busy = true;
-  el("forgot").disabled = el("pass").disabled = true;
+  renderReview();
   showError();
   let completed = false;
   try {
     await flushNote();
     const {current, date, due, planned, remembered: passed} = state;
     const result = await api("/api/vote", {
-      key: current.key, reviews: current.reviews, order: current.order, date, remembered, stay: !remembered,
+      key: current.key, reviews: current.reviews, order: current.order, date, remembered, stay: !remembered, passToday,
     });
     applyState(result, remembered);
     if (remembered) el("review-title").scrollIntoView({block: "nearest"});
@@ -392,15 +392,19 @@ async function vote(remembered, fromSwipe = false) {
   if (completed && view === "review") window.WordReviewCelebrate(el("review-empty"));
 }
 
-async function undo() {
-  if (!state?.canUndo || busy || swiping || practice) return;
+async function undo(fromSwipe = false) {
+  if (view !== "review" || !state?.canUndo || busy || (swiping && !fromSwipe) || practice) return;
   busy = true;
   try {
     await flushNote();
     const wasWaiting = state.waitingForNext;
-    applyState(await api("/api/undo", {}), !wasWaiting);
+    const result = await api("/api/undo", {});
+    if (fromSwipe && result.current) studying = true;
+    applyState(result, !wasWaiting);
+    if (fromSwipe) el("review-title").scrollIntoView({block: "nearest"});
   } catch (error) { showError(error); }
   finally { busy = false; renderReview(); }
+  if (state?.waitingForNext) await resumeWaiting();
 }
 
 async function stopReview() {
@@ -1234,10 +1238,12 @@ if (mobile) {
   let drag;
   let frame;
   const setOffset = x => { surface.style.transform = `translate3d(${x}px,0,0)`; };
-  const canSwipe = () => view === "review" && studying && !practice && !busy && !swiping &&
-    state?.current && !el("answer").hidden &&
+  const canSwipe = () => view === "review" && !practice && !busy && !swiping &&
     !document.activeElement?.matches("input,textarea,select,[contenteditable]") &&
     !document.querySelector("dialog[open]") && !controls.isOpen() && !window.getSelection()?.toString();
+  const canAdvance = () => studying && state?.current && !el("answer").hidden;
+  const sameReview = ({card, date, waiting}) => date === state?.date && sameCard(card, state.current) &&
+    waiting === Boolean(state.waitingForNext);
   function animate(from, to, duration) {
     if (reducedMotion.matches || !surface.animate) return Promise.resolve();
     return surface.animate([from, to], {duration, easing: "cubic-bezier(.2,.7,.3,1)"}).finished.catch(() => {});
@@ -1249,65 +1255,88 @@ if (mobile) {
     drag = undefined;
     setOffset(0);
     cue.style.opacity = "";
-    if (x) animate({transform:`translateX(${x}px)`}, {transform:"translateX(0)"}, 190);
+    if (x && !el("flashcard").hidden) animate({transform:`translateX(${x}px)`}, {transform:"translateX(0)"}, 190);
   }
   let suppressClickUntil = 0;
-  surface.addEventListener("click", event => {
+  document.addEventListener("click", event => {
     if (event.detail && performance.now() < suppressClickUntil) {
       event.preventDefault();
       event.stopImmediatePropagation();
     }
   }, true);
-  surface.addEventListener("pointerdown", event => {
+  document.addEventListener("pointerdown", event => {
+    if (event.pointerType !== "touch") return;
+    if (!event.isPrimary) { cancelDrag(); return; }
     suppressClickUntil = 0;
-    if (!event.isPrimary || event.pointerType !== "touch" || drag || !canSwipe() ||
-        event.clientX < 24 || innerWidth - event.clientX < 24 ||
-        event.target.closest("input,select,[contenteditable]")) return;
+    if (drag || !canSwipe() || event.target.closest("input,textarea,select,[contenteditable]")) return;
+    const forward = surface.contains(event.target) && event.clientX >= 24 && innerWidth - event.clientX >= 24 && canAdvance();
+    if (!state?.canUndo && !forward) return;
     drag = {id:event.pointerId, x:event.clientX, y:event.clientY, offset:0,
-      threshold:Math.min(88, surface.clientWidth * .21) * .75, card:state.current, date:state.date,
-      waiting: Boolean(state.waitingForNext)};
+      forward, undo:state.canUndo, card:state.current, date:state.date, waiting:Boolean(state.waitingForNext)};
   });
-  surface.addEventListener("pointermove", event => {
+  document.addEventListener("pointermove", event => {
     if (drag?.id !== event.pointerId) return;
-    if (!canSwipe()) { cancelDrag(); return; }
+    if (!canSwipe() || !sameReview(drag)) { cancelDrag(); return; }
     const dx = event.clientX - drag.x;
     const dy = Math.abs(event.clientY - drag.y);
-    if (!drag.offset && (dy > 10 && dy >= Math.abs(dx) || dx > 12)) { cancelDrag(); return; }
-    if (!drag.offset && (-dx < 12 || -dx < dy * 1.4)) return;
+    if (!drag.action) {
+      if (dy > 10 && dy >= Math.abs(dx)) { cancelDrag(); return; }
+      if (Math.abs(dx) < 12 || Math.abs(dx) < dy * 1.4) return;
+      const reversing = dx > 0;
+      if (reversing ? !drag.undo : !drag.forward) { cancelDrag(); return; }
+      drag.action = reversing ? "undo" : "forward";
+      drag.threshold = reversing ? Math.max(52, Math.min(78, innerWidth * .18)) : Math.min(88, surface.clientWidth * .21) * .75;
+      el("swipe-label").textContent = reversing ? "撤销上一次" : drag.waiting ? "下一单词" : "记住了";
+      el("swipe-icon").setAttribute("href", "/icons.svg#" + (reversing ? "arrow-left" : drag.waiting ? "right" : "check"));
+      document.body.setPointerCapture(event.pointerId);
+    }
     suppressClickUntil = performance.now() + 350;
-    if (!surface.hasPointerCapture(event.pointerId)) surface.setPointerCapture(event.pointerId);
-    drag.offset = Math.min(0, dx);
+    drag.offset = drag.action === "undo" ? Math.max(0, dx) : Math.min(0, dx);
     cancelAnimationFrame(frame);
     frame = requestAnimationFrame(() => {
       setOffset(drag.offset);
-      cue.style.opacity = Math.min(1, -drag.offset / drag.threshold);
+      cue.style.opacity = Math.min(1, Math.abs(drag.offset) / drag.threshold);
     });
   });
-  surface.addEventListener("pointercancel", cancelDrag);
-  surface.addEventListener("contextmenu", cancelDrag);
+  document.addEventListener("pointercancel", event => { if (drag?.id === event.pointerId) cancelDrag(); });
+  document.addEventListener("contextmenu", cancelDrag);
   document.addEventListener("selectionchange", () => { if (window.getSelection()?.toString()) cancelDrag(); });
-  surface.addEventListener("pointerup", async event => {
+  document.addEventListener("pointerup", async event => {
     if (drag?.id !== event.pointerId) return;
-    if (drag.offset) suppressClickUntil = performance.now() + 350;
-    if (-drag.offset < drag.threshold || !canSwipe()) { cancelDrag(); return; }
-    const {offset, card, date, waiting} = drag;
+    if (drag.action) suppressClickUntil = performance.now() + 350;
+    if (!drag.action || Math.abs(drag.offset) < drag.threshold || !canSwipe() || !sameReview(drag)) { cancelDrag(); return; }
+    const completed = drag;
+    const {offset, waiting, action} = completed;
+    const reversing = action === "undo";
+    if (reversing ? !state.canUndo : !canAdvance()) { cancelDrag(); return; }
     drag = undefined;
     cancelAnimationFrame(frame);
     swiping = true;
     renderReview();
-    const exit = -surface.clientWidth;
-    await animate({transform:`translateX(${offset}px)`, opacity:1}, {transform:`translateX(${exit}px)`, opacity:0}, 190);
-    surface.style.opacity = "0";
-    if (view === "review" && date === state.date && sameCard(card, state.current) && waiting === Boolean(state.waitingForNext)) {
-      if (waiting) await nextCard(true);
-      else await vote(true, true);
+    try {
+      if (!el("flashcard").hidden) {
+        const exit = (reversing ? 1 : -1) * surface.clientWidth;
+        await animate({transform:`translateX(${offset}px)`, opacity:1}, {transform:`translateX(${exit}px)`, opacity:0}, 190);
+        surface.style.opacity = "0";
+      }
+      if (view === "review" && sameReview(completed)) {
+        if (reversing) await undo(true);
+        else if (waiting) await nextCard(true);
+        else await vote(true, {fromSwipe:true});
+      }
+      setOffset(0);
+      cue.style.opacity = "";
+      surface.style.opacity = "";
+      if (!el("flashcard").hidden) {
+        await animate({transform:`translateX(${reversing ? -22 : 22}px)`, opacity:0.45}, {transform:"translateX(0)", opacity:1}, 190);
+      }
+    } finally {
+      setOffset(0);
+      cue.style.opacity = "";
+      surface.style.opacity = "";
+      swiping = false;
+      renderReview();
     }
-    setOffset(0);
-    cue.style.opacity = "";
-    surface.style.opacity = "";
-    await animate({transform:"translateX(22px)", opacity:0.45}, {transform:"translateX(0)", opacity:1}, 190);
-    swiping = false;
-    renderReview();
   });
 }
 
@@ -1361,10 +1390,11 @@ el("download-backup").onclick = event => {
 el("pick-restore").onclick = () => el("restore-file").click();
 el("restore-file").onchange = restoreFile;
 el("start-review").onclick = startReview;
-el("undo").onclick = undo;
+el("undo").onclick = () => undo();
 el("reveal").onclick = toggleReveal;
 el("forgot").onclick = () => state?.waitingForNext ? nextCard() : vote(false);
 el("pass").onclick = () => vote(true);
+el("pass-today").onclick = () => vote(true, {passToday: true});
 el("personal-note").oninput = noteInput;
 el("personal-note").oncompositionend = noteInput;
 el("personal-note").onblur = () => flushNote().catch(showError);

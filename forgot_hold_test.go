@@ -13,13 +13,13 @@ func TestForgotHoldSurvivesRestartTransferAndUndo(t *testing.T) {
 	day := date.Format(time.DateOnly)
 	importTest(t, s, day, "abundance, crucial, novel")
 	first := s.shuffleReview(day).Current
-	result, err := s.recordVote(day, first.Key, first.Reviews, first.Order, false, true)
+	result, err := s.recordVote(day, first.Key, first.Reviews, first.Order, false, true, false)
 	if err != nil || !result.Waiting || result.Current.Key != first.Key || result.Current.Reviews != 1 ||
 		result.DailyCount != 0 || s.attendance(day).votes != 1 {
 		t.Fatalf("forgot submission: %+v (%v)", result, err)
 	}
 	card := result.Current
-	if _, err := s.recordVote(day, card.Key, card.Reviews, card.Order, true, false); !errors.Is(err, errStaleReview) {
+	if _, err := s.recordVote(day, card.Key, card.Reviews, card.Order, true, false, false); !errors.Is(err, errStaleReview) {
 		t.Fatalf("held card accepted another vote: %v", err)
 	}
 	reopened, err := openStore(path)

@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="cn.wordreview.app.lexigo" android:versionCode="250" android:versionName="2.1.2">
+    package="cn.wordreview.app.lexigo.v213" android:versionCode="260" android:versionName="2.1.3">
     <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="34" />
     <uses-permission android:name="android.permission.INTERNET" />
     <queries><intent><action android:name="android.intent.action.TTS_SERVICE" /></intent></queries>
@@ -7,7 +7,7 @@
         android:allowBackup="false" android:extractNativeLibs="true"
         android:networkSecurityConfig="@xml/network_security" android:usesCleartextTraffic="false">
         <provider android:name="cn.wordreview.app.StudyShareProvider"
-            android:authorities="cn.wordreview.app.lexigo.share" android:exported="false" android:grantUriPermissions="true">
+            android:authorities="cn.wordreview.app.lexigo.v213.share" android:exported="false" android:grantUriPermissions="true">
             <grant-uri-permission android:pathPrefix="/study/" />
         </provider>
         <activity android:name="cn.wordreview.app.MainActivity" android:exported="true" android:screenOrientation="portrait"

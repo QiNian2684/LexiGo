@@ -242,11 +242,27 @@ body:not(.platform-android) .swipe-cue { display: none; }
 }
 .review-card { overflow: clip; box-shadow: var(--shadow); }
 .card-front {
+  position: relative;
   display: grid;
   justify-items: center;
   row-gap: .83rem;
   min-height: 16rem;
   padding: clamp(2rem, 4.5vw, 3.85rem) clamp(1.1rem, 4.1vw, 3rem) 1.65rem;
+}
+.card-front:has(.pass-today:not([hidden])) { padding-block-start: max(clamp(2rem, 4.5vw, 3.85rem), 3.55rem); }
+.pass-today {
+  position: absolute;
+  inset-block-start: .55rem;
+  inset-inline-end: .65rem;
+  color: var(--accent);
+}
+.pass-today::before {
+  content: "";
+  position: absolute;
+  inset: .26rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  pointer-events: none;
 }
 .english-word {
   max-width: 100%;

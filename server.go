@@ -367,8 +367,13 @@ func (a *application) handler() http.Handler {
 			Date       string `json:"date"`
 			Remembered bool   `json:"remembered"`
 			Stay       bool   `json:"stay"`
+			PassToday  bool   `json:"passToday"`
 		}
 		if !requestJSON(w, r, 4096, &req) {
+			return
+		}
+		if req.PassToday && (!req.Remembered || req.Stay) {
+			problem(w, 400, "直接过关须作为记住的作答提交。")
 			return
 		}
 		day := a.reviewDay()
@@ -376,7 +381,7 @@ func (a *application) handler() http.Handler {
 			problem(w, 409, errStaleReview.Error())
 			return
 		}
-		data, err := a.store.recordVote(day, req.Key, req.Reviews, req.Order, req.Remembered, req.Stay)
+		data, err := a.store.recordVote(day, req.Key, req.Reviews, req.Order, req.Remembered, req.Stay, req.PassToday)
 		if errors.Is(err, errStaleReview) {
 			problem(w, 409, err.Error())
 		} else if err != nil {

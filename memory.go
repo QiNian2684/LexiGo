@@ -27,7 +27,7 @@ func (p progress) effectiveStreak(day string) int {
 	return p.Streak
 }
 
-func (p *progress) answer(day string, correct bool, options settings, dayAlreadyCredited bool, previousAnswers int, entry *event) {
+func (p *progress) answer(day string, correct, passToday bool, options settings, dayAlreadyCredited bool, previousAnswers int, entry *event) {
 	if p.DailyDay != day {
 		p.Streak = p.effectiveStreak(day)
 		p.DailyDay, p.DailyCount, p.DailyTarget = day, 0, options.DailyGoal
@@ -37,7 +37,11 @@ func (p *progress) answer(day string, correct bool, options settings, dayAlready
 	if correct {
 		entry.Kind = "yes"
 		p.LastYes = day
-		p.DailyCount++
+		if passToday {
+			p.DailyCount = p.DailyTarget
+		} else {
+			p.DailyCount++
+		}
 		if p.DailyCount >= p.DailyTarget {
 			p.passDaily(day, options, dayAlreadyCredited, entry)
 			return

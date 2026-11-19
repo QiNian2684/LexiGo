@@ -74,7 +74,7 @@ func TestRolloverCompletesDisplayedCardAndKeepsForgotHold(t *testing.T) {
 	if state.Date != lastDay || state.Current.Key != current.Current.Key {
 		t.Fatalf("card interrupted: %+v", state)
 	}
-	hold, err := s.recordVote(lastDay, state.Current.Key, state.Current.Reviews, state.Current.Order, false, true)
+	hold, err := s.recordVote(lastDay, state.Current.Key, state.Current.Reviews, state.Current.Order, false, true, false)
 	if err != nil || !hold.Waiting {
 		t.Fatalf("could not finish old card: %+v %v", hold, err)
 	}

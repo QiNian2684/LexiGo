@@ -142,15 +142,16 @@ var errStaleReview = errors.New("复习卡已更新，请按当前卡片继续�
 var errWordConflict = errors.New("词库里已有这个拼写，包括回收站中的词条。")
 
 func (s *store) vote(day, key string, version int, order uint64, remembered bool) (voteResult, error) {
-	return s.recordVote(day, key, version, order, remembered, false)
+	return s.recordVote(day, key, version, order, remembered, false, false)
 }
 
-func (s *store) recordVote(day, key string, version int, order uint64, remembered, hold bool) (voteResult, error) {
+func (s *store) recordVote(day, key string, version int, order uint64, remembered, hold, passToday bool) (voteResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	plan := s.planReview(day)
 	state := s.reviewState(plan)
-	if state.Waiting || state.Current == nil || state.Current.Key != key || state.Current.Reviews != version || state.Current.Order != order {
+	if (state.Waiting && !passToday) || state.Current == nil || state.Current.Key != key ||
+		state.Current.Reviews != version || state.Current.Order != order {
 		return voteResult{}, errStaleReview
 	}
 	card := s.db.Words[key]
@@ -160,7 +161,7 @@ func (s *store) recordVote(day, key string, version int, order uint64, remembere
 	now := time.Now().UTC()
 	entry := event{Day: day, OccurredAt: &now, Card: card.ID, Word: card.Word, Tick: card.Order, Before: &before, Extra: card.ExtraDay == day,
 		Waiting: hold && !remembered}
-	card.answer(day, remembered, s.db.Settings, session.credited[card.ID], session.votes, &entry)
+	card.answer(day, remembered, passToday, s.db.Settings, session.credited[card.ID], session.votes, &entry)
 
 	s.db.Events = append(s.db.Events, entry)
 	if err := s.save([]string{key}, count); err != nil {
