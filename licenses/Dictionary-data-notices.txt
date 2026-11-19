@@ -16,3 +16,5 @@ Source: https://en.wiktionary.org/
 License: CC BY-SA 4.0 https://creativecommons.org/licenses/by-sa/4.0/
 Results are selected, tags removed, and whitespace normalized.
 The specific source revision is linked from the associated flashcard.
+
+LexiGo may convert the Chinese translations of example sentences to simplified Chinese using the bundled OpenCC-derived table. Source sentence identifiers and contributor credits are retained. See OpenCC.txt for the conversion data license.

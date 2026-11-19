@@ -61,6 +61,16 @@ type dictionary struct {
 	err      error
 }
 
+var bundledExamples = sync.OnceValues(func() (map[string]sourcedExample, error) {
+	data, err := expand(exampleBytes)
+	if err != nil {
+		return nil, err
+	}
+	var examples map[string]sourcedExample
+	err = json.Unmarshal(data, &examples)
+	return examples, err
+})
+
 func expand(data []byte) ([]byte, error) {
 	input, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
@@ -88,10 +98,7 @@ func (d *dictionary) load() {
 		if d.err = json.Unmarshal(learningJSON, &d.notes); d.err != nil {
 			return
 		}
-		var data []byte
-		if data, d.err = expand(exampleBytes); d.err == nil {
-			d.err = json.Unmarshal(data, &d.examples)
-		}
+		d.examples, d.err = bundledExamples()
 	})
 }
 
@@ -137,7 +144,7 @@ func (c *cardDetails) fill(from cardDetails) (used bool) {
 	if c.Examples == "" && from.Examples != "" {
 		c.Examples = from.Examples
 		if c.ExampleTranslation == "" {
-			c.ExampleTranslation = from.ExampleTranslation
+			c.ExampleTranslation = simplifyExampleTranslation(from.ExampleTranslation)
 		}
 		used = true
 	}

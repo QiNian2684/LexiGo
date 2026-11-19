@@ -535,9 +535,30 @@ td:first-child, th:first-child { min-width: 7.4rem; }
 .setting-text label, .switch-row > span:first-child { display: block; font-size: .96rem; font-weight: 575; line-height: 1.4; }
 .setting-text p { color: var(--muted); font-size: .8rem; margin-top: .23rem; line-height: 1.45; }
 .setting-control { width: clamp(8rem, 17vw, 10.45rem); }
-.exam-annual { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; }
-.exam-annual label { color: var(--muted); font-size: .8rem; }
-.exam-annual > .icon { display: none; }
+.exam-date-box {
+  display: flex; align-items: center; gap: .35rem;
+  min-height: var(--control); padding: .5rem .7rem;
+  background: var(--input, var(--raised)); border: 1px solid var(--control-line);
+  border-radius: var(--radius-control); font-size: 1rem; line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+.exam-annual label { display: flex; align-items: center; gap: .08em; }
+.exam-annual label span { font-size: .875em; }
+.exam-annual :is(#exam-month, #exam-day) {
+  width: 1.5em; min-height: 0; padding: 0 .06em;
+  background: transparent; border: 0; border-radius: var(--radius-small);
+}
+.exam-date-box > .icon { width: 1rem; height: 1rem; flex: none; margin-inline-start: auto; color: var(--muted); }
+.exam-annual:focus-within, .exam-fixed-control:focus-within > .exam-date-box { border-color: var(--focus); }
+.exam-annual:has([aria-invalid="true"]), #exam-fixed[aria-invalid="true"] + .exam-date-box { border-color: var(--danger); }
+.exam-fixed-control { position: relative; }
+.exam-fixed-control > input {
+  position: absolute; inset: 0; height: 100%; opacity: 0; cursor: pointer;
+}
+.exam-fixed-control > input::-webkit-calendar-picker-indicator {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; cursor: pointer;
+}
+#exam-fixed:focus-visible + .exam-date-box { outline: 2px solid var(--focus); outline-offset: 2px; }
 #custom-limit { margin-top: .45rem; }
 .number-unit { position: relative; display: flex; align-items: center; width: 5.15rem; }
 .number-unit span { position: absolute; right: .68rem; color: var(--muted); font-size: .83rem; pointer-events: none; }

@@ -909,9 +909,18 @@ function examMode() {
   return fixed;
 }
 
+function renderFixedExamDate() {
+  const input = el("exam-fixed");
+  const [year, month, day] = input.value.split("-").map(Number);
+  const label = input.value ? `${month}月${day}日` : "选择日期";
+  el("exam-fixed-display").textContent = label;
+  input.title = input.value ? `${year}年${label}` : "";
+}
+
 function commitExamDate() {
   const fixed = examMode();
   const fields = fixed ? [el("exam-fixed")] : [el("exam-month"), el("exam-day")];
+  if (fixed) renderFixedExamDate();
   const date = fixed ? fields[0].value : fields.map(field => field.value.padStart(2, "0")).join("-");
   const calendarDate = fixed ? date : "2000-" + date;
   const instant = new Date(calendarDate + "T00:00:00Z");
@@ -943,6 +952,7 @@ async function openSettings() {
     const annual = !fixed && prefs.examDate ? prefs.examDate : "12-20";
     el("exam-mode").value = fixed ? "fixed" : "annual";
     el("exam-fixed").value = fixed ? prefs.examDate : state.exam.date;
+    renderFixedExamDate();
     el("exam-month").value = Number(annual.slice(0, 2));
     el("exam-day").value = Number(annual.slice(3));
     examMode();
@@ -1376,9 +1386,24 @@ el("settings-form").addEventListener("change", event => {
 });
 el("settings-form").onsubmit = event => event.preventDefault();
 el("settings-form").addEventListener("keydown", event => {
-  if (!["number", "date"].includes(event.target.type) || event.key !== "Enter" || event.isComposing || event.keyCode === 229) return;
+  if (event.target.type !== "number" || event.key !== "Enter" || event.isComposing || event.keyCode === 229) return;
   event.preventDefault();
   event.target.blur();
+});
+const examDateInput = el("exam-fixed");
+const showExamPicker = event => {
+  if (!examDateInput.showPicker) return;
+  try {
+    examDateInput.showPicker();
+    event.preventDefault();
+  } catch {
+    // Older WebViews can still open the date picker through the native input.
+  }
+};
+examDateInput.addEventListener("click", showExamPicker);
+examDateInput.addEventListener("input", renderFixedExamDate);
+examDateInput.addEventListener("keydown", event => {
+  if (["Enter", " "].includes(event.key) && !event.isComposing && event.keyCode !== 229) showExamPicker(event);
 });
 const exportData = el("transfer-export");
 if (mobile && window.WordReviewFiles) {
