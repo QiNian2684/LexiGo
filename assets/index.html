@@ -31,7 +31,7 @@
     <div id="storage-notice" class="notice" role="status" hidden></div>
     <section id="closed" class="card empty-state" hidden>
       <h1>LexiGo已退出</h1>
-      <p class="desktop-data-copy">可以关闭窗口，或移动程序和同级的 Data 文件夹。</p>
+      <p class="desktop-data-copy">学习进度已保存，可以关闭窗口。</p>
     </section>
 
     <section id="review-view" aria-labelledby="review-title">
@@ -284,10 +284,54 @@
         </div>
       </div>
       <footer class="settings-footer">
+        <button class="quiet" type="button" id="open-guide">使用说明</button>
         <a href="/licenses" id="open-licenses">第三方许可</a>
       </footer>
     </section>
   </main>
+
+  <dialog id="guide-dialog" aria-labelledby="guide-title">
+    <form id="guide-form" class="dialog-form">
+      <header class="dialog-header guide-header">
+        <img src="/favicon.png" width="40" height="40" alt="">
+        <h2 id="guide-title" tabindex="-1" autofocus>LexiGo 使用说明</h2>
+      </header>
+      <div class="dialog-body guide-body">
+        <section class="guide-section">
+          <h3>从哪里开始</h3>
+          <p>在「添加单词」粘贴英文或导入词表，预览后确认。复习时先回想中文释义，再展开卡片作答。</p>
+          <p>「词库」可以查词和改备注，「统计」可以查看学习记录。</p>
+        </section>
+        <section class="guide-section">
+          <h3 id="guide-controls-title">Windows 快捷键</h3>
+          <dl class="guide-controls" id="guide-windows">
+            <dt><kbd>Enter</kbd></dt><dd>展开中文释义</dd>
+            <dt><kbd>1</kbd> / <kbd>2</kbd></dt><dd>没记住 / 记住了。记录遗忘后再按 1 翻到下一词。</dd>
+            <dt><kbd>Ctrl+Z</kbd></dt><dd>撤销上一答</dd>
+            <dt>词库悬停</dt><dd>预览词条详情</dd>
+          </dl>
+          <dl class="guide-controls" id="guide-android" hidden>
+            <dt>点开释义</dt><dd>展开中文释义和例句</dd>
+            <dt>向左滑</dt><dd>展开释义后表示记住了。记录遗忘后左滑只翻到下一词。</dd>
+            <dt>向右滑</dt><dd>撤销上一答</dd>
+            <dt>词库长按</dt><dd>预览词条详情</dd>
+          </dl>
+        </section>
+        <section class="guide-section">
+          <h3>怎么过关</h3>
+          <p>首次过关需要当天连对设定次数，默认 3 次。已有过关记录的词，之后每个学习日首答记住即过关，首答没记住则当天重新连对。</p>
+          <p>累计过关达到设定天数即长期掌握。学习日从凌晨 05:00 开始。</p>
+        </section>
+      </div>
+      <footer class="dialog-footer">
+        <p class="inline-status error" id="guide-error" role="alert" hidden></p>
+        <div class="guide-footer">
+          <label><input id="hide-guide" type="checkbox">以后不再提示</label>
+          <button class="button primary" id="guide-confirm" type="submit">确认</button>
+        </div>
+      </footer>
+    </form>
+  </dialog>
 
   <dialog id="word-preview" aria-labelledby="word-preview-title">
     <div class="dialog-form">

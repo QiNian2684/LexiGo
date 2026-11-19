@@ -239,12 +239,13 @@ func (a *application) handler() http.Handler {
 		mux.HandleFunc("GET /android.css", asset("text/css; charset=utf-8", androidCSS))
 	}
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		theme := "system"
+		prefs, showGuide := appearancePreferences{Theme: "system"}, false
 		if a.appearance != nil {
-			theme = a.appearance.get()
+			prefs, showGuide = a.appearance.windowPreferences()
 		}
 		// These attributes contain only known theme names, never user-entered text.
-		attributes := fmt.Sprintf(`<html lang="zh-CN" data-theme-preference="%s" data-system-theme="%s">`, theme, systemAppearance())
+		attributes := fmt.Sprintf(`<html lang="zh-CN" data-theme-preference="%s" data-system-theme="%s" data-show-guide="%t" data-hide-guide="%t">`,
+			prefs.Theme, systemAppearance(), showGuide, prefs.HideGuide)
 		if runtime.GOOS == "windows" && !a.mobile {
 			extra := fmt.Sprintf(` data-review-shortcuts="windows" data-window-ticket="%d">`, a.windowTicket.Add(1))
 			attributes = strings.Replace(attributes, ">", extra, 1)

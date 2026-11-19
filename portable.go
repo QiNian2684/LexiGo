@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -9,9 +11,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf16"
+	"unicode/utf8"
 )
 
-const databaseName = "vocabulary.db"
+const (
+	databaseName     = "vocabulary.db"
+	dataLocationFile = "LexiGo.data-dir"
+)
 
 func dataDirectory() (string, error) {
 	executable, err := os.Executable()
@@ -26,11 +33,45 @@ func portableDataDirectory(executable string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("无法识别LexiGo程序的真实位置：%w", err)
 	}
-	return filepath.Join(filepath.Dir(realPath), "Data"), nil
+	dir := filepath.Dir(realPath)
+	config := filepath.Join(dir, dataLocationFile)
+	data, err := os.ReadFile(config)
+	if errors.Is(err, os.ErrNotExist) {
+		return filepath.Join(dir, "Data"), nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("无法读取数据目录设置 %s：%w", config, err)
+	}
+	location := strings.TrimRight(decodeDataLocation(data), "\r\n")
+	if strings.EqualFold(location, "Data") {
+		return filepath.Join(dir, "Data"), nil
+	}
+	if !filepath.IsAbs(location) || strings.ContainsAny(location, "\x00\r\n") {
+		return "", fmt.Errorf("数据目录设置无效：%s\n请重新运行安装向导，选择正确的数据文件夹。", config)
+	}
+	return filepath.Clean(location), nil
+}
+
+func decodeDataLocation(data []byte) string {
+	// NSIS writes Windows paths as UTF-16LE with a byte order mark.
+	if body, ok := bytes.CutPrefix(data, []byte{0xff, 0xfe}); ok {
+		if len(body)%2 != 0 {
+			return ""
+		}
+		units := make([]uint16, len(body)/2)
+		for i := range units {
+			units[i] = binary.LittleEndian.Uint16(body[i*2:])
+		}
+		return string(utf16.Decode(units))
+	}
+	if utf8.Valid(data) {
+		return string(data)
+	}
+	return ""
 }
 
 func dataWriteError(dir string, err error) error {
-	return fmt.Errorf("无法写入程序同级的数据目录：\n%s\n请将程序及已有 Data 文件夹一起移到有写入权限的位置。\n%w", dir, err)
+	return fmt.Errorf("无法写入数据目录：\n%s\n请检查此文件夹的写入权限及可用空间。\n%w", dir, err)
 }
 
 func checkDirectoryWritable(dir string) error {
@@ -98,7 +139,7 @@ func migrateLegacy(dir, legacy string) (string, error) {
 		if targetInfo.Size() == 0 {
 			return "", fmt.Errorf("Data 中的 %s 是空文件，旧词库仍在 %s。请先移走空文件，再启动程序迁移旧词库。", databaseName, legacy)
 		}
-		return "检测到旧位置仍有词库。本次使用程序同级 Data 中的词库，两处文件都已保留。", nil
+		return "检测到旧位置仍有词库。本次使用当前数据目录中的词库，两处文件都已保留。", nil
 	}
 
 	// Take the old executable's own lock before reading its last WAL state.
@@ -121,7 +162,7 @@ func migrateLegacy(dir, legacy string) (string, error) {
 	if err = preserveLegacyBackup(legacy, dir); err != nil {
 		return "词库已迁移到 Data。旧版的恢复前备份仍在原位置，可手动复制。", nil
 	}
-	return "旧词库已迁移到程序同级 Data，原数据库仍保留在旧位置。", nil
+	return "旧词库已迁移到当前数据目录，原数据库仍保留在旧位置。", nil
 }
 
 func sqliteReadOnly(path string) (*sql.DB, error) {

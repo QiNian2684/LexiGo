@@ -1516,6 +1516,29 @@ for (const item of all("[data-close]")) item.addEventListener("click", () => {
   if (dialog.id === "edit-dialog") closeEditor();
   else dialog.close();
 });
+let hideGuide = document.documentElement.dataset.hideGuide === "true";
+function openGuide() {
+  el("guide-controls-title").textContent = mobile ? "Android 手势" : "Windows 快捷键";
+  el("guide-windows").hidden = mobile;
+  el("guide-android").hidden = !mobile;
+  el("hide-guide").checked = hideGuide;
+  message("guide-error");
+  el("guide-dialog").showModal();
+  el("guide-dialog").querySelector(".dialog-body").scrollTop = 0;
+}
+el("open-guide").onclick = openGuide;
+el("guide-form").onsubmit = async event => {
+  event.preventDefault();
+  const hidden = el("hide-guide").checked;
+  const confirm = el("guide-confirm");
+  confirm.disabled = true;
+  try {
+    if (hidden !== hideGuide) await api("/api/guide", {hidden});
+    hideGuide = hidden;
+    el("guide-dialog").close();
+  } catch (error) { message("guide-error", error.message); }
+  finally { confirm.disabled = false; }
+};
 el("open-licenses").onclick = async event => {
   event.preventDefault();
   try {
@@ -1679,5 +1702,6 @@ setInterval(async () => {
     }
   } catch (error) { showError(error); }
 }, 4000);
+if (document.documentElement.dataset.showGuide === "true") openGuide();
 refreshState().then(resumeWaiting).catch(error => { el("review-empty").removeAttribute("aria-busy"); showError(error); });
 refreshStorage().catch(showError);

@@ -138,7 +138,7 @@ with tempfile.TemporaryDirectory(prefix="wordreview-portable-") as temp:
         try:
             blocked = subprocess.run([str(moved / exe.name), "--serve"], cwd=unrelated, env=environment,
                                      capture_output=True, text=True, timeout=5)
-            assert blocked.returncode != 0 and "无法写入程序同级的数据目录" in blocked.stderr
+            assert blocked.returncode != 0 and "无法写入数据目录" in blocked.stderr
             assert not (unrelated / "Data").exists()
         finally:
             (moved / "Data").chmod(0o700)

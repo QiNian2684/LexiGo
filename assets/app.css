@@ -120,15 +120,15 @@ a { color: var(--accent); text-underline-offset: .17em; }
 .page-heading p { margin-block-start: .35rem; color: var(--muted); }
 .review-date { font-size: .88rem; }
 .settings-footer {
-  display: flex; justify-content: flex-end;
+  display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .45rem;
   margin-block-start: .7rem;
 }
-.settings-footer a {
+.settings-footer :is(a, button) {
   display: inline-flex; align-items: center;
   min-height: var(--control); padding-inline: .35rem;
   color: var(--muted); font-size: .83rem;
 }
-.settings-footer a:hover { color: var(--accent); }
+.settings-footer :is(a, button):hover { color: var(--accent); }
 
 .card { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-panel); }
 body:not(.platform-android) .swipe-cue { display: none; }
@@ -634,6 +634,20 @@ dialog::backdrop { background: var(--overlay); }
 .dialog-body .inline-status { margin-top: .65rem; }
 .dialog-footer { min-width: 0; padding: .72rem 1.2rem; border-top: 1px solid var(--line); background: var(--inset); }
 .dialog-footer .inline-status { margin-bottom: .6rem; }
+#guide-dialog { width: 33rem; }
+.guide-header { justify-content: flex-start; gap: .65rem; }
+.guide-header img { flex: none; }
+.guide-section { padding: .68rem 0; }
+.guide-section + .guide-section { border-top: 1px solid var(--line); }
+.guide-section h3 { color: var(--ink); font-size: .98rem; margin-bottom: .32rem; }
+.guide-section p, .guide-controls { color: var(--secondary); font-size: .88rem; line-height: 1.58; }
+.guide-section p + p { margin-top: .27rem; }
+.guide-controls { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .3rem .7rem; margin: 0; }
+.guide-controls dt { color: var(--ink); font-weight: 580; }
+.guide-controls dd { margin: 0; }
+.guide-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .55rem; }
+.guide-footer label { display: inline-flex; align-items: center; gap: .44rem; font-size: .9rem; cursor: pointer; }
+.guide-footer .button { min-width: 5.6rem; }
 .editor-fields { padding-bottom: 1.05rem; }
 .editor-fields label { display: block; color: var(--secondary); font-size: .9rem; font-weight: 590; margin: .65rem 0 .28rem; }
 .editor-fields > label:first-child { margin-top: 0; }

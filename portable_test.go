@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"unicode/utf16"
 )
 
 func portableTestDirectories(t *testing.T) (string, string) {
@@ -140,5 +142,37 @@ func TestDirectoryUsesExecutableLocation(t *testing.T) {
 	dir, err := portableDataDirectory(exePath)
 	if err != nil || dir != filepath.Join(appDir, "Data") {
 		t.Fatalf("directory = %q, err = %v", dir, err)
+	}
+}
+
+func TestInstalledDirectoryUsesChosenPathAndKeepsPortableDefault(t *testing.T) {
+	appDir := t.TempDir()
+	exePath := filepath.Join(appDir, "LexiGo.exe")
+	if err := os.WriteFile(exePath, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	location := filepath.Join(t.TempDir(), "词库空格 🗂")
+	file := filepath.Join(appDir, dataLocationFile)
+	writePath := func(value string) {
+		t.Helper()
+		data := []byte{0xff, 0xfe}
+		for _, unit := range utf16.Encode([]rune(value)) {
+			data = binary.LittleEndian.AppendUint16(data, unit)
+		}
+		if err := os.WriteFile(file, data, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writePath(location)
+	if dir, err := portableDataDirectory(exePath); err != nil || dir != location {
+		t.Fatalf("configured directory = %q (%v)", dir, err)
+	}
+	writePath("Data")
+	if dir, err := portableDataDirectory(exePath); err != nil || dir != filepath.Join(appDir, "Data") {
+		t.Fatalf("relative directory = %q (%v)", dir, err)
+	}
+	writePath(filepath.Join("not", "absolute"))
+	if dir, err := portableDataDirectory(exePath); err == nil || dir != "" {
+		t.Fatalf("invalid setting silently chose %q", dir)
 	}
 }

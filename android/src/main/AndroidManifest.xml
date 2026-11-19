@@ -1,9 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="cn.wordreview.app.lexigo.v213" android:versionCode="311" android:versionName="2.6.1">
+    package="cn.wordreview.app.lexigo.v213" android:versionCode="312" android:versionName="2.6.2">
     <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="34" />
     <uses-permission android:name="android.permission.INTERNET" />
     <queries><intent><action android:name="android.intent.action.TTS_SERVICE" /></intent></queries>
-    <application android:label="LexiGo" android:icon="@drawable/app_icon" android:theme="@style/WordReviewTheme"
+    <application android:label="LexiGo" android:icon="@mipmap/app_icon" android:roundIcon="@mipmap/app_icon"
+        android:theme="@style/WordReviewTheme"
         android:allowBackup="false" android:extractNativeLibs="true"
         android:networkSecurityConfig="@xml/network_security" android:usesCleartextTraffic="false">
         <provider android:name="cn.wordreview.app.StudyShareProvider"
