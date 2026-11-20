@@ -112,18 +112,27 @@ func runEngine(serveOnly bool, dir string, ready func(string)) error {
 		store: s, token: hex.EncodeToString(secret[:]),
 		host: listener.Addr().String(), wake: make(chan struct{}, 1),
 		exit: make(chan struct{}, 1), migrationNotice: notice,
-		mobile:     runtime.GOOS == "android" || (serveOnly && os.Getenv("WORDREVIEW_MOBILE") == "1"),
-		appearance: openAppearance(dir),
+		mobile:       runtime.GOOS == "android" || (serveOnly && os.Getenv("WORDREVIEW_MOBILE") == "1"),
+		appearance:   openAppearance(dir),
+		translations: translationQueue{wake: make(chan struct{}, 1)},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	workerDone := make(chan struct{})
+	translationsDone := make(chan struct{})
 	go func() {
 		defer close(workerDone)
 		app.enrich(ctx)
 	}()
+	go func() {
+		defer close(translationsDone)
+		app.completeTranslations(ctx, func(ctx context.Context, sentence string) (string, error) {
+			return myMemoryTranslation(ctx, translationClient, myMemoryURL, sentence)
+		})
+	}()
 	defer func() {
 		cancel()
 		<-workerDone
+		<-translationsDone
 	}()
 	server := &http.Server{
 		Handler: app.handler(), ReadHeaderTimeout: 5 * time.Second,

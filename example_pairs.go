@@ -7,7 +7,8 @@ func updateSavedExamples(words map[string]*wordCard) ([]string, error) {
 	}
 	var sources, pairs map[string]sourcedExample
 	for key, card := range words {
-		if card.ExampleBy != "simple" || card.Examples == "" || card.ExampleTranslation != "" {
+		if card.ExampleBy != "simple" || card.Examples == "" || card.ExampleTranslation != "" ||
+			card.ExampleTranslationBy == "manual" {
 			continue
 		}
 		if pairs == nil {

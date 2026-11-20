@@ -142,11 +142,14 @@ func loadConstructions() map[string]string {
 	return matches
 }
 
-func presentCard(card wordCard) any {
+type presentedDetails struct {
+	wordCard
+	MemoryHint         string `json:"memoryHint,omitempty"`
+	MoreMemory         string `json:"moreMemory,omitempty"`
+	TranslationPending bool   `json:"translationPending,omitempty"`
+}
+
+func presentCard(card wordCard) presentedDetails {
 	hint, more := memoryAssociation(card.Key)
-	return struct {
-		wordCard
-		MemoryHint string `json:"memoryHint,omitempty"`
-		MoreMemory string `json:"moreMemory,omitempty"`
-	}{card, hint, more}
+	return presentedDetails{wordCard: card, MemoryHint: hint, MoreMemory: more}
 }

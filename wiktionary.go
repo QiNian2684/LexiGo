@@ -35,8 +35,12 @@ var wikiPOS = map[string]string{
 var wikiClient = &http.Client{Timeout: 14 * time.Second}
 
 func fetchWiktionary(ctx context.Context, word string) (onlineEntry, error) {
+	return fetchWikiEntry(ctx, "page", word)
+}
+
+func fetchWikiEntry(ctx context.Context, selector, value string) (onlineEntry, error) {
 	params := url.Values{
-		"action": {"parse"}, "page": {word}, "prop": {"text|revid"},
+		"action": {"parse"}, selector: {value}, "prop": {"text|revid"},
 		"format": {"json"}, "formatversion": {"2"}, "redirects": {"1"}, "maxlag": {"5"},
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,

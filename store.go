@@ -56,15 +56,16 @@ type wordCard struct {
 	Word string `json:"word"`
 	cardDetails
 	progress
-	PersonalNote string `json:"personalNote"`
-	NoteClock    int64  `json:"noteClock,omitempty"`
-	ECDICT       bool   `json:"ecdict,omitempty"`
-	WikiSource   string `json:"wikiSource,omitempty"`
-	ExampleBy    string `json:"exampleBy,omitempty"`
-	LegacyStreak int    `json:"legacyStreak,omitempty"`
-	Reimports    int    `json:"reimports,omitempty"`
-	Lookup       string `json:"lookup"`
-	AddedDay     string `json:"addedDay"`
+	PersonalNote         string `json:"personalNote"`
+	NoteClock            int64  `json:"noteClock,omitempty"`
+	ECDICT               bool   `json:"ecdict,omitempty"`
+	WikiSource           string `json:"wikiSource,omitempty"`
+	ExampleBy            string `json:"exampleBy,omitempty"`
+	ExampleTranslationBy string `json:"exampleTranslationBy,omitempty"`
+	LegacyStreak         int    `json:"legacyStreak,omitempty"`
+	Reimports            int    `json:"reimports,omitempty"`
+	Lookup               string `json:"lookup"`
+	AddedDay             string `json:"addedDay"`
 }
 
 type event struct {

@@ -302,6 +302,7 @@ func (a *application) commitTransfer(w http.ResponseWriter, r *http.Request) {
 	}
 	if err == nil {
 		a.generation++
+		a.resetTranslationQueueLocked()
 		a.paused = time.Time{}
 		if studyDay(now) == draft.payload.Task.Day {
 			ranks := make(map[uint64]int, len(draft.payload.Task.Ranked))

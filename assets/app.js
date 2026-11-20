@@ -92,11 +92,13 @@ function sameCard(a, b) {
 function applyState(next, force = false) {
   const changed = !sameCard(state?.current, next.current) || state?.date !== next.date;
   const displayChanged = state?.settings.showIPA !== next.settings.showIPA;
+  const onlineChanged = state?.settings.online !== next.settings.online;
   const retained = !force && (state?.waitingForNext || next.waitingForNext) && state?.date === next.date && revealed?.key === next.current?.key;
   state = next;
   if ((changed || force) && !practice && !retained) clearAnswer();
   renderReview();
-  if (displayChanged && revealed) renderDetails(revealed);
+  if ((displayChanged || onlineChanged) && revealed) renderDetails(revealed);
+  if (onlineChanged && next.settings.online && revealed && !el("answer").hidden) refreshRevealedDetails().catch(showError);
   if (next.waitingForNext && studying && view === "review" && !practice && !busy && el("answer").hidden && !el("reveal").disabled) toggleReveal();
 }
 
@@ -239,8 +241,9 @@ function cardDetailSections(card, showIPA) {
   const fields = [
     meaning,
     group("英文例句", card.examples, missing, "example"),
-    group(card.exampleBy === "simple-mt" ? "例句翻译（机译）" : "例句翻译",
-      card.exampleTranslation, "暂无对应译文。", "translation"),
+    group(card.exampleBy === "simple-mt" || card.exampleTranslationBy === "mymemory"
+      ? "例句翻译（机译）" : "例句翻译", card.exampleTranslation,
+      card.translationPending && state?.settings.online ? "等待联网补译。" : "暂无对应译文。", "translation"),
   ];
   const sources = document.createElement("div");
   sources.className = "sources";
@@ -259,6 +262,9 @@ function cardDetailSections(card, showIPA) {
     }
     sources.append(link("CC BY 2.0 FR", "https://creativecommons.org/licenses/by/2.0/fr/"));
   }
+  if (card.exampleTranslationBy === "mymemory") {
+    sources.append(link("译文 · MyMemory", "https://mymemory.translated.net/"));
+  }
   return {fields, sound, sources};
 }
 
@@ -272,6 +278,17 @@ function renderDetails(card) {
   }));
   el("details").replaceChildren(...fields);
   el("card-metadata").replaceChildren(...(sound.length ? [group("音标", sound.join(" · "))] : []), sources);
+}
+
+async function refreshRevealedDetails() {
+  const before = revealed;
+  if (!before) return;
+  const result = await api("/api/card/" + keyPath(before.key));
+  if (revealed === before && (result.lookup !== before.lookup ||
+      result.exampleTranslation !== before.exampleTranslation || result.translationPending !== before.translationPending)) {
+    revealed = result;
+    renderDetails(result);
+  }
 }
 
 async function toggleReveal() {
@@ -582,28 +599,33 @@ function placeWordPreview({x, y}) {
   wordPreview.style.top = (showBelow ? y + gap : y - gap - height) + "px";
 }
 
+function renderWordPreview(card, progress) {
+  const {fields, sound, sources} = cardDetailSections(card, true);
+  const timing = document.createElement("p");
+  timing.className = "preview-progress";
+  timing.textContent = progress;
+  const body = el("word-preview-content");
+  body.replaceChildren(timing, ...fields, group("我的备注", card.personalNote, "暂无备注。"));
+  for (const [label, value] of [["词性", card.pos], ["音标", sound.join(" · ")],
+    ["词根和词源", card.etymology], ["搭配", card.collocations], ["记忆提示", card.note]]) {
+    if (value) body.append(group(label, value));
+  }
+  if (sources.childElementCount) body.append(sources);
+  el("word-preview-title").textContent = card.word;
+}
+
 async function openWordPreview(row, entry, progress, point) {
   if (view !== "library" || !row.isConnected || controls.isOpen() ||
       document.querySelector("dialog[open]:not(#word-preview)")) return;
   closeWordPreview();
-  const pending = {row, point};
+  const pending = {row, point, progress};
   preview = pending;
   try {
     const card = await api("/api/card/" + keyPath(entry.key));
     if (preview !== pending || !row.isConnected || view !== "library" ||
         controls.isOpen() || document.querySelector("dialog[open]:not(#word-preview)")) return;
-    const {fields, sound, sources} = cardDetailSections(card, true);
-    const timing = document.createElement("p");
-    timing.className = "preview-progress";
-    timing.textContent = progress;
-    const body = el("word-preview-content");
-    body.replaceChildren(timing, ...fields, group("我的备注", card.personalNote, "暂无备注。"));
-    for (const [label, value] of [["词性", card.pos], ["音标", sound.join(" · ")],
-      ["词根和词源", card.etymology], ["搭配", card.collocations], ["记忆提示", card.note]]) {
-      if (value) body.append(group(label, value));
-    }
-    if (sources.childElementCount) body.append(sources);
-    el("word-preview-title").textContent = card.word;
+    pending.card = card;
+    renderWordPreview(card, progress);
     wordPreview.classList.toggle("floating-preview", !!point);
     if (point) {
       const focus = document.activeElement;
@@ -612,7 +634,7 @@ async function openWordPreview(row, entry, progress, point) {
       if (focus === document.body) document.activeElement.blur();
       else focus?.focus({preventScroll: true});
     } else wordPreview.showModal();
-    body.scrollTop = 0;
+    el("word-preview-content").scrollTop = 0;
   } catch (error) {
     if (preview === pending) {
       hideWordPreview();
@@ -1694,10 +1716,18 @@ setInterval(async () => {
   try {
     if (view === "library" && !controls.isOpen() && !document.querySelector("dialog[open]")) await refreshLibrary();
     if (view === "add" && importPending) await updateImportStatus();
-    if (view === "review" && revealed?.lookup === "pending" && !el("answer").hidden && state.settings.online) {
-      const before = revealed;
-      const result = await api("/api/card/" + keyPath(before.key));
-      if (revealed === before && result.lookup !== "pending") { revealed = result; renderDetails(result); }
+    if (view === "review" && revealed && !el("answer").hidden && state.settings.online &&
+        (revealed.lookup === "pending" || revealed.translationPending)) {
+      await refreshRevealedDetails();
+    }
+    if (wordPreview.open && preview?.card?.translationPending && state?.settings.online) {
+      const active = preview;
+      const result = await api("/api/card/" + keyPath(active.card.key));
+      if (preview === active && !result.translationPending) {
+        active.card = result;
+        renderWordPreview(result, active.progress);
+        if (active.point) placeWordPreview(active.point);
+      }
     }
     if (tick % 5 === 0) {
       if (view === "stats") await refreshStats();

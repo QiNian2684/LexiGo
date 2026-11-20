@@ -83,6 +83,7 @@ type application struct {
 	transferMu      sync.Mutex
 	transfer        transferDraft
 	appearance      *appearanceSettings
+	translations    translationQueue
 }
 
 func setExamDate(state *reviewState, now time.Time) {
@@ -100,6 +101,9 @@ func (a *application) reviewResponse(now time.Time, pin bool) reviewState {
 	state := s.review(day)
 	if pin {
 		s.pinReview(state)
+		if state.Current != nil {
+			a.queueTranslationLocked(s.db.Words[state.Current.Key], true)
+		}
 	}
 	setExamDate(&state, now)
 	return state
@@ -164,14 +168,20 @@ func (a *application) enrich(ctx context.Context) {
 			} else {
 				old := *current
 				current.Lookup = "done"
+				if current.ExampleTranslationBy == "manual" {
+					entry.ExampleTranslation = ""
+				}
 				if current.cardDetails.fill(entry.cardDetails) {
-					current.WikiSource = wikiSource(entry.Revision)
+					if current.WikiSource == "" || old.Examples != current.Examples {
+						current.WikiSource = wikiSource(entry.Revision)
+					}
 				}
 				if err := a.store.save([]string{key}, len(a.store.db.Events)); err != nil {
 					*current = old
 					a.paused = time.Now().Add(90 * time.Second)
 					log.Printf("save lookup: %v", err)
 				}
+				a.queueTranslationLocked(current, false)
 			}
 		}
 		a.store.mu.Unlock()
@@ -326,6 +336,9 @@ func (a *application) handler() http.Handler {
 			state = a.store.reviewState(plan)
 		}
 		a.store.pinReview(state)
+		if state.Current != nil {
+			a.queueTranslationLocked(a.store.db.Words[state.Current.Key], true)
+		}
 		a.store.mu.Unlock()
 		setExamDate(&state, now)
 		respond(w, 200, state)
@@ -365,8 +378,11 @@ func (a *application) handler() http.Handler {
 			return
 		}
 		data := *card
+		translating := a.queueTranslationLocked(card, true)
 		a.store.mu.Unlock()
-		respond(w, 200, presentCard(data))
+		details := presentCard(data)
+		details.TranslationPending = translating
+		respond(w, 200, details)
 	})
 	mux.HandleFunc("GET /api/history/{key}", func(w http.ResponseWriter, r *http.Request) {
 		a.store.mu.Lock()
@@ -439,6 +455,9 @@ func (a *application) handler() http.Handler {
 		}
 		a.store.mu.Lock()
 		a.store.pinReview(data)
+		if data.Current != nil {
+			a.queueTranslationLocked(a.store.db.Words[data.Current.Key], true)
+		}
 		a.store.mu.Unlock()
 		setExamDate(&data, time.Now())
 		respond(w, 200, data)
@@ -489,6 +508,11 @@ func (a *application) handler() http.Handler {
 			saveError(w, err)
 			return
 		}
+		a.store.mu.Lock()
+		for _, key := range result.Keys {
+			a.queueTranslationLocked(a.store.db.Words[key], false)
+		}
+		a.store.mu.Unlock()
 		a.poke()
 		respond(w, 200, result)
 	})
@@ -507,10 +531,11 @@ func (a *application) handler() http.Handler {
 		a.store.mu.Lock()
 		data := lookupStatus{Online: a.store.db.Settings.Online, Paused: time.Now().Before(a.paused)}
 		for _, item := range a.store.selected(req) {
+			_, translating := a.translations.pending[item.Key]
 			switch {
 			case !item.needsOnline() && item.ExampleTranslation != "":
 				data.Complete++
-			case item.Lookup == "pending" && data.Online:
+			case (item.Lookup == "pending" || translating) && data.Online:
 				data.Pending++
 			default:
 				data.Partial++
@@ -602,6 +627,14 @@ func (a *application) handler() http.Handler {
 					c.ExampleBy = "simple-edited"
 				}
 			}
+			if c.ExampleTranslation != oldTranslation && (c.Examples == oldExample || req["exampleTranslation"] != "") {
+				c.ExampleTranslationBy = "manual"
+			} else if c.Examples != oldExample {
+				if c.ExampleTranslationBy == "mymemory" {
+					c.ExampleTranslation = ""
+				}
+				c.ExampleTranslationBy = ""
+			}
 			return nil
 		})
 	})
@@ -692,8 +725,12 @@ func readImport(w http.ResponseWriter, r *http.Request) (importInput, []imported
 func (a *application) resumeLookup() {
 	a.store.mu.Lock()
 	a.paused = time.Time{}
+	if !a.store.db.Settings.Online && a.translations.cancel != nil {
+		a.translations.cancel()
+	}
 	a.store.mu.Unlock()
 	a.poke()
+	a.wakeTranslations()
 }
 
 func (a *application) restore(incoming database) error {
@@ -703,6 +740,7 @@ func (a *application) restore(incoming database) error {
 		return err
 	}
 	a.generation++
+	a.resetTranslationQueueLocked()
 	return nil
 }
 
