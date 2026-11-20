@@ -120,7 +120,7 @@ function renderReview() {
     : days < 0 ? "考试日期已过" : `距考试还有 ${days} 天`;
   el("date").textContent = dayFormat.format(new Date(next.date + "T12:00:00"));
   el("study-summary").hidden = !!practice || !next.planned;
-  el("day-completion").textContent = practice ? "" : `今日过关 ${next.remembered} / ${next.planned}`;
+  el("day-completion").textContent = practice ? "" : `今日达标 ${next.remembered} / ${next.planned}`;
   el("day-meter").max = Math.max(1, next.planned);
   el("day-meter").value = next.remembered;
   el("review-empty").removeAttribute("aria-busy");
@@ -145,7 +145,7 @@ function renderReview() {
   const recallDue = next.recallDue || 0;
   const regularDue = next.due - recallDue;
   el("start-summary").textContent = regularDue
-    ? `还有 ${regularDue} 个词待过关${recallDue ? " · " + recallDue + " 个易错词待回顾" : ""}`
+    ? `还有 ${regularDue} 个词待达标${recallDue ? " · " + recallDue + " 个易错词待回顾" : ""}`
     : recallDue ? `${recallDue} 个易错词待回顾` : "";
   el("vote-actions").hidden = !current || !!practice || (concealed && !windowsReview);
   document.body.classList.toggle("has-vote", !el("vote-actions").hidden);
@@ -154,8 +154,8 @@ function renderReview() {
     el("word").classList.toggle("long-word", current.word.length > 18);
     el("streak").hidden = !!practice;
     el("streak").textContent = practice ? "" :
-      current.recall ? `易错词回顾 · 已累计过关 ${current.streak} 天` :
-      `今日连对 ${current.dailyCount} / ${current.dailyTarget} · 累计过关 ${current.streak} / ${next.settings.goal} 天`;
+      current.recall ? `易错词回顾 · 已累计达标 ${current.streak} 天` :
+      `今日连对 ${current.dailyCount} / ${current.dailyTarget} · 累计达标 ${current.streak} / ${next.settings.goal} 天`;
     updateVoice();
   }
   if (!next.current) {
@@ -761,7 +761,7 @@ async function refreshLibrary() {
     meaning.textContent = entry.meaning || (entry.lookup === "pending" ? "等待词典补充" : "暂无中文释义");
     const timing = document.createElement("small");
     const progress = entry.legacyMastered ? `旧规则连续 ${entry.legacyStreak || 0} 次` :
-      `累计过关 ${entry.streak}${entry.mastered ? "" : " / " + data.goal} 天`;
+      `累计达标 ${entry.streak}${entry.mastered ? "" : " / " + data.goal} 天`;
     const legacy = entry.legacyStreak && !entry.legacyMastered ? ` · 旧规则记录 ${entry.legacyStreak} 次` : "";
     timing.textContent = `${progress}${legacy} · 最近复习 ${entry.lastTry || "—"}`;
     main.append(title, meaning, timing);
@@ -810,7 +810,7 @@ async function confirmAction(event) {
 function batchAction(action, items, count) {
   const actions = {
     remove: ["移入回收站", "词条、备注和学习历史会一并移入回收站，可以恢复。"],
-    reset: ["重新学习", "当天连对次数和累计过关天数会清零，备注和历史保留。"],
+    reset: ["重新学习", "当天连对次数和累计达标天数会清零，备注和历史保留。"],
     restore: ["恢复词条", "卡片会恢复到词库，保留移入回收站前的学习进度。"],
     retry: ["联网补缺", "词典只填写空白字段。"],
   };
@@ -852,7 +852,7 @@ async function openHistory(entry) {
   };
   el("history-list").replaceChildren(...history.map(row => {
     const item = document.createElement("li");
-    const rule = row.legacy ? "（旧规则）" : row.recall ? "（易错词回顾）" : row.dayPassed ? (row.credit ? "（当日过关）" : "（当日重过）") : "";
+    const rule = row.legacy ? "（旧规则）" : row.recall ? "（易错词回顾）" : row.dayPassed ? (row.credit ? "（当日达标）" : "（当日再次达标）") : "";
     const suffix = rule + (row.undone ? "（已撤销）" : "");
     item.textContent = [row.day, items[row.kind] + suffix].join(" · ");
     return item;
@@ -1005,7 +1005,7 @@ async function refreshStats() {
   const today = data.days[data.days.length - 1];
   const stats = [
     ["历史累计录入不同词", data.imported], ["当前词库", data.current], ["已掌握", data.mastered],
-    ["未掌握", data.unmastered], ["回收站", data.trashed], ["今天复习的不同词", today.distinct], ["今天过关的词", today.passed],
+    ["未掌握", data.unmastered], ["回收站", data.trashed], ["今天复习的不同词", today.distinct], ["今日达标词数", today.passed],
     ["今天记住操作", today.yes], ["今天没记住操作", today.no], ["累计复习操作", data.totalReviews],
     ["累计没记住操作", data.totalForgot], ["累计重新录入", data.totalReimport],
   ];
@@ -1172,7 +1172,7 @@ function showTransferPreview(data) {
     return;
   }
   const plan = data.continuation
-    ? `继续当天任务，已过关 ${data.passed} 个，待过关 ${data.pending} 个。`
+    ? `继续当天任务，已达标 ${data.passed} 个，待达标 ${data.pending} 个。`
     : "文件来自较早的学习日。复习会按本机当前日期安排。";
   ask("覆盖当前学习数据？", `${overview}
 ${plan}
@@ -1522,19 +1522,12 @@ function openGuide() {
   el("guide-windows").hidden = mobile;
   el("guide-android").hidden = !mobile;
   el("guide-swipe-area").hidden = !mobile;
-  el("guide-preview-tip").textContent = mobile ? "长按词条可预览详情。" : "在词条上悬停可预览详情。";
-  el("guide-export-tip").textContent = mobile ? "在 Android 选择「分享数据」或「保存到手机」。" : "在 Windows 选择保存位置。";
+  el("guide-preview-tip").textContent = mobile ? "长按词条可预览详情。" : "把鼠标停在词条上可预览详情。";
+  el("guide-export-tip").textContent = mobile ? "在 Android 选择「分享数据」或「保存到手机」。" : "在 Windows 选择文件的保存位置。";
   el("hide-guide").checked = hideGuide;
   message("guide-error");
   el("guide-dialog").showModal();
   el("guide-dialog").querySelector(".dialog-body").scrollTop = 0;
-}
-for (const jump of all("[data-guide-jump]")) {
-  jump.onclick = () => {
-    const heading = el(jump.dataset.guideJump);
-    heading.focus({preventScroll: true});
-    heading.scrollIntoView({block: "start"});
-  };
 }
 el("open-guide").onclick = openGuide;
 el("guide-form").onsubmit = async event => {

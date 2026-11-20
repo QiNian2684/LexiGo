@@ -50,7 +50,7 @@
       </section>
       <article class="card review-card" id="flashcard" hidden>
         <div class="swipe-content" id="swipe-content"><div class="card-front">
-          <button class="icon-button pass-today" type="button" id="pass-today" title="今日直接过关" aria-label="今日直接过关" hidden><svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg></button>
+          <button class="icon-button pass-today" type="button" id="pass-today" title="标记为今日达标" aria-label="标记为今日达标" hidden><svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg></button>
           <h2 class="english-word" id="word" lang="en"></h2>
           <p class="streak" id="streak" hidden></p>
           <div class="review-controls">
@@ -206,11 +206,11 @@
               </div>
             </div>
             <div class="setting-row">
-              <div class="setting-text"><label for="daily-goal">过关连对次数</label><p>首次过关需连对设定次数。之后每天首答记住即过关，首答没记住则需重新连对。</p></div>
+              <div class="setting-text"><label for="daily-goal">达标所需连对次数</label><p>首次达标需连对设定次数。之后每天首答记住即达标，首答没记住则需重新连对。</p></div>
               <div class="number-unit"><input type="number" inputmode="numeric" min="1" max="99" step="1" id="daily-goal" required><span aria-hidden="true">次</span></div>
             </div>
             <div class="setting-row">
-              <div class="setting-text"><label for="goal">长期掌握所需累计过关天数</label><p>每个学习日最多计 1 天，过关天数可以间隔。</p></div>
+              <div class="setting-text"><label for="goal">长期掌握所需达标天数</label><p>每个学习日最多计 1 天，达标天数可以间隔。</p></div>
               <div class="number-unit"><input type="number" inputmode="numeric" min="1" max="99" step="1" id="goal" required><span aria-hidden="true">天</span></div>
             </div>
             <div class="setting-row" id="exam-mode-row">
@@ -296,105 +296,116 @@
         <img src="/favicon.png" width="40" height="40" alt="">
         <h2 id="guide-title" tabindex="-1" autofocus>LexiGo 使用说明</h2>
       </header>
-      <div class="dialog-body guide-body" tabindex="0" aria-label="使用手册正文">
-        <div class="guide-intro">
-          <p>先添加想学的词，再用复习卡回想释义。进度会按每个词分别记录，之后可以接着学。</p>
-          <nav class="guide-contents" aria-label="手册目录">
-            <button type="button" data-guide-jump="guide-start">开始学习</button>
-            <button type="button" data-guide-jump="guide-review">复习操作</button>
-            <button type="button" data-guide-jump="guide-rules">过关规则</button>
-            <button type="button" data-guide-jump="guide-library">管理词库</button>
-            <button type="button" data-guide-jump="guide-settings">统计与设置</button>
-            <button type="button" data-guide-jump="guide-data">备份与迁移</button>
-          </nav>
-        </div>
+      <div class="dialog-body guide-body" tabindex="0" aria-label="使用说明正文">
+        <p class="guide-intro">第一次使用时，先把想学的词加进词库，再到「复习」开始。下面用实际界面演示怎么操作，以及 LexiGo 如何记录学习进度。</p>
 
         <section class="guide-section" aria-labelledby="guide-start">
-          <h3 id="guide-start" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="/icons.svg#add"/></svg>开始学习</h3>
-          <ol class="guide-steps">
-            <li><strong>添加单词</strong><span>粘贴英文，每行一个或用逗号隔开。也可用「导入 TXT 文件」打开 TXT、CSV 或 JSON 词表。</span></li>
-            <li><strong>预览导入</strong><span>检查新增和重复数量后确认。重复词会重置学习进度，原有备注和资料会保留。</span></li>
-            <li><strong>开始复习</strong><span>进入「复习」，先回想词义，再展开释义核对。任务没做完时可以离开，下次继续。</span></li>
-          </ol>
+          <h3 id="guide-start"><svg class="icon" aria-hidden="true"><use href="/icons.svg#add"/></svg>添加单词并开始复习</h3>
+          <div class="guide-layout">
+            <ol class="guide-list">
+              <li><strong>输入词表。</strong> 在「添加单词」粘贴英文单词或短语，每行一项，也可以用逗号分隔。已有词表时，可以通过「导入 TXT 文件」读取 TXT、CSV 或 JSON 词表。</li>
+              <li><strong>核对后导入。</strong> 点击「预览导入」，确认新增和重置的数量。再次添加已有单词会让它重新进入学习计划，原有资料、备注和答题历史会保留。</li>
+              <li><strong>开始今天的任务。</strong> 回到「复习」，点击「开始复习」。中途离开也可以，下次打开时可以继续当天的任务。</li>
+            </ol>
+            <figure class="guide-figure">
+              <img src="/guide/add.webp" width="754" height="670" alt="添加单词界面，从上到下是单词输入框、导入文件和预览导入按钮" loading="lazy">
+              <figcaption>把词表填入输入框，再用右下角的「预览导入」核对。</figcaption>
+            </figure>
+          </div>
         </section>
 
         <section class="guide-section" aria-labelledby="guide-review">
-          <h3 id="guide-review" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="/icons.svg#review"/></svg>读懂复习卡</h3>
-          <div class="guide-review-layout">
-            <figure class="guide-figure">
-              <div class="guide-card" aria-hidden="true">
-                <div class="guide-card-front">
-                  <span class="guide-card-check"><svg class="icon"><use href="/icons.svg#check"/></svg></span>
-                  <strong lang="en">abundance</strong>
-                  <small>今日连对 1 / 3 · 累计过关 0 / 6 天</small>
-                  <span class="guide-card-reveal">查看中文释义 <svg class="icon"><use href="/icons.svg#down"/></svg></span>
-                </div>
-                <div class="guide-card-answer"><strong>丰富；大量</strong><small>我的备注</small></div>
-                <div class="guide-card-vote"><span>没记住</span><span>记住了</span></div>
-              </div>
-              <figcaption>复习卡示意 · 展开后可看释义并作答</figcaption>
-            </figure>
+          <h3 id="guide-review"><svg class="icon" aria-hidden="true"><use href="/icons.svg#review"/></svg>使用复习卡</h3>
+          <div class="guide-layout">
             <dl class="guide-controls">
-              <dt>展开释义</dt><dd>查看中文释义、记忆联想、例句及译文。系统有英语语音时可点喇叭听发音。</dd>
-              <dt>记住了</dt><dd>提交正确作答并进入下一词。当天还没过关的词会再出现。</dd>
-              <dt>没记住</dt><dd>记一次遗忘，留在原卡片让你再看一遍。随后点「下一单词」只翻页。</dd>
-              <dt><svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg> 今日直接过关</dt><dd>已很熟悉时，可以点卡片右上角的小勾，直接计为今天过关。记下遗忘后，小勾会暂时禁用。</dd>
+              <dt>查看中文释义</dt><dd>先回想词义，再展开核对。卡片还会显示可用的记忆联想、例句和译文。看到喇叭按钮时，可以点击听发音。</dd>
+              <dt>记住了</dt><dd>确认自己回想对了就选这一项。程序记录一次正确作答，然后进入下一词。尚未达标的词会按计划再次出现。</dd>
+              <dt>没记住</dt><dd>选中后会记录一次遗忘，卡片先留在原处，方便你重新看释义。看完再点「下一单词」继续。</dd>
+              <dt><svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg> 标记为今日达标</dt><dd>对已经很熟悉的词，可以点卡片右上角的勾，直接完成这个词当天的任务。记录「没记住」后，这一按钮会暂时禁用。</dd>
             </dl>
+            <figure class="guide-figure">
+              <img src="/guide/review.webp" width="754" height="1229" alt="展开的复习卡，顶部右侧有达标按钮，中部有中文释义和例句，底部有作答按钮" loading="lazy">
+              <figcaption>展开后可核对词义、记录自己的联想，再通过底部按钮作答。</figcaption>
+            </figure>
           </div>
           <div class="guide-platform">
             <h4 id="guide-controls-title">Windows 快捷键</h4>
             <dl class="guide-controls" id="guide-windows">
-              <dt><kbd>Enter</kbd></dt><dd>展开释义。</dd>
-              <dt><kbd>1</kbd> / <kbd>2</kbd></dt><dd>分别为「没记住」和「记住了」。没记住后再按 1 才翻到下一词。</dd>
-              <dt><kbd>Ctrl</kbd> + <kbd>Z</kbd></dt><dd>撤销上一次作答，也可以点复习区下方的「撤销上一次」。</dd>
+              <dt><kbd>Enter</kbd></dt><dd>展开中文释义。</dd>
+              <dt><kbd>1</kbd></dt><dd>选择「没记住」。已记录遗忘时，再按一次会翻到下一词。</dd>
+              <dt><kbd>2</kbd></dt><dd>选择「记住了」。</dd>
+              <dt><kbd>Ctrl</kbd> + <kbd>Z</kbd></dt><dd>撤销上一次作答。也可以点击复习区下方的「撤销上一次」。</dd>
             </dl>
             <dl class="guide-controls" id="guide-android" hidden>
-              <dt><svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-left"/></svg> 向左滑</dt><dd>展开释义后表示记住了。已记录遗忘时只翻到下一词。</dd>
-              <dt><svg class="icon guide-arrow-right" aria-hidden="true"><use href="/icons.svg#arrow-left"/></svg> 向右滑</dt><dd>撤销上一次作答。即使释义收起也可以滑，撤销后会打开上一张词卡的释义，供你重新作答。</dd>
+              <dt><svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-left"/></svg> 向左滑</dt><dd>展开释义后，在卡片上向左滑，等同于选择「记住了」。已记录遗忘时，左滑会翻到下一词。</dd>
+              <dt><svg class="icon guide-arrow-right" aria-hidden="true"><use href="/icons.svg#arrow-left"/></svg> 向右滑</dt><dd>撤销上一次作答并重新打开上一词的释义。也可以从复习页的空白处开始右滑。</dd>
             </dl>
-            <p id="guide-swipe-area" hidden>左滑从卡片内开始。右滑可从复习页面的空白处开始，编辑备注时请先退出输入框。</p>
+            <p id="guide-swipe-area" hidden>正在编辑备注时，先退出输入框再滑动。</p>
           </div>
         </section>
 
         <section class="guide-section" aria-labelledby="guide-rules">
-          <h3 id="guide-rules" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="/icons.svg#calendar"/></svg>什么时候算过关</h3>
-          <ol class="guide-steps">
-            <li><strong>首次过关</strong><span>同一天连对设定次数，默认 3 次。还没过关时通常隔约 15 张其他卡片再测，剩余词少时会提前出现。</span></li>
-            <li><strong>以后再遇到</strong><span>已经过关过的词，当天首答选「记住了」就过关。首答没记住，当天改为按设定次数连对。</span></li>
-            <li><strong>长期掌握</strong><span>累计过关达到设定天数即掌握，每个学习日最多计一天，跳过几天也保留已累计的天数。</span></li>
-          </ol>
-          <p>学习日从凌晨 05:00 开始。当天新增或重复导入的词优先复习，可以超过每日常规上限。</p>
-          <p>每隔 5 个学习日，程序会把历史答错率较高的词穿插回顾。已掌握的词也可能出现，本轮回顾不会扣除已累计的过关天数。</p>
+          <h3 id="guide-rules"><svg class="icon" aria-hidden="true"><use href="/icons.svg#calendar"/></svg>理解今日达标与长期掌握</h3>
+          <div class="guide-layout">
+            <div>
+              <p><strong>第一次达标。</strong> 以默认设置为例，当天连续选对 3 次才达标。未达标时，这个词通常隔约 15 张其他卡片再出现。当天剩余的词很少时，重测会提前。</p>
+              <p><strong>之后再复习。</strong> 有达标记录的词，换一个学习日后，第一次答「记住了」当天即可达标。如果先答「没记住」，当天就要重新达到设定的连对次数。</p>
+              <p><strong>长期掌握。</strong> 每个词在一个学习日最多记 1 个达标日。累计到设定天数后，词库会把它标为「已掌握」。中间隔几天也可以，已经累计的天数会保留。</p>
+            </div>
+            <figure class="guide-figure">
+              <img src="/guide/rules.webp" width="754" height="754" alt="学习设置中可以选择每日复习上限、达标所需连对次数和长期掌握所需达标天数" loading="lazy">
+              <figcaption>在「设置 → 学习」调整连对次数和达标天数。</figcaption>
+            </figure>
+          </div>
+          <p class="guide-note">学习日从本机时间凌晨 05:00 开始。当天新增或重新导入的词优先安排，可以超过每日常规上限。每隔 5 个学习日，系统还会挑选历史答错率较高的词做一次回顾。</p>
         </section>
 
         <section class="guide-section" aria-labelledby="guide-library">
-          <h3 id="guide-library" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="/icons.svg#library"/></svg>查词与管理词库</h3>
-          <ul class="guide-list">
-            <li><strong>搜索与预览</strong>　可按英文或中文释义搜索，并按掌握状态筛选。<span id="guide-preview-tip">在词条上悬停可预览详情。</span></li>
-            <li><strong>编辑资料</strong>　在卡片展开后写「我的备注」，或点「编辑卡片资料」补充释义、音标、例句和译文。修改会自动保存。</li>
-            <li><strong>更多操作</strong>　在词库的「更多」中可查看复习记录、提前复习或重新学习。删除的词可在回收站恢复，也可以勾选多个词一起处理。</li>
-            <li><strong>补充词典</strong>　缺资料时可在设置开启联网补充，也可在词库选择「联网补缺」。已有资料保留，内置词典可离线使用。</li>
-          </ul>
+          <h3 id="guide-library"><svg class="icon" aria-hidden="true"><use href="/icons.svg#library"/></svg>查词与管理词库</h3>
+          <div class="guide-layout">
+            <div>
+              <p><strong>找到目标词。</strong> 搜索单词拼写或中文释义，也可以用筛选和排序缩小范围。<span id="guide-preview-tip">把鼠标停在词条上可预览详情。</span></p>
+              <p><strong>记录自己的记法。</strong> 展开复习卡后，可以在「我的备注」写联想、易混点或例句。通过「编辑卡片资料」也能补充释义、音标和例句。编辑会自动保存。</p>
+              <p><strong>处理词条。</strong> 打开一行右侧的更多菜单，可以查看复习记录、提前复习或重新学习。勾选多个词可批量处理，移除的词也可以从回收站恢复。</p>
+              <p>内置词典可离线使用。如果词条缺少资料，可以在设置开启联网补充。</p>
+            </div>
+            <figure class="guide-figure">
+              <img src="/guide/library.webp" width="754" height="1075" alt="词库带有搜索框、筛选和排序选项，单词行的右侧有更多菜单" loading="lazy">
+              <figcaption>可以逐条操作，也可以先勾选多条，再选择「批量操作」。</figcaption>
+            </figure>
+          </div>
         </section>
 
         <section class="guide-section" aria-labelledby="guide-settings">
-          <h3 id="guide-settings" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="/icons.svg#stats"/></svg>看统计与调整设置</h3>
-          <p>「统计」可以看最近 7 天或 30 天的学习词数和作答次数。点图表或悬停可查看当天的数据。</p>
-          <p>「设置 → 学习」可调整每日复习上限、当天连对次数、累计过关天数和考试日期。考试可以每年循环或指定某一天。「外观」可切换主题和音标显示。</p>
-          <p>如果勾选了「以后不再提示」，仍可在「设置」底部重新打开本手册。</p>
+          <h3 id="guide-settings"><svg class="icon" aria-hidden="true"><use href="/icons.svg#stats"/></svg>查看统计与调整设置</h3>
+          <div class="guide-layout">
+            <div>
+              <p><strong>看最近的学习情况。</strong> 在「统计」切换最近 7 天或 30 天。想知道学了多少不同的词，选「学习词数」。想知道答对和答错多少次，选「作答情况」。点击图表上的日期可查看具体数字。</p>
+              <p><strong>按自己的计划设置。</strong> 在「设置 → 学习」调整每日复习上限，也可以设定考试倒计时，选择每年重复的日期或一个指定日期。</p>
+              <p><strong>调整显示。</strong> 「外观」可以切换浅色、深色或跟随系统，也可以选择是否在复习卡上显示音标。</p>
+            </div>
+            <figure class="guide-figure">
+              <img src="/guide/stats.webp" width="754" height="582" alt="学习统计图表，可切换最近七天或三十天，以及学习词数或作答情况" loading="lazy">
+              <figcaption>同一个词可能答好几次。词数和作答次数可以分开查看。</figcaption>
+            </figure>
+          </div>
         </section>
 
         <section class="guide-section" aria-labelledby="guide-data">
-          <h3 id="guide-data" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="/icons.svg#backup"/></svg>备份与换设备</h3>
-          <div class="guide-transfer" aria-label="原设备导出，再到另一台设备导入">
-            <span><svg class="icon" aria-hidden="true"><use href="/icons.svg#upload"/></svg>原设备导出</span>
-            <svg class="icon" aria-hidden="true"><use href="/icons.svg#right"/></svg>
-            <span><svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg>新设备导入</span>
+          <h3 id="guide-data"><svg class="icon" aria-hidden="true"><use href="/icons.svg#backup"/></svg>备份与更换设备</h3>
+          <div class="guide-layout">
+            <div>
+              <p><strong>从原设备导出。</strong> 打开「设置 → 导出数据」。<span id="guide-export-tip">在 Windows 选择保存位置。</span>将生成的 <code>.lexi</code> 文件传到新设备。</p>
+              <p><strong>在新设备导入。</strong> 选择「导入数据」，打开刚传过去的文件。确认前可以预览词条和学习进度。确认后会覆盖当前设备的数据，原数据会保存在覆盖前备份中。</p>
+              <p><strong>在同一设备备份。</strong> 使用「备份数据」保存词库、备注和学习记录。需要恢复时，选择「恢复备份」。只想分享词表时，可从词库导出 CSV。</p>
+            </div>
+            <figure class="guide-figure">
+              <img src="/guide/data.webp" width="754" height="576" alt="数据管理分为跨设备迁移和本地备份两组操作" loading="lazy">
+              <figcaption>换设备用「跨设备迁移」，本机留档用「本地备份」。</figcaption>
+            </figure>
           </div>
-          <p>先在原设备打开「设置 → 导出数据」。<span id="guide-export-tip">在 Windows 选择保存位置。</span>将生成的 <code>.lexi</code> 文件传到另一台设备，再用「导入数据」。</p>
-          <p><strong>导入会覆盖当前数据。</strong> 确认前能预览词条数和任务进度。应用会保留覆盖前的自动备份，可通过「导出覆盖前备份」取回。</p>
-          <p>在同一设备留档，用「备份数据」和「恢复备份」。只想分享词表时，可在词库导出 CSV。</p>
         </section>
+        <p class="guide-note guide-reopen">关闭启动提示后，仍可在「设置」底部打开这份使用说明。</p>
       </div>
       <footer class="dialog-footer">
         <p class="inline-status error" id="guide-error" role="alert" hidden></p>

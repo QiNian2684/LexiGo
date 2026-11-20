@@ -50,7 +50,7 @@ func openStore(file string) (*store, error) {
 	if !s.db.CumulativePasses {
 		keys, first := upgradePassCounts(&s.db)
 		if err := s.save(keys, first); err != nil {
-			return nil, fmt.Errorf("无法升级累计过关记录：%w", err)
+			return nil, fmt.Errorf("无法升级累计达标记录：%w", err)
 		}
 	}
 	keys, err := updateSavedExamples(s.db.Words)

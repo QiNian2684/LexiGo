@@ -7,7 +7,7 @@ window.WordReviewChart = (() => {
   const reading = document.getElementById("chart-reading");
   const switches = [...document.querySelectorAll("[data-chart-days], [data-chart-metric]")];
   const metrics = {
-    words: [["distinct", "复习词数"], ["passed", "过关词数"]],
+    words: [["distinct", "复习词数"], ["passed", "达标词数"]],
     answers: [["yes", "记住次数"], ["no", "没记住次数"]],
   };
   let history = [], data = [], range = 7, metric = "words", selected = -1;

@@ -6,7 +6,7 @@ ManifestDPIAware true
 !include "nsDialogs.nsh"
 !include "FileFunc.nsh"
 
-!define VERSION "2.6.3"
+!define VERSION "3.0.0"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\LexiGo"
 !define DATA_CONFIG "LexiGo.data-dir"
 

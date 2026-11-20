@@ -18,7 +18,7 @@ try {
     $target = Join-Path $OutputDirectory 'LexiGo.exe'
     & go build -buildvcs=false -trimpath '-ldflags=-s -w -H=windowsgui' -o $target .
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
-    $setup = Join-Path (Resolve-Path $OutputDirectory).Path 'LexiGo-Setup-2.6.3.exe'
+    $setup = Join-Path (Resolve-Path $OutputDirectory).Path 'LexiGo-Setup-3.0.0.exe'
     & $MakeNSIS "/DPACKAGE_EXE=$((Resolve-Path $target).Path)" "/DPACKAGE_SETUP=$setup" .\installer\LexiGo.nsi
     if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
     Get-FileHash -Algorithm SHA256 $target

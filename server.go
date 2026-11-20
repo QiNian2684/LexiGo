@@ -59,6 +59,9 @@ var ecdictLicense []byte
 //go:embed assets/favicon.png
 var favicon []byte
 
+//go:embed assets/guide/*.webp
+var guideImages embed.FS
+
 //go:embed licenses/*.txt
 var licenseFiles embed.FS
 
@@ -263,6 +266,14 @@ func (a *application) handler() http.Handler {
 	mux.HandleFunc("GET /stats-chart.js", asset("text/javascript; charset=utf-8", statsChartJS))
 	mux.HandleFunc("GET /celebration.js", asset("text/javascript; charset=utf-8", celebrationJS))
 	mux.HandleFunc("GET /favicon.png", asset("image/png", favicon))
+	mux.HandleFunc("GET /guide/{image}", func(w http.ResponseWriter, r *http.Request) {
+		data, err := guideImages.ReadFile("assets/guide/" + r.PathValue("image"))
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		asset("image/webp", data)(w, r)
+	})
 	mux.HandleFunc("GET /licenses", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		entries, _ := licenseFiles.ReadDir("licenses")
@@ -383,7 +394,7 @@ func (a *application) handler() http.Handler {
 			return
 		}
 		if req.PassToday && (!req.Remembered || req.Stay) {
-			problem(w, 400, "直接过关须作为记住的作答提交。")
+			problem(w, 400, "标记为今日达标时，请提交「记住了」。")
 			return
 		}
 		day := a.reviewDay()
@@ -442,7 +453,7 @@ func (a *application) handler() http.Handler {
 			return
 		}
 		if !req.valid() {
-			problem(w, 400, "当天连续正确次数与长期过关天数均须为 1 至 99。每日上限须为 1 至 10,000，或设为全部。")
+			problem(w, 400, "当天连续正确次数与长期掌握所需达标天数均须为 1 至 99。每日上限须为 1 至 10,000，或设为全部。")
 			return
 		}
 		state, err := a.store.changeSettings(a.reviewDay(), req)
