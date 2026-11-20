@@ -50,6 +50,15 @@ func TestTranslationQueuePreservesManualAndPersistsPublicExample(t *testing.T) {
 	a := &application{store: s, translations: translationQueue{wake: make(chan struct{}, 1)}}
 	public := s.db.Words["appendix"]
 	stale := s.db.Words["zany"]
+	original, err := bundledExamples()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Use the original untranslated text even when the newer bundle
+	// supplies an offline translation for this word.
+	for _, card := range []*wordCard{public, stale} {
+		card.ExampleBy, card.Examples, card.ExampleTranslation = "simple", original[card.Key].Examples, ""
+	}
 	if !a.queueTranslationLocked(stale, false) || !a.queueTranslationLocked(public, false) ||
 		!a.queueTranslationLocked(stale, true) {
 		t.Fatal("public examples were not queued")
@@ -131,5 +140,23 @@ func TestTranslationQueuePreservesManualAndPersistsPublicExample(t *testing.T) {
 	if got := reopened.db.Words["appendix"]; got.ExampleTranslationBy != "mymemory" ||
 		got.ExampleTranslation != "自动生成的译文。" || got.Examples != public.Examples {
 		t.Fatalf("unexpected reopened card %+v", got)
+	}
+}
+
+func TestExactUsageExamples(t *testing.T) {
+	for _, example := range []struct {
+		text, term string
+		ok         bool
+	}{
+		{"She was nodding in agreement.", "nodding", true},
+		{"She nodded in agreement.", "nodding", false},
+		{"We walked past it yesterday.", "walked", true},
+		{"The path ran beside a river.", "ran", true},
+		{"For quotations using this term, see Citations:nodding.", "nodding", false},
+		{"The sprang-like noise was unusual.", "sprang", false},
+	} {
+		if got := hasUsageExample(example.text, example.term); got != example.ok {
+			t.Errorf("%q in %q: got %v, want %v", example.term, example.text, got, example.ok)
+		}
 	}
 }

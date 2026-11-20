@@ -238,11 +238,14 @@ function cardDetailSections(card, showIPA) {
       meaning.append(more);
     }
   }
+  const exampleSource = card.exampleBy || "";
+  const machine = card.exampleTranslation && (card.exampleTranslationBy === "mymemory" ||
+    card.exampleTranslationBy !== "manual" &&
+      /^(simple-mt$|tatoeba-mt\||wiktionary-data\||simple-wikipedia\|)/.test(exampleSource));
   const fields = [
     meaning,
     group("英文例句", card.examples, missing, "example"),
-    group(card.exampleBy === "simple-mt" || card.exampleTranslationBy === "mymemory"
-      ? "例句翻译（机译）" : "例句翻译", card.exampleTranslation,
+    group(machine ? "例句翻译（机译）" : "例句翻译", card.exampleTranslation,
       card.translationPending && state?.settings.online ? "等待联网补译。" : "暂无对应译文。", "translation"),
   ];
   const sources = document.createElement("div");
@@ -255,12 +258,25 @@ function cardDetailSections(card, showIPA) {
     sources.append(link("例句 · Simple Wiktionary", "https://simple.wiktionary.org/wiki/" + encodeURIComponent(card.key)),
       link("CC BY-SA 4.0", "https://creativecommons.org/licenses/by-sa/4.0/"));
   }
-  if (card.exampleBy?.startsWith("tatoeba|")) {
-    for (const entry of card.exampleBy.split("|").slice(1)) {
+  if (/^tatoeba(?:-mt|-online)?\|/.test(exampleSource)) {
+    for (const entry of exampleSource.split("|").slice(1)) {
       const [id, ...author] = entry.split(":");
       if (/^\d+$/.test(id)) sources.append(link("例句 · " + author.join(":"), "https://tatoeba.org/en/sentences/show/" + id));
     }
     sources.append(link("CC BY 2.0 FR", "https://creativecommons.org/licenses/by/2.0/fr/"));
+  }
+  if (exampleSource.startsWith("wiktionary-data|")) {
+    sources.append(link("例句 · Wiktionary",
+      "https://en.wiktionary.org/wiki/" + encodeURIComponent(exampleSource.split("|")[1]) + "#English"),
+      link("CC BY-SA 4.0", "https://creativecommons.org/licenses/by-sa/4.0/"));
+  }
+  const article = exampleSource.match(/^(simple-wikipedia|wikipedia-(?:online|context))\|(\d+)$/);
+  if (article) {
+    const simplified = article[1] === "simple-wikipedia";
+    sources.append(link(simplified ? "例句 · Simple Wikipedia" : "例句 · Wikipedia",
+      (simplified ? "https://simple.wikipedia.org/" : "https://en.wikipedia.org/") + "?curid=" + article[2]),
+      simplified ? link("CC BY-SA 3.0", "https://creativecommons.org/licenses/by-sa/3.0/") :
+        link("CC BY-SA 4.0", "https://creativecommons.org/licenses/by-sa/4.0/"));
   }
   if (card.exampleTranslationBy === "mymemory") {
     sources.append(link("译文 · MyMemory", "https://mymemory.translated.net/"));
@@ -1720,10 +1736,12 @@ setInterval(async () => {
         (revealed.lookup === "pending" || revealed.translationPending)) {
       await refreshRevealedDetails();
     }
-    if (wordPreview.open && preview?.card?.translationPending && state?.settings.online) {
+    if (wordPreview.open && preview?.card && state?.settings.online &&
+        (preview.card.translationPending || preview.card.lookup === "pending")) {
       const active = preview;
       const result = await api("/api/card/" + keyPath(active.card.key));
-      if (preview === active && !result.translationPending) {
+      if (preview === active && (result.lookup !== active.card.lookup ||
+          result.exampleTranslation !== active.card.exampleTranslation || result.translationPending !== active.card.translationPending)) {
         active.card = result;
         renderWordPreview(result, active.progress);
         if (active.point) placeWordPreview(active.point);

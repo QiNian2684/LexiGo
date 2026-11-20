@@ -62,6 +62,7 @@ type wordCard struct {
 	WikiSource           string `json:"wikiSource,omitempty"`
 	ExampleBy            string `json:"exampleBy,omitempty"`
 	ExampleTranslationBy string `json:"exampleTranslationBy,omitempty"`
+	ExampleSearchTried   bool   `json:"exampleSearchTried,omitempty"`
 	LegacyStreak         int    `json:"legacyStreak,omitempty"`
 	Reimports            int    `json:"reimports,omitempty"`
 	Lookup               string `json:"lookup"`
@@ -484,6 +485,7 @@ func (s *store) batch(day string, input selection, action string) (int, error) {
 			s.advance(card)
 		case "retry":
 			card.Lookup = "pending"
+			card.ExampleSearchTried = false
 			continue
 		}
 		s.record(day, action, card)

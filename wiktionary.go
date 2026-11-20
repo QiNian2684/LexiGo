@@ -91,6 +91,23 @@ func wikiSource(revision int64) string {
 	return "https://en.wiktionary.org/wiki/Special:PermanentLink/" + strconv.FormatInt(revision, 10) + "#English"
 }
 
+func filterWikiExamples(details cardDetails, key string) cardDetails {
+	sentences := strings.Split(details.Examples, "\n\n")
+	translations := strings.Split(details.ExampleTranslation, "\n\n")
+	pairs := details.ExampleTranslation != "" && len(sentences) == len(translations)
+	var en, zh []string
+	for i, sentence := range sentences {
+		if hasUsageExample(sentence, key) {
+			en = append(en, sentence)
+			if pairs {
+				zh = append(zh, translations[i])
+			}
+		}
+	}
+	details.Examples, details.ExampleTranslation = strings.Join(en, "\n\n"), strings.Join(zh, "\n\n")
+	return details
+}
+
 func attribute(node *html.Node, key string) string {
 	for _, a := range node.Attr {
 		if a.Key == key {

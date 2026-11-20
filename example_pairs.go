@@ -1,14 +1,22 @@
 package main
 
+import "strings"
+
+func bundledMachineTranslation(source string) bool {
+	return source == "simple-mt" || strings.HasPrefix(source, "tatoeba-mt|") ||
+		strings.HasPrefix(source, "wiktionary-data|") || strings.HasPrefix(source, "simple-wikipedia|")
+}
+
 func updateSavedExamples(words map[string]*wordCard) ([]string, error) {
 	keys, err := simplifySavedExamples(words)
 	if err != nil {
 		return nil, err
 	}
 	var sources, pairs map[string]sourcedExample
+	var expanded map[string]sourcedExample
 	for key, card := range words {
-		if card.ExampleBy != "simple" || card.Examples == "" || card.ExampleTranslation != "" ||
-			card.ExampleTranslationBy == "manual" {
+		if card.ExampleTranslation != "" || card.ExampleTranslationBy == "manual" ||
+			(card.Examples != "" && card.ExampleBy != "simple") {
 			continue
 		}
 		if pairs == nil {
@@ -20,12 +28,24 @@ func updateSavedExamples(words map[string]*wordCard) ([]string, error) {
 			if err != nil {
 				return nil, err
 			}
+			expanded, err = expandedExamples()
+			if err != nil {
+				return nil, err
+			}
 		}
-		pair, ok := pairs[key]
-		original := sources[key]
 		// Source markers on older cards could survive editing. Backfill
 		// only when the saved text still matches the original English.
-		if !ok || original.By != "simple" || original.Examples != card.Examples {
+		if card.Examples != "" && (sources[key].By != "simple" || sources[key].Examples != card.Examples) {
+			continue
+		}
+		pair, ok := pairs[key]
+		if !ok {
+			pair, ok = expanded[key]
+		}
+		if !ok {
+			continue
+		}
+		if card.Examples != "" && pair.ExampleTranslation == "" {
 			continue
 		}
 		card.Examples = pair.Examples

@@ -77,6 +77,7 @@ type application struct {
 	wake            chan struct{}
 	generation      uint64
 	paused          time.Time
+	lookupFirst     string
 	exit            chan struct{}
 	migrationNotice string
 	mobile          bool
@@ -102,7 +103,7 @@ func (a *application) reviewResponse(now time.Time, pin bool) reviewState {
 	if pin {
 		s.pinReview(state)
 		if state.Current != nil {
-			a.queueTranslationLocked(s.db.Words[state.Current.Key], true)
+			a.viewExampleLocked(s.db.Words[state.Current.Key])
 		}
 	}
 	setExamDate(&state, now)
@@ -129,16 +130,28 @@ func (a *application) enrich(ctx context.Context) {
 		var pending *wordCard
 		generation := a.generation
 		if remaining <= 0 && a.store.db.Settings.Online {
-			for _, item := range a.store.db.Words {
-				if !item.Deleted && item.Lookup == "pending" && (pending == nil || item.ID < pending.ID) {
-					pending = item
+			first := a.store.db.Words[a.lookupFirst]
+			if first != nil && !first.Deleted && first.Lookup == "pending" {
+				pending = first
+			} else {
+				for _, item := range a.store.db.Words {
+					if item.Deleted || item.Lookup != "pending" {
+						continue
+					}
+					missing := needsPublicExample(item)
+					priority := needsPublicExample(pending)
+					if pending == nil || missing && !priority || missing == priority && item.ID < pending.ID {
+						pending = item
+					}
 				}
 			}
 		}
 		var key string
 		var id uint64
+		var tryExample bool
 		if pending != nil {
 			key, id = pending.Key, pending.ID
+			tryExample = needsPublicExample(pending)
 		}
 		a.store.mu.Unlock()
 
@@ -156,6 +169,27 @@ func (a *application) enrich(ctx context.Context) {
 			continue
 		}
 		entry, err := fetchWiktionary(ctx, key)
+		var candidate sourcedExample
+		usedAlternate := false
+		if tryExample && ctx.Err() == nil {
+			entry.cardDetails = filterWikiExamples(entry.cardDetails, key)
+			if entry.ExampleTranslation == "" {
+				var sourceErr error
+				candidate, sourceErr = fetchTatoebaExample(ctx, key)
+				if candidate.Examples == "" && entry.Examples == "" && ctx.Err() == nil {
+					var lastErr error
+					candidate, lastErr = fetchWikipediaExample(ctx, key)
+					if sourceErr == nil {
+						sourceErr = lastErr
+					}
+				}
+				if err == nil && entry.Examples == "" && candidate.Examples == "" {
+					err = sourceErr
+				}
+				usedAlternate = candidate.ExampleTranslation != "" ||
+					(candidate.Examples != "" && entry.Examples == "")
+			}
+		}
 		if ctx.Err() != nil {
 			return
 		}
@@ -163,16 +197,24 @@ func (a *application) enrich(ctx context.Context) {
 		current := a.store.db.Words[key]
 		if generation == a.generation && a.store.db.Settings.Online &&
 			current != nil && current.ID == id && !current.Deleted && current.Lookup == "pending" {
-			if err != nil {
+			if err != nil && !usedAlternate {
 				a.paused = time.Now().Add(90 * time.Second)
 			} else {
 				old := *current
 				current.Lookup = "done"
+				current.ExampleSearchTried = current.ExampleSearchTried || tryExample
 				if current.ExampleTranslationBy == "manual" {
 					entry.ExampleTranslation = ""
 				}
+				if usedAlternate && current.Examples == "" && current.ExampleTranslation == "" &&
+					current.ExampleTranslationBy != "manual" {
+					current.Examples = candidate.Examples
+					current.ExampleTranslation = simplifyExampleTranslation(candidate.ExampleTranslation)
+					current.ExampleBy = candidate.By
+				}
+				wikiExampleBefore := current.Examples
 				if current.cardDetails.fill(entry.cardDetails) {
-					if current.WikiSource == "" || old.Examples != current.Examples {
+					if current.WikiSource == "" || wikiExampleBefore != current.Examples {
 						current.WikiSource = wikiSource(entry.Revision)
 					}
 				}
@@ -193,6 +235,20 @@ func (a *application) enrich(ctx context.Context) {
 		}
 		timer.Stop()
 	}
+}
+
+func needsPublicExample(card *wordCard) bool {
+	return card != nil && !card.ExampleSearchTried && card.Examples == "" &&
+		card.ExampleTranslation == "" && card.ExampleTranslationBy != "manual"
+}
+
+func (a *application) viewExampleLocked(card *wordCard) bool {
+	if card != nil && !card.Deleted && a.store.db.Settings.Online && needsPublicExample(card) {
+		card.Lookup = "pending"
+		a.lookupFirst = card.Key
+		a.poke()
+	}
+	return a.queueTranslationLocked(card, true)
 }
 
 func respond(w http.ResponseWriter, status int, data any) {
@@ -337,7 +393,7 @@ func (a *application) handler() http.Handler {
 		}
 		a.store.pinReview(state)
 		if state.Current != nil {
-			a.queueTranslationLocked(a.store.db.Words[state.Current.Key], true)
+			a.viewExampleLocked(a.store.db.Words[state.Current.Key])
 		}
 		a.store.mu.Unlock()
 		setExamDate(&state, now)
@@ -378,7 +434,8 @@ func (a *application) handler() http.Handler {
 			return
 		}
 		data := *card
-		translating := a.queueTranslationLocked(card, true)
+		translating := a.viewExampleLocked(card)
+		data.Lookup = card.Lookup
 		a.store.mu.Unlock()
 		details := presentCard(data)
 		details.TranslationPending = translating
@@ -456,7 +513,7 @@ func (a *application) handler() http.Handler {
 		a.store.mu.Lock()
 		a.store.pinReview(data)
 		if data.Current != nil {
-			a.queueTranslationLocked(a.store.db.Words[data.Current.Key], true)
+			a.viewExampleLocked(a.store.db.Words[data.Current.Key])
 		}
 		a.store.mu.Unlock()
 		setExamDate(&data, time.Now())
@@ -616,24 +673,19 @@ func (a *application) handler() http.Handler {
 			if c.cardDetails.size() > 12000 || utf8.RuneCountInString(c.PersonalNote) > 12000 {
 				return errors.New("卡片资料及备注各最多 12,000 字。")
 			}
-			switch c.ExampleBy {
-			case "simple", "simple-mt", "simple-edited":
-				if c.Examples != oldExample {
-					if c.ExampleBy == "simple-mt" && c.ExampleTranslation == oldTranslation {
-						c.ExampleTranslation = ""
-					}
-					c.ExampleBy = ""
-				} else if c.ExampleTranslation != oldTranslation {
+			if c.ExampleTranslation != oldTranslation {
+				c.ExampleTranslationBy = "manual"
+				if c.Examples == oldExample && (c.ExampleBy == "simple" || c.ExampleBy == "simple-mt") {
 					c.ExampleBy = "simple-edited"
 				}
-			}
-			if c.ExampleTranslation != oldTranslation && (c.Examples == oldExample || req["exampleTranslation"] != "") {
-				c.ExampleTranslationBy = "manual"
 			} else if c.Examples != oldExample {
-				if c.ExampleTranslationBy == "mymemory" {
+				if c.ExampleTranslationBy == "mymemory" || bundledMachineTranslation(c.ExampleBy) {
 					c.ExampleTranslation = ""
 				}
 				c.ExampleTranslationBy = ""
+			}
+			if c.Examples != oldExample {
+				c.ExampleBy = ""
 			}
 			return nil
 		})

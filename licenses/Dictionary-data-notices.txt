@@ -36,3 +36,32 @@ Chinese example translations are selected only from the same usage example.
 The specific source revision is linked from the associated flashcard.
 
 LexiGo may convert the Chinese translations of example sentences to simplified Chinese using the bundled OpenCC-derived table. Source sentence identifiers and contributor credits are retained. See OpenCC.txt for the conversion data license.
+
+Additional offline usage examples in assets/example-expansion.json.gz
+
+Tatoeba contributors. The 2026-11-14 export supplies exact-spelling
+bilingual pairs and English examples for which LexiGo supplies a machine
+translation. Sources, author usernames and the CC BY 2.0 France license
+are linked on the flashcard. The adapted translations are distributed
+under the same license. Online lookups use the official Tatoeba API at
+https://api.tatoeba.org/.
+
+English Wiktionary contributors. Usage examples extracted by Tatu Ylonen's
+Wiktextract from the Kaikki English dictionary data. The source entry,
+its history, and CC BY-SA 4.0 are linked on the flashcard. Machine
+translations of these examples are distributed under CC BY-SA 4.0.
+Source: https://kaikki.org/dictionary/English/
+
+Simple English Wikipedia contributors. Selected contextual sentences,
+with original article ID and a link to its contributor history, come
+from the 20231101.simple snapshot of wikimedia/wikipedia. Source text
+from that snapshot and machine-translated adaptations are distributed
+under CC BY-SA 3.0. Optional live English Wikipedia lookups use
+CC BY-SA 4.0 and show the originating page.
+Snapshot: https://huggingface.co/datasets/wikimedia/wikipedia/tree/main/20231101.simple
+Licenses: https://creativecommons.org/licenses/by-sa/3.0/
+          https://creativecommons.org/licenses/by-sa/4.0/
+
+The new offline supplement uses the same OPUS-MT model documented
+above at build time. In-app online translations are provided by
+MyMemory at the user's request through the online dictionary setting.

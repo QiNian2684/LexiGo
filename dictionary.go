@@ -29,6 +29,9 @@ var examplePairBytes []byte
 //go:embed assets/example-translations.json.gz
 var exampleTranslationBytes []byte
 
+//go:embed assets/example-expansion.json.gz
+var exampleExpansionBytes []byte
+
 type cardDetails struct {
 	Meaning            string `json:"meaning"`
 	POS                string `json:"pos"`
@@ -66,6 +69,7 @@ type dictionary struct {
 	notes    map[string]cardDetails
 	examples map[string]sourcedExample
 	pairs    map[string]sourcedExample
+	expanded map[string]sourcedExample
 	err      error
 }
 
@@ -95,6 +99,10 @@ var bundledExamplePairs = sync.OnceValues(func() (map[string]sourcedExample, err
 		}
 	}
 	return pairs, nil
+})
+
+var expandedExamples = sync.OnceValues(func() (map[string]sourcedExample, error) {
+	return readExamples(exampleExpansionBytes)
 })
 
 func readExamples(packed []byte) (map[string]sourcedExample, error) {
@@ -138,6 +146,9 @@ func (d *dictionary) load() {
 		if d.err == nil {
 			d.pairs, d.err = bundledExamplePairs()
 		}
+		if d.err == nil {
+			d.expanded, d.err = expandedExamples()
+		}
 	})
 }
 
@@ -167,9 +178,14 @@ func (d *dictionary) lookup(word string) (offlineEntry, error) {
 		ipa := result.IPA
 		result.cardDetails = override
 		result.IPA = ipa
-	} else if example, ok := d.examples[word]; ok {
+	} else {
+		example := d.examples[word]
 		if pair, ok := d.pairs[word]; ok {
 			example = pair
+		}
+		if supplemental, ok := d.expanded[word]; ok &&
+			(example.Examples == "" || example.ExampleTranslation == "" && supplemental.ExampleTranslation != "") {
+			example = supplemental
 		}
 		result.Examples = example.Examples
 		result.ExampleTranslation = example.ExampleTranslation

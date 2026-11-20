@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -33,7 +34,7 @@ func myMemoryTranslation(ctx context.Context, client *http.Client, endpoint, sen
 		return "", err
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "LexiGo/3.1.2 (+https://github.com/QiNian2684/LexiGo)")
+	req.Header.Set("User-Agent", "LexiGo/3.2.0 (+https://github.com/QiNian2684/LexiGo)")
 	reply, err := client.Do(req)
 	if err != nil {
 		return "", err
@@ -102,20 +103,44 @@ func translatableExample(card *wordCard) bool {
 		source := sources[card.Key]
 		return source.By == "simple" && source.Examples == card.Examples
 	}
+	if bundledMachineTranslation(card.ExampleBy) {
+		examples, _ := expandedExamples()
+		source := examples[card.Key]
+		return card.ExampleBy == source.By && card.Examples == source.Examples
+	}
+	if onlineTatoebaID(card.ExampleBy) > 0 || onlineWikipediaID(card.ExampleBy) != "" {
+		return true
+	}
 	return card.ExampleBy == "" && publicWikiRevision(card.WikiSource) != ""
 }
 
 type translateSentence func(context.Context, string) (string, error)
 
 func translatePublicExample(ctx context.Context, card wordCard, translate translateSentence) (string, error) {
-	if card.ExampleBy != "simple" {
+	if id := onlineTatoebaID(card.ExampleBy); id > 0 {
+		entry, err := publicTatoebaExample(ctx, id)
+		if err != nil && !errors.Is(err, errMissingSentence) {
+			return "", errVerifyExample
+		}
+		if err != nil || entry.Text != card.Examples && !slices.Contains(proseSentences(entry.Text), card.Examples) {
+			return "", nil
+		}
+	} else if id := onlineWikipediaID(card.ExampleBy); id != "" {
+		pages, err := wikipediaExtracts(ctx, url.Values{"pageids": {id}}, strings.HasPrefix(card.ExampleBy, "wikipedia-context|"))
+		if err != nil {
+			return "", errVerifyExample
+		}
+		if len(pages) != 1 || !slices.Contains(proseSentences(pages[0].Text), card.Examples) {
+			return "", nil
+		}
+	} else if card.ExampleBy != "simple" && !bundledMachineTranslation(card.ExampleBy) {
 		// Legacy cards could retain a source link after being edited. Verify the
 		// sentence against the actual public revision before sending it anywhere.
 		entry, err := fetchWikiEntry(ctx, "oldid", publicWikiRevision(card.WikiSource))
 		if err != nil {
 			return "", errVerifyExample
 		}
-		if entry.Examples != card.Examples {
+		if entry.Examples != card.Examples && filterWikiExamples(entry.cardDetails, card.Key).Examples != card.Examples {
 			return "", nil
 		}
 	}
@@ -248,12 +273,10 @@ func (a *application) saveTranslationLocked(card *wordCard, text string, err err
 	switch {
 	case errors.Is(err, errTranslationQuota):
 		q.readyAt = time.Now().Add(12 * time.Hour)
-	case errors.Is(err, errVerifyExample):
+	case err != nil:
 		task := q.pending[card.Key]
 		task.retryAt = time.Now().Add(time.Minute)
 		q.pending[card.Key] = task
-	case err != nil:
-		q.readyAt = time.Now().Add(time.Minute)
 	case text == "" || card.cardDetails.size()+utf8.RuneCountInString(text) > 12000:
 		if q.skipped == nil {
 			q.skipped = make(map[uint64]string)
