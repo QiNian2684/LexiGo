@@ -654,7 +654,9 @@ dialog::backdrop { background: var(--overlay); }
   margin: 0; min-width: 0; padding: .5rem;
   border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--inset);
 }
-.guide-figure img { display: block; width: 100%; height: auto; background: #f7f8fa; border-radius: .37rem; }
+.guide-figure img { display: block; width: 100%; height: auto; background: var(--inset); border-radius: .37rem; }
+:root[data-theme="dark"] .guide-figure .guide-light,
+:root:not([data-theme="dark"]) .guide-figure .guide-dark { display: none; }
 .guide-figure figcaption { margin-top: .45rem; padding-inline: .2rem; color: var(--muted); font-size: .8rem; line-height: 1.48; }
 .guide-controls { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .4rem .66rem; margin: 0; align-content: start; }
 .guide-controls dt { font-weight: 600; }
