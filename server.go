@@ -394,7 +394,7 @@ func (a *application) handler() http.Handler {
 			return
 		}
 		if req.PassToday && (!req.Remembered || req.Stay) {
-			problem(w, 400, "标记为今日达标时，请提交「记住了」。")
+			problem(w, 400, "直接完成今日记忆时，请提交「记住了」。")
 			return
 		}
 		day := a.reviewDay()
@@ -453,7 +453,7 @@ func (a *application) handler() http.Handler {
 			return
 		}
 		if !req.valid() {
-			problem(w, 400, "当天连续正确次数与长期掌握所需达标天数均须为 1 至 99。每日上限须为 1 至 10,000，或设为全部。")
+			problem(w, 400, "每日记忆所需连对次数与长期掌握所需累计天数均须为 1 至 99。每日上限须为 1 至 10,000，或设为全部。")
 			return
 		}
 		state, err := a.store.changeSettings(a.reviewDay(), req)
