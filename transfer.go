@@ -23,6 +23,7 @@ const (
 	transferFormat  = "wordreview.learning-state"
 	transferVersion = 3
 	maxTransfer     = 128 << 20
+	studyFileExt    = ".lexi"
 )
 
 type transferEnvelope struct {
@@ -245,7 +246,7 @@ func (p transferPayload) summarize(token string, now time.Time) transferSummary 
 }
 
 func transferFilename(now time.Time) string {
-	return "WordReview-Learning-" + now.Format(time.DateOnly) + ".json"
+	return "LexiGo-" + now.Format("2006-01-02-15-04-05") + studyFileExt
 }
 
 func (a *application) exportTransfer() ([]byte, error) {
@@ -372,7 +373,7 @@ func (a *application) transferRoutes(mux *http.ServeMux) {
 			problem(w, 404, "没有可导出的覆盖前备份。")
 			return
 		}
-		target, err := chooseTransferFile(true, filepath.Base(file))
+		target, err := chooseTransferFile(true, transferFilename(time.Now()))
 		if err != nil {
 			saveError(w, err)
 			return

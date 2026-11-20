@@ -1205,7 +1205,7 @@ async function pickTransfer(kind) {
 }
 
 if (mobile) {
-  el("transfer-guide").textContent = "在「导出数据」中选择分享或保存，再到另一台设备导入。";
+  el("transfer-guide").textContent = "在「导出数据」中分享或保存 .lexi 文件，再到另一台设备导入。";
   window.wordReviewFlushNote = flushOnHide;
   window.wordReviewResume = () => refreshState().catch(showError);
   window.wordReviewSpeechChanged = updateVoice;
@@ -1521,10 +1521,20 @@ function openGuide() {
   el("guide-controls-title").textContent = mobile ? "Android 手势" : "Windows 快捷键";
   el("guide-windows").hidden = mobile;
   el("guide-android").hidden = !mobile;
+  el("guide-swipe-area").hidden = !mobile;
+  el("guide-preview-tip").textContent = mobile ? "长按词条可预览详情。" : "在词条上悬停可预览详情。";
+  el("guide-export-tip").textContent = mobile ? "在 Android 选择「分享数据」或「保存到手机」。" : "在 Windows 选择保存位置。";
   el("hide-guide").checked = hideGuide;
   message("guide-error");
   el("guide-dialog").showModal();
   el("guide-dialog").querySelector(".dialog-body").scrollTop = 0;
+}
+for (const jump of all("[data-guide-jump]")) {
+  jump.onclick = () => {
+    const heading = el(jump.dataset.guideJump);
+    heading.focus({preventScroll: true});
+    heading.scrollIntoView({block: "start"});
+  };
 }
 el("open-guide").onclick = openGuide;
 el("guide-form").onsubmit = async event => {

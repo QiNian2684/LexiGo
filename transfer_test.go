@@ -12,6 +12,13 @@ import (
 	"time"
 )
 
+func TestTransferFilenameUsesLocalTimeToTheSecond(t *testing.T) {
+	local := time.Date(2026, time.November, 20, 9, 7, 3, 0, time.FixedZone("UTC+8", 8*60*60))
+	if name := transferFilename(local); name != "LexiGo-2026-11-20-09-07-03.lexi" {
+		t.Fatalf("unexpected learning data filename %q", name)
+	}
+}
+
 func startTransferTest(t *testing.T) (*store, *store, []byte) {
 	t.Helper()
 	source, _ := newTestStore(t)

@@ -266,7 +266,7 @@
               <button class="settings-operation" id="transfer-recovery" type="button" hidden>
                 <svg class="icon" aria-hidden="true"><use href="/icons.svg#history"/></svg><span>导出覆盖前备份</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
               </button>
-              <p class="data-guide"><strong>使用方法</strong> <span id="transfer-guide">在原设备导出数据，将文件发送到另一台设备，再选择「导入数据」。</span></p>
+              <p class="data-guide"><strong>使用方法</strong> <span id="transfer-guide">在原设备导出 .lexi 文件，将它发送到另一台设备，再选择「导入数据」。</span></p>
               <p class="data-guide"><strong>注意</strong> 导入会覆盖本机数据，不会自动合并。</p>
               <h3>本地备份</h3>
               <a class="settings-operation" id="download-backup" href="/api/backup" download>
@@ -277,7 +277,7 @@
               </button>
               <p class="data-guide"><strong>备份数据</strong> 保存词库、备注、学习进度和历史记录。</p>
               <p class="data-guide"><strong>恢复备份</strong> 用此前保存的备份替换当前学习状态。</p>
-              <input id="restore-file" type="file" accept=".json,application/json" hidden>
+              <input id="restore-file" type="file" accept=".lexi,.json,application/json" hidden>
             </div>
             <p id="settings-status" class="inline-status" role="status" hidden></p>
           </section>
@@ -296,31 +296,104 @@
         <img src="/favicon.png" width="40" height="40" alt="">
         <h2 id="guide-title" tabindex="-1" autofocus>LexiGo 使用说明</h2>
       </header>
-      <div class="dialog-body guide-body">
-        <section class="guide-section">
-          <h3>从哪里开始</h3>
-          <p>在「添加单词」粘贴英文或导入词表，预览后确认。复习时先回想中文释义，再展开卡片作答。</p>
-          <p>「词库」可以查词和改备注，「统计」可以查看学习记录。</p>
+      <div class="dialog-body guide-body" tabindex="0" aria-label="使用手册正文">
+        <div class="guide-intro">
+          <p>先添加想学的词，再用复习卡回想释义。进度会按每个词分别记录，之后可以接着学。</p>
+          <nav class="guide-contents" aria-label="手册目录">
+            <button type="button" data-guide-jump="guide-start">开始学习</button>
+            <button type="button" data-guide-jump="guide-review">复习操作</button>
+            <button type="button" data-guide-jump="guide-rules">过关规则</button>
+            <button type="button" data-guide-jump="guide-library">管理词库</button>
+            <button type="button" data-guide-jump="guide-settings">统计与设置</button>
+            <button type="button" data-guide-jump="guide-data">备份与迁移</button>
+          </nav>
+        </div>
+
+        <section class="guide-section" aria-labelledby="guide-start">
+          <h3 id="guide-start" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="/icons.svg#add"/></svg>开始学习</h3>
+          <ol class="guide-steps">
+            <li><strong>添加单词</strong><span>粘贴英文，每行一个或用逗号隔开。也可用「导入 TXT 文件」打开 TXT、CSV 或 JSON 词表。</span></li>
+            <li><strong>预览导入</strong><span>检查新增和重复数量后确认。重复词会重置学习进度，原有备注和资料会保留。</span></li>
+            <li><strong>开始复习</strong><span>进入「复习」，先回想词义，再展开释义核对。任务没做完时可以离开，下次继续。</span></li>
+          </ol>
         </section>
-        <section class="guide-section">
-          <h3 id="guide-controls-title">Windows 快捷键</h3>
-          <dl class="guide-controls" id="guide-windows">
-            <dt><kbd>Enter</kbd></dt><dd>展开中文释义</dd>
-            <dt><kbd>1</kbd> / <kbd>2</kbd></dt><dd>没记住 / 记住了。记录遗忘后再按 1 翻到下一词。</dd>
-            <dt><kbd>Ctrl+Z</kbd></dt><dd>撤销上一答</dd>
-            <dt>词库悬停</dt><dd>预览词条详情</dd>
-          </dl>
-          <dl class="guide-controls" id="guide-android" hidden>
-            <dt>点开释义</dt><dd>展开中文释义和例句</dd>
-            <dt>向左滑</dt><dd>展开释义后表示记住了。记录遗忘后左滑只翻到下一词。</dd>
-            <dt>向右滑</dt><dd>撤销上一答</dd>
-            <dt>词库长按</dt><dd>预览词条详情</dd>
-          </dl>
+
+        <section class="guide-section" aria-labelledby="guide-review">
+          <h3 id="guide-review" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="/icons.svg#review"/></svg>读懂复习卡</h3>
+          <div class="guide-review-layout">
+            <figure class="guide-figure">
+              <div class="guide-card" aria-hidden="true">
+                <div class="guide-card-front">
+                  <span class="guide-card-check"><svg class="icon"><use href="/icons.svg#check"/></svg></span>
+                  <strong lang="en">abundance</strong>
+                  <small>今日连对 1 / 3 · 累计过关 0 / 6 天</small>
+                  <span class="guide-card-reveal">查看中文释义 <svg class="icon"><use href="/icons.svg#down"/></svg></span>
+                </div>
+                <div class="guide-card-answer"><strong>丰富；大量</strong><small>我的备注</small></div>
+                <div class="guide-card-vote"><span>没记住</span><span>记住了</span></div>
+              </div>
+              <figcaption>复习卡示意 · 展开后可看释义并作答</figcaption>
+            </figure>
+            <dl class="guide-controls">
+              <dt>展开释义</dt><dd>查看中文释义、记忆联想、例句及译文。系统有英语语音时可点喇叭听发音。</dd>
+              <dt>记住了</dt><dd>提交正确作答并进入下一词。当天还没过关的词会再出现。</dd>
+              <dt>没记住</dt><dd>记一次遗忘，留在原卡片让你再看一遍。随后点「下一单词」只翻页。</dd>
+              <dt><svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg> 今日直接过关</dt><dd>已很熟悉时，可以点卡片右上角的小勾，直接计为今天过关。记下遗忘后，小勾会暂时禁用。</dd>
+            </dl>
+          </div>
+          <div class="guide-platform">
+            <h4 id="guide-controls-title">Windows 快捷键</h4>
+            <dl class="guide-controls" id="guide-windows">
+              <dt><kbd>Enter</kbd></dt><dd>展开释义。</dd>
+              <dt><kbd>1</kbd> / <kbd>2</kbd></dt><dd>分别为「没记住」和「记住了」。没记住后再按 1 才翻到下一词。</dd>
+              <dt><kbd>Ctrl</kbd> + <kbd>Z</kbd></dt><dd>撤销上一次作答，也可以点复习区下方的「撤销上一次」。</dd>
+            </dl>
+            <dl class="guide-controls" id="guide-android" hidden>
+              <dt><svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-left"/></svg> 向左滑</dt><dd>展开释义后表示记住了。已记录遗忘时只翻到下一词。</dd>
+              <dt><svg class="icon guide-arrow-right" aria-hidden="true"><use href="/icons.svg#arrow-left"/></svg> 向右滑</dt><dd>撤销上一次作答。即使释义收起也可以滑，撤销后会打开上一张词卡的释义，供你重新作答。</dd>
+            </dl>
+            <p id="guide-swipe-area" hidden>左滑从卡片内开始。右滑可从复习页面的空白处开始，编辑备注时请先退出输入框。</p>
+          </div>
         </section>
-        <section class="guide-section">
-          <h3>怎么过关</h3>
-          <p>首次过关需要当天连对设定次数，默认 3 次。已有过关记录的词，之后每个学习日首答记住即过关，首答没记住则当天重新连对。</p>
-          <p>累计过关达到设定天数即长期掌握。学习日从凌晨 05:00 开始。</p>
+
+        <section class="guide-section" aria-labelledby="guide-rules">
+          <h3 id="guide-rules" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="/icons.svg#calendar"/></svg>什么时候算过关</h3>
+          <ol class="guide-steps">
+            <li><strong>首次过关</strong><span>同一天连对设定次数，默认 3 次。还没过关时通常隔约 15 张其他卡片再测，剩余词少时会提前出现。</span></li>
+            <li><strong>以后再遇到</strong><span>已经过关过的词，当天首答选「记住了」就过关。首答没记住，当天改为按设定次数连对。</span></li>
+            <li><strong>长期掌握</strong><span>累计过关达到设定天数即掌握，每个学习日最多计一天，跳过几天也保留已累计的天数。</span></li>
+          </ol>
+          <p>学习日从凌晨 05:00 开始。当天新增或重复导入的词优先复习，可以超过每日常规上限。</p>
+          <p>每隔 5 个学习日，程序会把历史答错率较高的词穿插回顾。已掌握的词也可能出现，本轮回顾不会扣除已累计的过关天数。</p>
+        </section>
+
+        <section class="guide-section" aria-labelledby="guide-library">
+          <h3 id="guide-library" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="/icons.svg#library"/></svg>查词与管理词库</h3>
+          <ul class="guide-list">
+            <li><strong>搜索与预览</strong>　可按英文或中文释义搜索，并按掌握状态筛选。<span id="guide-preview-tip">在词条上悬停可预览详情。</span></li>
+            <li><strong>编辑资料</strong>　在卡片展开后写「我的备注」，或点「编辑卡片资料」补充释义、音标、例句和译文。修改会自动保存。</li>
+            <li><strong>更多操作</strong>　在词库的「更多」中可查看复习记录、提前复习或重新学习。删除的词可在回收站恢复，也可以勾选多个词一起处理。</li>
+            <li><strong>补充词典</strong>　缺资料时可在设置开启联网补充，也可在词库选择「联网补缺」。已有资料保留，内置词典可离线使用。</li>
+          </ul>
+        </section>
+
+        <section class="guide-section" aria-labelledby="guide-settings">
+          <h3 id="guide-settings" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="/icons.svg#stats"/></svg>看统计与调整设置</h3>
+          <p>「统计」可以看最近 7 天或 30 天的学习词数和作答次数。点图表或悬停可查看当天的数据。</p>
+          <p>「设置 → 学习」可调整每日复习上限、当天连对次数、累计过关天数和考试日期。考试可以每年循环或指定某一天。「外观」可切换主题和音标显示。</p>
+          <p>如果勾选了「以后不再提示」，仍可在「设置」底部重新打开本手册。</p>
+        </section>
+
+        <section class="guide-section" aria-labelledby="guide-data">
+          <h3 id="guide-data" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="/icons.svg#backup"/></svg>备份与换设备</h3>
+          <div class="guide-transfer" aria-label="原设备导出，再到另一台设备导入">
+            <span><svg class="icon" aria-hidden="true"><use href="/icons.svg#upload"/></svg>原设备导出</span>
+            <svg class="icon" aria-hidden="true"><use href="/icons.svg#right"/></svg>
+            <span><svg class="icon" aria-hidden="true"><use href="/icons.svg#download"/></svg>新设备导入</span>
+          </div>
+          <p>先在原设备打开「设置 → 导出数据」。<span id="guide-export-tip">在 Windows 选择保存位置。</span>将生成的 <code>.lexi</code> 文件传到另一台设备，再用「导入数据」。</p>
+          <p><strong>导入会覆盖当前数据。</strong> 确认前能预览词条数和任务进度。应用会保留覆盖前的自动备份，可通过「导出覆盖前备份」取回。</p>
+          <p>在同一设备留档，用「备份数据」和「恢复备份」。只想分享词表时，可在词库导出 CSV。</p>
         </section>
       </div>
       <footer class="dialog-footer">

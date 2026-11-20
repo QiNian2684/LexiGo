@@ -634,17 +634,70 @@ dialog::backdrop { background: var(--overlay); }
 .dialog-body .inline-status { margin-top: .65rem; }
 .dialog-footer { min-width: 0; padding: .72rem 1.2rem; border-top: 1px solid var(--line); background: var(--inset); }
 .dialog-footer .inline-status { margin-bottom: .6rem; }
-#guide-dialog { width: 33rem; }
-.guide-header { justify-content: flex-start; gap: .65rem; }
-.guide-header img { flex: none; }
-.guide-section { padding: .68rem 0; }
-.guide-section + .guide-section { border-top: 1px solid var(--line); }
-.guide-section h3 { color: var(--ink); font-size: .98rem; margin-bottom: .32rem; }
-.guide-section p, .guide-controls { color: var(--secondary); font-size: .88rem; line-height: 1.58; }
-.guide-section p + p { margin-top: .27rem; }
-.guide-controls { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .3rem .7rem; margin: 0; }
-.guide-controls dt { color: var(--ink); font-weight: 580; }
+#guide-dialog { width: 49rem; }
+.guide-header { justify-content: flex-start; gap: .72rem; border-bottom: 1px solid var(--line); }
+.guide-header img { flex: none; width: 2.35rem; height: 2.35rem; }
+.guide-body { color: var(--secondary); font-size: .91rem; line-height: 1.63; }
+.guide-body:focus-visible { outline-offset: -3px; }
+.guide-body strong, .guide-body dt { color: var(--ink); }
+.guide-intro { padding: .9rem 0 1.02rem; }
+.guide-intro > p { max-inline-size: 54ch; }
+.guide-contents { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .66rem; }
+.guide-contents button {
+  min-height: 2.5rem; padding: .35rem .62rem; background: var(--inset); color: var(--accent);
+  border: 1px solid var(--control-line); border-radius: var(--radius-control); font-size: .85rem;
+}
+.guide-contents button:hover { background: var(--accent-soft); }
+.guide-section { padding-block: .95rem 1.1rem; border-top: 1px solid var(--line); }
+.guide-section h3 { display: flex; align-items: center; gap: .48rem; color: var(--ink); font-size: 1.1rem; margin-bottom: .62rem; }
+.guide-section h3 .icon { color: var(--accent); }
+.guide-section h4 { color: var(--ink); font-size: .94rem; margin: 0 0 .35rem; }
+.guide-section p + p { margin-top: .55rem; }
+.guide-steps { list-style: none; padding: 0; margin: .55rem 0; display: grid; gap: .48rem; counter-reset: guide-step; }
+.guide-steps li { position: relative; padding: .56rem .65rem .56rem 2.65rem; background: var(--inset); border-radius: var(--radius-control); }
+.guide-steps li::before {
+  counter-increment: guide-step; content: counter(guide-step);
+  position: absolute; inset: .62rem auto auto .65rem; width: 1.45rem; height: 1.45rem; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent); border-radius: 50%; font-weight: 650; font-size: .84rem;
+}
+.guide-steps strong, .guide-steps span { display: block; }
+.guide-review-layout { display: grid; gap: .85rem; }
+.guide-figure { margin: 0; min-width: 0; }
+.guide-figure figcaption { margin-top: .24rem; color: var(--muted); font-size: .79rem; text-align: center; }
+.guide-card { border: 1px solid var(--control-line); border-radius: var(--radius-control); color: var(--ink); }
+.guide-card-front { position: relative; padding: 1.38rem .54rem .74rem; text-align: center; background: var(--inset); border-radius: inherit; }
+.guide-card-front > strong { display: block; font-size: 1.58rem; line-height: 1.2; overflow-wrap: anywhere; }
+.guide-card small { display: block; margin-block: .26rem; color: var(--muted); font-size: .75rem; }
+.guide-card-check {
+  position: absolute; inset: .35rem .4rem auto auto; display: grid; place-items: center; width: 1.5rem; height: 1.5rem;
+  color: var(--accent); border: 1px solid var(--control-line); border-radius: .35rem;
+}
+.guide-card-check .icon, .guide-card-reveal .icon { width: .88rem; height: .88rem; }
+.guide-card-reveal { display: inline-flex; align-items: center; gap: .26rem; padding: .24rem .45rem; border-radius: .35rem; background: var(--accent-soft); color: var(--accent); font-size: .8rem; }
+.guide-card-answer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .24rem .54rem; padding: .37rem .65rem; border-block: 1px solid var(--line); }
+.guide-card-vote { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .35rem; padding: .42rem; text-align: center; font-size: .8rem; }
+.guide-card-vote span { padding: .22rem; border: 1px solid var(--control-line); border-radius: .35rem; }
+.guide-card-vote span:last-child { background: var(--accent-fill); color: var(--on-accent); border-color: transparent; }
+.guide-controls { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .36rem .64rem; margin: 0; align-content: start; }
+.guide-controls dt { font-weight: 600; }
 .guide-controls dd { margin: 0; }
+.guide-controls .icon { width: 1rem; height: 1rem; color: var(--accent); }
+.guide-arrow-right { transform: scaleX(-1); }
+.guide-platform { margin-top: .78rem; padding: .62rem .73rem; background: var(--inset); border-radius: var(--radius-control); }
+.guide-platform > p { margin-top: .52rem; }
+.guide-list { padding-inline-start: 1.2rem; margin: .25rem 0 0; }
+.guide-list li + li { margin-top: .42rem; }
+.guide-transfer { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .4rem .62rem; margin-bottom: .6rem; padding: .54rem; background: var(--inset); border-radius: var(--radius-control); }
+.guide-transfer span { display: inline-flex; align-items: center; gap: .32rem; color: var(--accent); font-weight: 600; }
+.guide-transfer .icon { width: 1.1rem; height: 1.1rem; }
+@media (min-width: 44rem) {
+  .guide-review-layout { grid-template-columns: minmax(0, .94fr) minmax(0, 1.25fr); }
+}
+@media (max-width: 28rem) {
+  .guide-review-layout .guide-controls { grid-template-columns: minmax(0, 1fr); gap: .2rem; }
+  .guide-review-layout .guide-controls dd + dt { margin-top: .37rem; }
+  .guide-contents button { min-height: 2.75rem; }
+}
 .guide-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .55rem; }
 .guide-footer label { display: inline-flex; align-items: center; gap: .44rem; font-size: .9rem; cursor: pointer; }
 .guide-footer .button { min-width: 5.6rem; }

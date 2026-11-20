@@ -5,11 +5,13 @@ import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.OpenableColumns;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.Voice;
 import android.view.Gravity;
@@ -362,19 +364,30 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
         return new Intent(action).addCategory(Intent.CATEGORY_OPENABLE).setType(type);
     }
 
+    private static String studyFilename() {
+        String time = new java.text.SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", java.util.Locale.ROOT)
+            .format(new java.util.Date());
+        return "LexiGo-" + time + StudyShareProvider.FILE_EXTENSION;
+    }
+
+    private boolean isStudyDocument(Uri uri) {
+        String name = uri.getLastPathSegment();
+        try (Cursor cursor = getContentResolver().query(uri, new String[] {OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst() && !cursor.isNull(0)) name = cursor.getString(0);
+        }
+        return name != null && name.toLowerCase(java.util.Locale.ROOT).endsWith(StudyShareProvider.FILE_EXTENSION);
+    }
+
     private void pruneShares() {
         long expiry = System.currentTimeMillis() - StudyShareProvider.KEEP_MILLIS;
         File[] files = StudyShareProvider.directory(this).listFiles();
         if (files == null) return;
         for (File file : files) {
             String name = file.getName();
-            if (name.endsWith(".json") && StudyShareProvider.validId(name.substring(0, name.length() - 5)) &&
-                    file.isFile() && file.lastModified() < expiry) {
-                String day = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT)
-                    .format(new java.util.Date(file.lastModified()));
-                String title = "WordReview-Learning-" + day + ".json";
-                revokeUriPermission(StudyShareProvider.uri(this, name.substring(0, name.length() - 5), title),
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            int dot = name.lastIndexOf('.');
+            if (dot > 0 && (name.endsWith(StudyShareProvider.FILE_EXTENSION) || name.endsWith(".json")) &&
+                    StudyShareProvider.validId(name.substring(0, dot)) && file.isFile() && file.lastModified() < expiry) {
+                revokeUriPermission(StudyShareProvider.uri(this, name.substring(0, dot), null), Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 file.delete();
             }
         }
@@ -387,16 +400,15 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
         io.execute(() -> {
             File directory = StudyShareProvider.directory(this);
             String id = UUID.randomUUID().toString();
-            File cache = new File(directory, id + ".json");
+            File cache = new File(directory, id + StudyShareProvider.FILE_EXTENSION);
+            String filename = studyFilename();
             try {
                 pruneShares();
                 if (!directory.isDirectory() && !directory.mkdirs()) throw new IOException("无法准备分享文件。");
                 try (OutputStream destination = new FileOutputStream(cache)) {
                     processDocument(new Operation("export", ""), null, base, cookie, destination);
                 }
-                String day = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT)
-                    .format(new java.util.Date(cache.lastModified()));
-                Uri uri = StudyShareProvider.uri(this, id, "WordReview-Learning-" + day + ".json");
+                Uri uri = StudyShareProvider.uri(this, id, filename);
                 runOnUiThread(() -> {
                     preparingShare = false;
                     if (isDestroyed() || !visible) return;
@@ -439,12 +451,14 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
         Intent selector;
         if ("import".equals(kind)) {
             selector = document(Intent.ACTION_OPEN_DOCUMENT, "*/*");
-        } else {
-            boolean csv = "csv".equals(kind);
-            selector = document(Intent.ACTION_CREATE_DOCUMENT, csv ? "text/csv" : "application/json");
+        } else if ("csv".equals(kind)) {
+            selector = document(Intent.ACTION_CREATE_DOCUMENT, "text/csv");
             String day = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT).format(new java.util.Date());
-            String base = csv ? "WordReview-words-" : ("backup".equals(kind) ? "WordReview-backup-" : "WordReview-Learning-");
-            selector.putExtra(Intent.EXTRA_TITLE, "recovery".equals(kind) ? body : base + day + (csv ? ".csv" : ".json"));
+            selector.putExtra(Intent.EXTRA_TITLE, "WordReview-words-" + day + ".csv");
+        } else {
+            // An explicit JSON MIME type may make document providers append .json to the title.
+            selector = document(Intent.ACTION_CREATE_DOCUMENT, "application/vnd.lexigo.learning");
+            selector.putExtra(Intent.EXTRA_TITLE, studyFilename());
         }
         try {
             startActivityForResult(selector, SYSTEM_DOCUMENT);
@@ -508,6 +522,9 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
     }
 
     private String processDocument(Operation op, Uri uri, Uri base, String cookie, OutputStream privateOutput) throws IOException {
+        if ("import".equals(op.kind) && !isStudyDocument(uri)) {
+            throw new IOException("请选择扩展名为 .lexi 的 LexiGo 学习数据文件。");
+        }
         if ("recovery".equals(op.kind)) {
             if (!op.body.matches("before-transfer-[0-9TZ.]+\\.json")) throw new IOException("备份文件名无效。");
             File file = new File(recoveryDirectory(), op.body);

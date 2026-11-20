@@ -616,7 +616,7 @@ func (a *application) handler() http.Handler {
 			saveError(w, err)
 			return
 		}
-		download(w, "application/json", "WordReview-backup-"+localDay()+".json", data)
+		download(w, "application/json", transferFilename(time.Now()), data)
 	})
 	mux.HandleFunc("POST /api/restore", func(w http.ResponseWriter, r *http.Request) {
 		var incoming database

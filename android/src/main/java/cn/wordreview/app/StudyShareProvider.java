@@ -16,6 +16,7 @@ import java.util.List;
 /** Read-only provider scoped to generated share files in the private cache. */
 public final class StudyShareProvider extends ContentProvider {
     private static final String JSON = "application/json";
+    static final String FILE_EXTENSION = ".lexi";
     static final long KEEP_MILLIS = 3L * 24 * 60 * 60 * 1000;
 
     static File directory(Context context) {
@@ -23,8 +24,9 @@ public final class StudyShareProvider extends ContentProvider {
     }
 
     static Uri uri(Context context, String id, String name) {
-        return new Uri.Builder().scheme("content").authority(context.getPackageName() + ".share")
-            .appendPath("study").appendPath(id).appendPath(name).build();
+        Uri.Builder path = new Uri.Builder().scheme("content").authority(context.getPackageName() + ".share")
+            .appendPath("study").appendPath(id);
+        return (name == null ? path : path.appendPath(name)).build();
     }
 
     static boolean validId(String id) {
@@ -36,10 +38,10 @@ public final class StudyShareProvider extends ContentProvider {
     private File resolve(Uri uri) {
         List<String> parts = uri.getPathSegments();
         if (parts.size() != 3 || !"study".equals(parts.get(0)) || !validId(parts.get(1)) ||
-                !parts.get(2).matches("WordReview-Learning-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.json")) {
+                !parts.get(2).matches("LexiGo-[0-9]{4}(-[0-9]{2}){5}\\.lexi")) {
             return null;
         }
-        File file = new File(directory(getContext()), parts.get(1) + ".json");
+        File file = new File(directory(getContext()), parts.get(1) + FILE_EXTENSION);
         return file.isFile() ? file : null;
     }
 

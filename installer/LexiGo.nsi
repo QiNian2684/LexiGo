@@ -4,8 +4,9 @@ ManifestDPIAware true
 
 !include "MUI2.nsh"
 !include "nsDialogs.nsh"
+!include "FileFunc.nsh"
 
-!define VERSION "2.6.2"
+!define VERSION "2.6.3"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\LexiGo"
 !define DATA_CONFIG "LexiGo.data-dir"
 
@@ -51,6 +52,7 @@ Var ShortcutCheck
 Var MakeShortcut
 Var Stage
 Var DataLock
+Var InstallError
 
 Function .onInit
   SetRegView 64
@@ -103,6 +105,24 @@ FunctionEnd
 Function BrowseData
   Pop $0
   ${NSD_GetText} $DataEdit $0
+  # The default subfolder may not exist until the installation is confirmed.
+  ${DoWhile} $0 != ""
+    ${If} ${FileExists} "$0\."
+      ${ExitDo}
+    ${EndIf}
+    ${GetParent} "$0" $1
+    ${If} $1 == $0
+      StrCpy $0 ""
+    ${Else}
+      StrCpy $0 "$1"
+    ${EndIf}
+  ${Loop}
+  ${If} $0 == ""
+    StrCpy $0 "$INSTDIR" 3
+    ${IfNot} ${FileExists} "$0."
+      StrCpy $0 ""
+    ${EndIf}
+  ${EndIf}
   nsDialogs::SelectFolderDialog "选择存放 LexiGo 数据的文件夹" "$0"
   Pop $0
   ${If} $0 != "error"
@@ -111,20 +131,29 @@ Function BrowseData
 FunctionEnd
 
 Function DataLeave
-  ${NSD_GetText} $DataEdit $DataDir
+  ${NSD_GetText} $DataEdit $0
   ${NSD_GetState} $ShortcutCheck $MakeShortcut
-  System::Call 'shlwapi::PathIsRelativeW(w "$DataDir") i.r0'
-  ${If} $DataDir == ""
-  ${OrIf} $0 != 0
-    MessageBox MB_OK|MB_ICONEXCLAMATION "请选择一个完整的数据文件夹路径。"
+  StrCpy $1 $0 2 1
+  System::Call 'shlwapi::PathGetDriveNumberW(w r0) i.r2'
+  ${If} $1 != ":\"
+  ${OrIf} $2 == -1
+    StrCpy $1 $0 4
+    System::Call 'shlwapi::PathIsUNCW(w r0) i.r2'
+    ${If} $2 == 0
+    ${OrIf} $1 == "\\?\"
+    ${OrIf} $1 == "\\.\"
+      MessageBox MB_OK|MB_ICONEXCLAMATION "请输入完整的数据文件夹路径，例如 D:\LexiGo\Data。"
+      Abort
+    ${EndIf}
+  ${EndIf}
+  # NSIS GetFullPathName requires an existing parent. Win32 only resolves the spelling.
+  System::Call 'kernel32::GetFullPathNameW(w r0, i ${NSIS_MAX_STRLEN}, w .r1, p 0) i.r2'
+  ${If} $2 == 0
+  ${OrIf} $2 >= ${NSIS_MAX_STRLEN}
+    MessageBox MB_OK|MB_ICONEXCLAMATION "无法解析数据文件夹路径：$\r$\n$0"
     Abort
   ${EndIf}
-  ClearErrors
-  GetFullPathName $DataDir "$DataDir"
-  ${If} ${Errors}
-    MessageBox MB_OK|MB_ICONEXCLAMATION "无法使用此路径。请选择有效的数据文件夹。"
-    Abort
-  ${EndIf}
+  StrCpy $DataDir "$1"
 FunctionEnd
 
 Section "LexiGo"
@@ -132,16 +161,22 @@ Section "LexiGo"
     Call LoadDataDir
     StrCpy $MakeShortcut ${BST_UNCHECKED}
   ${EndIf}
+  StrCpy $InstallError "无法创建或写入数据文件夹：$\r$\n$DataDir$\r$\n请确认磁盘已连接，且当前账户对该路径有写入权限。"
   ClearErrors
-  CreateDirectory "$INSTDIR"
   CreateDirectory "$DataDir"
   IfErrors installFailed
   GetTempFileName $0 "$DataDir"
   IfErrors installFailed
   Delete "$0"
+  IfErrors installFailed
+  StrCpy $InstallError "无法创建或写入程序文件夹：$\r$\n$INSTDIR$\r$\n请确认磁盘已连接，且当前账户对该路径有写入权限。"
+  CreateDirectory "$INSTDIR"
+  IfErrors installFailed
   GetTempFileName $Stage "$INSTDIR"
   IfErrors installFailed
   Delete "$Stage"
+  IfErrors installFailed
+  StrCpy $InstallError "未能更新程序或注册卸载入口。请关闭旧版 LexiGo，并确认程序文件夹可写入后重试。"
   SetOutPath "$Stage"
   SetOverwrite on
   File /oname=LexiGo.exe "${PACKAGE_EXE}"
@@ -203,7 +238,7 @@ Section "LexiGo"
       Delete "$Stage\${DATA_CONFIG}"
       RMDir "$Stage"
     ${EndIf}
-    MessageBox MB_OK|MB_ICONSTOP "未能完成安装。请关闭旧版 LexiGo，确认两个文件夹均可写入后再试。学习数据已保留。" /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "$InstallError$\r$\n学习数据已保留。" /SD IDOK
     SetErrorLevel 1
     Quit
   installDone:
