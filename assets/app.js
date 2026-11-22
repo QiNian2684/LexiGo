@@ -7,6 +7,9 @@ const windowsReview = document.documentElement.dataset.reviewShortcuts === "wind
 const shell = document.querySelector(".shell");
 const controls = window.WordReviewControls;
 const wordPreview = el("word-preview");
+const swipeContent = el("swipe-content");
+const swipeCue = el("swipe-cue");
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const views = ["review", "add", "library", "stats", "settings"];
 const editFields = ["word", "meaning", "pos", "ipa", "ipaUK", "ipaUS", "examples",
   "exampleTranslation", "etymology", "collocations", "note", "personalNote"];
@@ -456,6 +459,62 @@ async function undo(fromSwipe = false) {
   finally { busy = false; renderReview(); }
   if (state?.waitingForNext) await resumeWaiting();
   else if (revealAfterUndo && view === "review" && el("answer").hidden) await toggleReveal();
+}
+
+function canAdvanceReview() {
+  return studying && state?.current && !el("answer").hidden;
+}
+
+function sameReview({card, date, waiting}) {
+  return date === state?.date && sameCard(card, state.current) &&
+    waiting === Boolean(state.waitingForNext);
+}
+
+function animateReviewSlide(from, to) {
+  if (reducedMotion.matches || !swipeContent.animate) return;
+  return swipeContent.animate([from, to], {
+    duration: 190, easing: "cubic-bezier(.2,.7,.3,1)",
+  }).finished.catch(() => {});
+}
+
+function resetReviewSlide() {
+  swipeContent.style.transform = "";
+  swipeContent.style.opacity = "";
+  swipeCue.style.opacity = "";
+}
+
+async function slideReview({offset = 0, reversing = false} = {}) {
+  if (view !== "review" || !state || practice || busy || swiping ||
+      (reversing ? !state.canUndo : !canAdvanceReview())) return;
+  const {current: card, date, waitingForNext} = state;
+  const waiting = Boolean(waitingForNext);
+  const animated = !reducedMotion.matches && swipeContent.animate;
+  swiping = true;
+  renderReview();
+  try {
+    if (animated && !el("flashcard").hidden) {
+      const exit = (reversing ? 1 : -1) * swipeContent.clientWidth;
+      await animateReviewSlide({transform: `translateX(${offset}px)`, opacity: 1},
+        {transform: `translateX(${exit}px)`, opacity: 0});
+      swipeContent.style.opacity = "0";
+    } else {
+      resetReviewSlide();
+    }
+    if (view === "review" && sameReview({card, date, waiting})) {
+      if (reversing) await undo(true);
+      else if (waiting) await nextCard(true);
+      else await vote(true, {fromSwipe: true});
+    }
+    resetReviewSlide();
+    if (animated && !el("flashcard").hidden) {
+      await animateReviewSlide({transform: `translateX(${reversing ? -22 : 22}px)`, opacity: .45},
+        {transform: "translateX(0)", opacity: 1});
+    }
+  } finally {
+    resetReviewSlide();
+    swiping = false;
+    renderReview();
+  }
 }
 
 async function stopReview() {
@@ -1346,8 +1405,10 @@ function keyboard(event) {
   if (voteKeys.includes(event.key) && !el("vote-actions").hidden && !el("answer").hidden) {
     event.preventDefault();
     const remembered = event.key === "2" || event.key === "ArrowRight";
-    if (state.waitingForNext && !remembered) nextCard();
-    else vote(remembered);
+    if (remembered) {
+      if (!state.waitingForNext) slideReview();
+    } else if (state.waitingForNext) slideReview();
+    else vote(false);
   }
 }
 
@@ -1410,30 +1471,18 @@ if (mobile) {
 }
 
 if (mobile) {
-  const surface = el("swipe-content");
-  const cue = el("swipe-cue");
-  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
   let drag;
   let frame;
-  const setOffset = x => { surface.style.transform = `translate3d(${x}px,0,0)`; };
   const canSwipe = () => view === "review" && !practice && !busy && !swiping &&
     !document.activeElement?.matches("input,textarea,select,[contenteditable]") &&
     !document.querySelector("dialog[open]") && !controls.isOpen() && !window.getSelection()?.toString();
-  const canAdvance = () => studying && state?.current && !el("answer").hidden;
-  const sameReview = ({card, date, waiting}) => date === state?.date && sameCard(card, state.current) &&
-    waiting === Boolean(state.waitingForNext);
-  function animate(from, to, duration) {
-    if (reducedMotion.matches || !surface.animate) return Promise.resolve();
-    return surface.animate([from, to], {duration, easing: "cubic-bezier(.2,.7,.3,1)"}).finished.catch(() => {});
-  }
   function cancelDrag() {
     if (!drag) return;
     cancelAnimationFrame(frame);
     const x = drag.offset;
     drag = undefined;
-    setOffset(0);
-    cue.style.opacity = "";
-    if (x && !el("flashcard").hidden) animate({transform:`translateX(${x}px)`}, {transform:"translateX(0)"}, 190);
+    resetReviewSlide();
+    if (x && !el("flashcard").hidden) animateReviewSlide({transform: `translateX(${x}px)`}, {transform: "translateX(0)"});
   }
   let suppressClickUntil = 0;
   document.addEventListener("click", event => {
@@ -1447,7 +1496,8 @@ if (mobile) {
     if (!event.isPrimary) { cancelDrag(); return; }
     suppressClickUntil = 0;
     if (drag || !canSwipe() || event.target.closest("input,textarea,select,[contenteditable]")) return;
-    const forward = surface.contains(event.target) && event.clientX >= 24 && innerWidth - event.clientX >= 24 && canAdvance();
+    const forward = swipeContent.contains(event.target) && event.clientX >= 24 &&
+      innerWidth - event.clientX >= 24 && canAdvanceReview();
     if (!state?.canUndo && !forward) return;
     drag = {id:event.pointerId, x:event.clientX, y:event.clientY, offset:0,
       forward, undo:state.canUndo, card:state.current, date:state.date, waiting:Boolean(state.waitingForNext)};
@@ -1463,7 +1513,7 @@ if (mobile) {
       const reversing = dx > 0;
       if (reversing ? !drag.undo : !drag.forward) { cancelDrag(); return; }
       drag.action = reversing ? "undo" : "forward";
-      drag.threshold = reversing ? Math.max(52, Math.min(78, innerWidth * .18)) : Math.min(88, surface.clientWidth * .21) * .75;
+      drag.threshold = reversing ? Math.max(52, Math.min(78, innerWidth * .18)) : Math.min(88, swipeContent.clientWidth * .21) * .75;
       el("swipe-label").textContent = reversing ? "撤销上一次" : drag.waiting ? "下一单词" : "记住了";
       el("swipe-icon").setAttribute("href", "/icons.svg#" + (reversing ? "arrow-left" : drag.waiting ? "right" : "check"));
       document.body.setPointerCapture(event.pointerId);
@@ -1472,8 +1522,8 @@ if (mobile) {
     drag.offset = drag.action === "undo" ? Math.max(0, dx) : Math.min(0, dx);
     cancelAnimationFrame(frame);
     frame = requestAnimationFrame(() => {
-      setOffset(drag.offset);
-      cue.style.opacity = Math.min(1, Math.abs(drag.offset) / drag.threshold);
+      swipeContent.style.transform = `translate3d(${drag.offset}px,0,0)`;
+      swipeCue.style.opacity = Math.min(1, Math.abs(drag.offset) / drag.threshold);
     });
   });
   document.addEventListener("pointercancel", event => { if (drag?.id === event.pointerId) cancelDrag(); });
@@ -1483,38 +1533,12 @@ if (mobile) {
     if (drag?.id !== event.pointerId) return;
     if (drag.action) suppressClickUntil = performance.now() + 350;
     if (!drag.action || Math.abs(drag.offset) < drag.threshold || !canSwipe() || !sameReview(drag)) { cancelDrag(); return; }
-    const completed = drag;
-    const {offset, waiting, action} = completed;
+    const {offset, action} = drag;
     const reversing = action === "undo";
-    if (reversing ? !state.canUndo : !canAdvance()) { cancelDrag(); return; }
+    if (reversing ? !state.canUndo : !canAdvanceReview()) { cancelDrag(); return; }
     drag = undefined;
     cancelAnimationFrame(frame);
-    swiping = true;
-    renderReview();
-    try {
-      if (!el("flashcard").hidden) {
-        const exit = (reversing ? 1 : -1) * surface.clientWidth;
-        await animate({transform:`translateX(${offset}px)`, opacity:1}, {transform:`translateX(${exit}px)`, opacity:0}, 190);
-        surface.style.opacity = "0";
-      }
-      if (view === "review" && sameReview(completed)) {
-        if (reversing) await undo(true);
-        else if (waiting) await nextCard(true);
-        else await vote(true, {fromSwipe:true});
-      }
-      setOffset(0);
-      cue.style.opacity = "";
-      surface.style.opacity = "";
-      if (!el("flashcard").hidden) {
-        await animate({transform:`translateX(${reversing ? -22 : 22}px)`, opacity:0.45}, {transform:"translateX(0)", opacity:1}, 190);
-      }
-    } finally {
-      setOffset(0);
-      cue.style.opacity = "";
-      surface.style.opacity = "";
-      swiping = false;
-      renderReview();
-    }
+    await slideReview({offset, reversing});
   });
 }
 
@@ -1641,8 +1665,8 @@ el("restore-file").onchange = restoreFile;
 el("start-review").onclick = startReview;
 el("undo").onclick = () => undo();
 el("reveal").onclick = toggleReveal;
-el("forgot").onclick = () => state?.waitingForNext ? nextCard() : vote(false);
-el("pass").onclick = () => vote(true);
+el("forgot").onclick = () => state?.waitingForNext ? slideReview() : vote(false);
+el("pass").onclick = () => slideReview();
 el("pass-today").onclick = () => vote(true, {passToday: true});
 el("personal-note").oninput = noteInput;
 el("personal-note").oncompositionend = noteInput;

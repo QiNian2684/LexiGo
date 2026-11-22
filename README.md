@@ -1,10 +1,10 @@
-# LexiGo 3.2.0
+# LexiGo 3.2.1
 
 个人使用的英语词库与复习软件。支持 Windows 10/11 x64 和 Android 9 及以上。两端共用词典、SQLite 表结构、数据交换格式和复习逻辑。
 
 ## 使用
 
-Windows 运行 `LexiGo-Setup-3.2.0.exe`，先选择程序位置，再选择数据文件夹和桌面快捷方式。默认程序位置为 `%LOCALAPPDATA%\Programs\LexiGo`，默认数据文件夹为程序目录下的 `Data`。直接运行 `LexiGo.exe` 也可以使用便携模式。Windows 使用 WebView2 Runtime，窗口配置保存在数据目录的 `WebView2` 子目录。Android 安装 `LexiGo-Android-3.2.0.apk` 后打开「LexiGo」。运行无需安装 Go、Python 或数据库服务器。
+Windows 运行 `LexiGo-Setup-3.2.1.exe`，先选择程序位置，再选择数据文件夹和桌面快捷方式。默认程序位置为 `%LOCALAPPDATA%\Programs\LexiGo`，默认数据文件夹为程序目录下的 `Data`。直接运行 `LexiGo.exe` 也可以使用便携模式。Windows 使用 WebView2 Runtime，窗口配置保存在数据目录的 `WebView2` 子目录。Android 安装 `LexiGo-Android-3.2.1.apk` 后打开「LexiGo」。运行无需安装 Go、Python 或数据库服务器。
 
 启动时显示可滚动的使用手册。手册配有操作截图，涵盖添加单词、每日记忆与长期掌握、词库、统计、设置和备份迁移，并显示本平台的快捷键或手势。勾选「以后不再提示」并点「确认」后，可以从「设置 → 使用说明」随时重开。
 
@@ -108,7 +108,7 @@ JSON 词表是对象数组，也可以用相同的字段名。
 
 Android 数据保存在应用私有目录 `files/StudyData`。卸载应用或清除应用数据之前，请用「导出数据」把快照保存到应用外。导入后可通过「导出覆盖前备份」将最近一次自动快照取出，再用「导入数据」恢复。完整数据含个人备注，请自行保管。
 
-Android 3.2.0 沿用 2.1.3 至 3.1.2 的包名和发行签名，可直接覆盖安装。
+Android 3.2.1 沿用 2.1.3 至 3.2.0 的包名和发行签名，可直接覆盖安装。
 
 ## 构建与测试
 
@@ -118,7 +118,7 @@ Android 3.2.0 沿用 2.1.3 至 3.1.2 的包名和发行签名，可直接覆盖�
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-脚本运行 Go 测试并生成便携版 `dist\LexiGo.exe` 和安装版 `dist\LexiGo-Setup-3.2.0.exe`。首次从源码构建需要取得 `go.mod` 和 `go.sum` 声明的依赖。已编入的词典、界面和应用图标无需重新下载。第三方依赖许可证见 `licenses/`，数据处理脚本在 `scripts/`。
+脚本运行 Go 测试并生成便携版 `dist\LexiGo.exe` 和安装版 `dist\LexiGo-Setup-3.2.1.exe`。首次从源码构建需要取得 `go.mod` 和 `go.sum` 声明的依赖。已编入的词典、界面和应用图标无需重新下载。第三方依赖许可证见 `licenses/`，数据处理脚本在 `scripts/`。
 
 也可用 `go test ./...` 单独测试核心规则。用 Python 3 运行 `python scripts/test_http.py 路径\LexiGo.exe` 可以在独立临时词库上测试离线工作流和中止进程后恢复。还可运行 `python scripts/test_portable.py .\dist\LexiGo.exe`，用独立临时目录验证 EXE 路径、移动后重新打开和隔离的旧库迁移。脚本经过 EXE 的 `--serve` 模式测试后端，WebView2 窗口的验证需在 Windows 上双击 EXE。
 
