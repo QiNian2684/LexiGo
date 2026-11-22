@@ -88,6 +88,10 @@ if [[ ! -f "$signing_key" ]]; then
     -validity 10000 -dname 'CN=LexiGo Release')
 fi
 env "JAVA_HOME=$java_root" "$tools_dir/apksigner" sign --ks "$signing_key" --ks-key-alias "$signing_alias" \
-  --ks-pass env:WORDREVIEW_KEY_PASSWORD --out "$output" "$work/aligned.apk"
-env "JAVA_HOME=$java_root" "$tools_dir/apksigner" verify --verbose "$output"
+  --ks-pass env:WORDREVIEW_KEY_PASSWORD \
+  --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
+  --v4-signing-enabled true --out "$output" "$work/aligned.apk"
+test -s "${output}.idsig"
+# Check the older signature schemes as well, even though the app requires API 28.
+env "JAVA_HOME=$java_root" "$tools_dir/apksigner" verify -Werr --verbose --min-sdk-version 23 "$output"
 echo "$output"
