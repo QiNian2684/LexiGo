@@ -30,7 +30,7 @@ window.WordReviewChart = (() => {
     highlight?.setAttribute("x", bounds.left + selected * bounds.slot);
   }
 
-  function draw() {
+  function draw(animate = false) {
     if (!history.length || !surface.clientWidth) return;
     data = history.slice(-range);
     const series = metrics[metric];
@@ -70,6 +70,8 @@ window.WordReviewChart = (() => {
         svg.append(svgElement("text", {x: x(index), y: bottom + 20, "text-anchor": "middle"}, label));
       }
     }
+    const marks = svgElement("g", animate ? {class: "chart-enter"} : {});
+    svg.append(marks);
     series.forEach(([key], seriesIndex) => {
       const color = `series-${seriesIndex}`;
       if (range === 7) {
@@ -77,13 +79,13 @@ window.WordReviewChart = (() => {
         data.forEach((row, index) => {
           if (!row[key]) return;
           const rectX = x(index) + (seriesIndex ? 1 : -bar - 1), rectY = y(row[key]);
-          svg.append(svgElement("rect", {x: rectX, y: rectY, width: bar, height: bottom - rectY,
+          marks.append(svgElement("rect", {x: rectX, y: rectY, width: bar, height: bottom - rectY,
             rx: Math.min(4, (bottom - rectY) / 2), class: `chart-mark ${color}`}));
         });
       } else {
-        svg.append(svgElement("polyline", {points: data.map((row, index) => `${x(index)},${y(row[key])}`).join(" "),
+        marks.append(svgElement("polyline", {points: data.map((row, index) => `${x(index)},${y(row[key])}`).join(" "),
           class: `chart-line ${color}`}));
-        data.forEach((row, index) => svg.append(svgElement("circle", {cx: x(index), cy: y(row[key]),
+        data.forEach((row, index) => marks.append(svgElement("circle", {cx: x(index), cy: y(row[key]),
           r: width < 490 ? 2 : 2.6, class: `chart-mark ${color}`})));
       }
     });
@@ -91,6 +93,7 @@ window.WordReviewChart = (() => {
   }
 
   for (const button of switches) button.addEventListener("click", () => {
+    if (button.getAttribute("aria-pressed") === "true") return;
     if (button.dataset.chartDays) {
       range = Number(button.dataset.chartDays);
       selected = -1;
@@ -100,7 +103,7 @@ window.WordReviewChart = (() => {
     for (const item of switches) {
       item.setAttribute("aria-pressed", String(item.dataset.chartDays ? Number(item.dataset.chartDays) === range : item.dataset.chartMetric === metric));
     }
-    draw();
+    draw(true);
   });
   function selectAt(event) {
     if (!bounds) return;
@@ -114,7 +117,7 @@ window.WordReviewChart = (() => {
       select(selected + (event.key === "ArrowLeft" ? -1 : 1));
     }
   });
-  new ResizeObserver(draw).observe(surface);
+  new ResizeObserver(() => draw()).observe(surface);
   return {update(rows) {
     const previous = history.at(-1)?.day;
     history = rows;

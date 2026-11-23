@@ -54,6 +54,8 @@
   --control: 2.75rem;
   --rail-size: 13.5rem;
   --motion: 140ms;
+  --motion-panel: 220ms;
+  --motion-ease: cubic-bezier(.2,.7,.3,1);
 }
 
 :root[data-theme="dark"] {
@@ -95,5 +97,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { --motion: 0ms; }
+  :root { --motion: 0ms; --motion-panel: 0ms; }
 }

@@ -19,6 +19,7 @@
   <aside class="sidebar">
     <div class="brand"><img src="/favicon.png" alt="" width="35" height="35"><span>LexiGo</span></div>
     <nav class="nav" aria-label="主导航">
+      <span class="nav-indicator" aria-hidden="true"></span>
       <button type="button" data-view="review" aria-current="page"><svg class="icon" aria-hidden="true"><use href="/icons.svg#review"/></svg><span>复习</span></button>
       <button type="button" data-view="add"><svg class="icon" aria-hidden="true"><use href="/icons.svg#add"/></svg><span>添加<span class="wide-label">单词</span></span></button>
       <button type="button" data-view="library"><svg class="icon" aria-hidden="true"><use href="/icons.svg#library"/></svg><span>词库<span class="wide-label">管理</span></span></button>
@@ -60,18 +61,22 @@
             </button>
           </div>
         </div>
-        <div class="answer" id="answer" hidden>
-          <section id="details" class="meaning-panel" tabindex="0" aria-label="释义和例句"></section>
-          <section class="memory-panel" aria-label="我的备注">
-            <div class="personal-note">
-              <label for="personal-note">我的备注</label>
-              <textarea id="personal-note" rows="4" maxlength="12000" placeholder="写下你的联想、易混点或任何想记的内容。"></textarea>
-              <div class="note-actions">
-                <span id="note-status" role="status"></span>
-              </div>
+        <div class="answer-panel" id="answer" aria-hidden="true" inert>
+          <div class="answer-clip">
+            <div class="answer">
+              <section id="details" class="meaning-panel" tabindex="0" aria-label="释义和例句"></section>
+              <section class="memory-panel" aria-label="我的备注">
+                <div class="personal-note">
+                  <label for="personal-note">我的备注</label>
+                  <textarea id="personal-note" rows="4" maxlength="12000" placeholder="写下你的联想、易混点或任何想记的内容。"></textarea>
+                  <div class="note-actions">
+                    <span id="note-status" role="status"></span>
+                  </div>
+                </div>
+                <div id="card-metadata"></div>
+              </section>
             </div>
-            <div id="card-metadata"></div>
-          </section>
+          </div>
         </div>
         </div>
         <div class="swipe-cue" id="swipe-cue" aria-hidden="true"><svg class="icon"><use id="swipe-icon" href="/icons.svg#check"/></svg><span id="swipe-label">记住了</span></div>

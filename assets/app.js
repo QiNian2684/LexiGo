@@ -9,6 +9,10 @@ const controls = window.WordReviewControls;
 const wordPreview = el("word-preview");
 const swipeContent = el("swipe-content");
 const swipeCue = el("swipe-cue");
+const answerPanel = el("answer");
+const navigation = document.querySelector(".nav");
+const navigationButtons = [...navigation.querySelectorAll("button[data-view]")];
+const navigationIndicator = navigation.querySelector(".nav-indicator");
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const views = ["review", "add", "library", "stats", "settings"];
 const editFields = ["word", "meaning", "pos", "ipa", "ipaUK", "ipaUS", "examples",
@@ -19,6 +23,8 @@ const dayFormat = new Intl.DateTimeFormat("zh-CN", {
 
 let state, revealed, practice, editing, confirmation;
 let view = "review";
+let sectionAnimation;
+let listAnimation;
 let settingsFrom = "review";
 let settingsOffset = 0;
 let studying = false;
@@ -101,8 +107,8 @@ function applyState(next, force = false) {
   if ((changed || force) && !practice && !retained) clearAnswer();
   renderReview();
   if ((displayChanged || onlineChanged) && revealed) renderDetails(revealed);
-  if (onlineChanged && next.settings.online && revealed && !el("answer").hidden) refreshRevealedDetails().catch(showError);
-  if (next.waitingForNext && studying && view === "review" && !practice && !busy && el("answer").hidden && !el("reveal").disabled) toggleReveal();
+  if (onlineChanged && next.settings.online && revealed && answerExpanded()) refreshRevealedDetails().catch(showError);
+  if (next.waitingForNext && studying && view === "review" && !practice && !busy && !answerExpanded() && !el("reveal").disabled) toggleReveal();
 }
 
 async function refreshState() {
@@ -138,7 +144,7 @@ function renderReview() {
   el("session-hint").hidden = !next.current;
   el("forgot-label").textContent = waiting ? "下一单词" : "没记住";
   el("vote-actions").classList.toggle("awaiting-next", !!waiting);
-  const concealed = el("answer").hidden;
+  const concealed = !answerExpanded();
   el("pass").disabled = busy || swiping || concealed || !!waiting;
   el("forgot").disabled = busy || swiping || concealed;
   el("pass-today").hidden = !studying || !!practice || !next.current || !!next.current.recall;
@@ -185,11 +191,9 @@ function clearAnswer() {
   clearTimeout(noteTimer);
   revealed = undefined;
   savedNote = "";
-  el("answer").hidden = true;
+  setAnswerExpanded(false, false);
   el("vote-actions").hidden = true;
   document.body.classList.remove("has-vote");
-  el("reveal").setAttribute("aria-expanded", "false");
-  el("reveal-label").textContent = "查看中文释义";
   el("personal-note").value = "";
   el("note-status").textContent = "";
   el("details").replaceChildren();
@@ -310,15 +314,23 @@ async function refreshRevealedDetails() {
   }
 }
 
+function answerExpanded() { return answerPanel.getAttribute("aria-hidden") === "false"; }
+
+function setAnswerExpanded(expanded, animate = true) {
+  answerPanel.classList.toggle("animate-answer", animate);
+  answerPanel.setAttribute("aria-hidden", String(!expanded));
+  answerPanel.inert = !expanded;
+  el("reveal").setAttribute("aria-expanded", String(expanded));
+  el("reveal-label").textContent = expanded ? "收起释义" : "查看中文释义";
+}
+
 async function toggleReveal() {
   const current = practice || state?.current;
   if (!current || (!studying && !practice) || busy) return;
   const trigger = el("reveal");
-  if (!el("answer").hidden) {
+  if (answerExpanded()) {
     if (!practice && state?.waitingForNext) return;
-    el("answer").hidden = true;
-    trigger.setAttribute("aria-expanded", "false");
-    el("reveal-label").textContent = "查看中文释义";
+    setAnswerExpanded(false);
     renderReview();
     return;
   }
@@ -333,10 +345,8 @@ async function toggleReveal() {
     }
     revealed = card;
     renderDetails(card);
-    el("answer").hidden = false;
+    setAnswerExpanded(true, !swiping);
     fitNote();
-    trigger.setAttribute("aria-expanded", "true");
-    el("reveal-label").textContent = "收起释义";
     renderReview();
   } catch (error) {
     showError(error);
@@ -346,7 +356,7 @@ async function toggleReveal() {
 function noteDirty() { return !!revealed && el("personal-note").value !== savedNote; }
 
 function fitNote() {
-  if ((!mobile && !windowsReview) || view !== "review" || el("answer").hidden) return;
+  if ((!mobile && !windowsReview) || view !== "review" || !answerExpanded()) return;
   const note = el("personal-note");
   note.style.height = "auto";
   note.style.height = (note.scrollHeight + note.offsetHeight - note.clientHeight) + "px";
@@ -400,7 +410,7 @@ async function resumeWaiting() {
   if (view !== "review" || practice || !state?.waitingForNext) return;
   studying = true;
   renderReview();
-  if (el("answer").hidden && !el("reveal").disabled) await toggleReveal();
+  if (!answerExpanded() && !el("reveal").disabled) await toggleReveal();
 }
 
 function noteInput(event) {
@@ -414,7 +424,7 @@ function noteInput(event) {
 
 async function vote(remembered, {fromSwipe = false, passToday = false} = {}) {
   if (!studying || practice || !state?.current || busy || (swiping && !fromSwipe) || state.waitingForNext ||
-      (passToday ? state.current.recall : el("answer").hidden)) return;
+      (passToday ? state.current.recall : !answerExpanded())) return;
   busy = true;
   renderReview();
   showError();
@@ -458,11 +468,11 @@ async function undo(fromSwipe = false) {
   } catch (error) { showError(error); }
   finally { busy = false; renderReview(); }
   if (state?.waitingForNext) await resumeWaiting();
-  else if (revealAfterUndo && view === "review" && el("answer").hidden) await toggleReveal();
+  else if (revealAfterUndo && view === "review" && !answerExpanded()) await toggleReveal();
 }
 
 function canAdvanceReview() {
-  return studying && state?.current && !el("answer").hidden;
+  return studying && state?.current && answerExpanded();
 }
 
 function sameReview({card, date, waiting}) {
@@ -531,14 +541,34 @@ async function stopReview() {
   } catch (error) { showError(error); }
 }
 
+function positionNavigationIndicator() {
+  const active = navigation.querySelector('button[aria-current="page"]');
+  navigationIndicator.style.width = active.offsetWidth + "px";
+  navigationIndicator.style.height = active.offsetHeight + "px";
+  navigationIndicator.style.transform = `translate(${active.offsetLeft}px, ${active.offsetTop}px)`;
+  navigation.classList.add("has-indicator");
+}
+
 function displayView(next) {
+  const previous = view;
   if (next !== "library") closeWordPreview();
   view = next;
   document.body.dataset.view = next;
   for (const id of views) el(id + "-view").hidden = id !== next;
-  for (const item of all("button[data-view]")) {
+  for (const item of navigationButtons) {
     if (item.dataset.view === next) item.setAttribute("aria-current", "page");
-    else if (item.dataset.view) item.removeAttribute("aria-current");
+    else item.removeAttribute("aria-current");
+  }
+  positionNavigationIndicator();
+  const section = el(next + "-view");
+  if (previous !== next && !reducedMotion.matches && section.animate) {
+    sectionAnimation?.cancel();
+    const direction = Math.sign(views.indexOf(next) - views.indexOf(previous));
+    const offset = mobile ? `translateX(${direction * 10}px)` : `translateY(${direction * 8}px)`;
+    sectionAnimation = section.animate([
+      {opacity: .68, transform: offset},
+      {opacity: 1, transform: "none"},
+    ], {duration: 220, easing: "cubic-bezier(.2,.7,.3,1)"});
   }
   if (windowsReview && next === "review") fitNote();
 }
@@ -589,7 +619,7 @@ async function startReview() {
     busy = false;
     el("start-review").disabled = false;
     renderReview();
-    if (state?.waitingForNext && el("answer").hidden) await toggleReveal();
+    if (state?.waitingForNext && !answerExpanded()) await toggleReveal();
   }
 }
 
@@ -804,13 +834,13 @@ function addWordActions(row, entry, progress) {
   return actions;
 }
 
-async function refreshLibrary() {
+async function refreshLibrary(animate = false) {
   const requestID = ++listRequest;
   const data = await api("/api/cards?" + new URLSearchParams({...libraryQuery(), page: listPage}));
   if (requestID !== listRequest || view !== "library") return;
   if (listPage && !data.rows.length) {
     listPage = Math.max(0, Math.ceil(data.total / 24) - 1);
-    return refreshLibrary();
+    return refreshLibrary(animate);
   }
   listTotal = data.total;
   showSelection();
@@ -869,6 +899,11 @@ async function refreshLibrary() {
   el("results").textContent = data.total ? `共 ${data.total} 个 · 第 ${listPage + 1} 页` : "共 0 个";
   el("prev-page").disabled = listPage === 0;
   el("next-page").disabled = (listPage + 1) * 24 >= data.total;
+  const list = el("word-list");
+  if (animate === true && !reducedMotion.matches && list.animate) {
+    listAnimation?.cancel();
+    listAnimation = list.animate([{opacity: .55}, {opacity: 1}], {duration: 170, easing: "ease-out"});
+  }
 }
 
 function clearSelection() { selected.clear(); selectedAll = false; }
@@ -876,11 +911,11 @@ function runSearch() {
   clearSelection();
   listPage = 0;
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => refreshLibrary().catch(showError), 130);
+  searchTimer = setTimeout(() => refreshLibrary(true).catch(showError), 130);
 }
 function usePage(delta) {
   listPage += delta;
-  refreshLibrary().catch(showError);
+  refreshLibrary(true).catch(showError);
 }
 
 function ask(title, text, label, perform, danger = false) {
@@ -1388,7 +1423,7 @@ function keyboard(event) {
   }
   if (windowsReview && event.key === "Enter" && reviewKeyAllowed(event)) {
     event.preventDefault();
-    if (!event.repeat && !event.shiftKey && !el("reveal").disabled && el("answer").hidden) toggleReveal();
+    if (!event.repeat && !event.shiftKey && !el("reveal").disabled && !answerExpanded()) toggleReveal();
     return;
   }
   if (view !== "review" || event.repeat || event.altKey || event.isComposing || event.keyCode === 229 ||
@@ -1402,7 +1437,7 @@ function keyboard(event) {
     event.preventDefault(); toggleReveal();
   }
   const voteKeys = windowsReview ? ["1", "2"] : ["1", "2", "ArrowLeft", "ArrowRight"];
-  if (voteKeys.includes(event.key) && !el("vote-actions").hidden && !el("answer").hidden) {
+  if (voteKeys.includes(event.key) && !el("vote-actions").hidden && answerExpanded()) {
     event.preventDefault();
     const remembered = event.key === "2" || event.key === "ArrowRight";
     if (remembered) {
@@ -1412,8 +1447,8 @@ function keyboard(event) {
   }
 }
 
+if (windowsReview || mobile) document.body.append(el("vote-actions"));
 if (windowsReview) {
-  document.body.append(el("vote-actions"));
   let noteWidth;
   new ResizeObserver(([entry]) => {
     if (entry.contentRect.width === noteWidth) return;
@@ -1542,7 +1577,13 @@ if (mobile) {
   });
 }
 
-for (const item of all("button[data-view]")) item.addEventListener("click", () => changeView(item.dataset.view));
+positionNavigationIndicator();
+const navigationResize = new ResizeObserver(positionNavigationIndicator);
+navigationResize.observe(navigation);
+for (const item of navigationButtons) {
+  navigationResize.observe(item);
+  item.addEventListener("click", () => changeView(item.dataset.view));
+}
 wordPreview.addEventListener("pointerenter", () => clearTimeout(previewDismiss));
 wordPreview.addEventListener("pointerleave", event => {
   if (!preview?.row.contains(event.relatedTarget)) delayPreviewClose();
@@ -1756,7 +1797,7 @@ setInterval(async () => {
   try {
     if (view === "library" && !controls.isOpen() && !document.querySelector("dialog[open]")) await refreshLibrary();
     if (view === "add" && importPending) await updateImportStatus();
-    if (view === "review" && revealed && !el("answer").hidden && state.settings.online &&
+    if (view === "review" && revealed && answerExpanded() && state.settings.online &&
         (revealed.lookup === "pending" || revealed.translationPending)) {
       await refreshRevealedDetails();
     }

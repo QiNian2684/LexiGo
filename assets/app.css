@@ -64,7 +64,15 @@ a { color: var(--accent); text-underline-offset: .17em; }
   letter-spacing: .025em;
 }
 .brand img { flex: 0 0 auto; border-radius: .6rem; }
-.nav { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: .32rem; }
+.nav { position: relative; isolation: isolate; display: flex; min-height: 0; flex: 1; flex-direction: column; gap: .32rem; }
+.nav-indicator {
+  position: absolute; z-index: -1; top: 0; left: 0;
+  pointer-events: none;
+  border-radius: var(--radius-control);
+  background: var(--accent-soft);
+  transition: transform var(--motion-panel) var(--motion-ease), width var(--motion-panel) var(--motion-ease),
+    height var(--motion-panel) var(--motion-ease);
+}
 .nav button {
   position: relative;
   min-height: 2.875rem;
@@ -79,6 +87,7 @@ a { color: var(--accent); text-underline-offset: .17em; }
   border-radius: var(--radius-control);
   text-align: start;
   font-weight: 520;
+  transition: color var(--motion), background var(--motion), transform var(--motion) var(--motion-ease);
 }
 .nav button:not(:disabled):hover { color: var(--ink); background: var(--hover); }
 .nav button[aria-current="page"] {
@@ -86,7 +95,7 @@ a { color: var(--accent); text-underline-offset: .17em; }
   background: var(--accent-soft);
   font-weight: 650;
 }
-.nav button[aria-current="page"]::before {
+.nav button[aria-current="page"]::before, .nav-indicator::before {
   content: "";
   position: absolute;
   inset-inline-start: .15rem;
@@ -95,6 +104,11 @@ a { color: var(--accent); text-underline-offset: .17em; }
   border-radius: 2px;
   background: var(--accent);
 }
+@media (forced-colors: none) {
+  .nav.has-indicator button[aria-current="page"] { background: transparent; }
+  .nav.has-indicator button[aria-current="page"]::before { display: none; }
+}
+@media (forced-colors: active) { .nav-indicator { display: none; } }
 #open-settings { margin-block-start: auto; }
 
 .shell {
@@ -186,7 +200,8 @@ body:not(.platform-android) .swipe-cue { display: none; }
   line-height: 1.35;
   text-align: center;
   text-decoration: none;
-  transition: background var(--motion), color var(--motion), border-color var(--motion);
+  transition: background var(--motion), color var(--motion), border-color var(--motion),
+    transform var(--motion) var(--motion-ease), opacity var(--motion);
 }
 .button .icon { width: 1.1rem; height: 1.1rem; }
 .button.primary { background: var(--accent-fill); color: var(--on-accent); }
@@ -201,8 +216,10 @@ body:not(.platform-android) .swipe-cue { display: none; }
 .icon-button { width: var(--control); height: var(--control); padding: 0; flex: 0 0 auto; color: var(--secondary); }
 .button.outline:not(:disabled):hover, .quiet:not(:disabled):hover, .icon-button:not(:disabled):hover,
 .select-control > button:not(:disabled):hover, .settings-operation:not(:disabled):hover { background: var(--hover); }
-.button:not(:disabled):active, .quiet:not(:disabled):active, .icon-button:not(:disabled):active,
-.settings-operation:not(:disabled):active { transform: translateY(1px); }
+@media (prefers-reduced-motion: no-preference) {
+  .button:not(:disabled):active, .quiet:not(:disabled):active, .icon-button:not(:disabled):active,
+  .nav button:not(:disabled):active, .settings-operation:not(:disabled):active { transform: scale(.975); }
+}
 .destructive { color: var(--danger); }
 
 .study-summary {
@@ -224,7 +241,10 @@ body:not(.platform-android) .swipe-cue { display: none; }
   color: var(--accent);
 }
 .study-summary progress::-webkit-progress-bar { background: var(--line); border-radius: 1rem; }
-.study-summary progress::-webkit-progress-value { background: var(--accent); border-radius: 1rem; }
+.study-summary progress::-webkit-progress-value {
+  background: var(--accent); border-radius: 1rem;
+  transition: width var(--motion-panel) var(--motion-ease);
+}
 .study-summary progress::-moz-progress-bar { background: var(--accent); border-radius: 1rem; }
 .session-tools {
   display: flex;
@@ -278,8 +298,18 @@ body:not(.platform-android) .swipe-cue { display: none; }
 .streak { color: var(--muted); font-size: .91rem; text-align: center; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .review-controls { display: flex; align-items: center; gap: .45rem; margin-block-start: .16rem; }
 .sound { border-color: var(--line); }
+#reveal .icon, .select-control > button .icon:last-child { transition: transform var(--motion-panel) var(--motion-ease); }
 #reveal[aria-expanded="true"] .icon { transform: rotate(180deg); }
+.select-control > button[aria-expanded="true"] .icon:last-child { transform: rotate(180deg); }
 
+.answer-panel { display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden; }
+.answer-panel[aria-hidden="false"] { grid-template-rows: 1fr; opacity: 1; visibility: visible; }
+.answer-panel.animate-answer {
+  transition: grid-template-rows var(--motion-panel) var(--motion-ease),
+    opacity var(--motion) ease, visibility 0ms var(--motion-panel);
+}
+.answer-panel.animate-answer[aria-hidden="false"] { transition-delay: 0ms; }
+.answer-clip { min-height: 0; overflow: hidden; }
 .answer {
   display: grid;
   grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr);
@@ -319,6 +349,7 @@ body:not(.platform-android) .swipe-cue { display: none; }
   border-top: 1px solid var(--line);
   background: var(--inset);
 }
+body:not([data-view="review"]) > .card-actions { display: none; }
 .awaiting-next #forgot { background: var(--accent-fill); color: var(--on-accent); border-color: var(--accent-fill); }
 .awaiting-next #forgot:not(:disabled):hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 
@@ -348,7 +379,6 @@ body:not(.platform-android) .swipe-cue { display: none; }
   grid-area: 2 / 2;
   padding: .72rem clamp(.45rem, 3vw, 1.25rem);
 }
-:root[data-review-shortcuts="windows"] body:not([data-view="review"]) > .card-actions { display: none; }
 :root[data-review-shortcuts="windows"] .personal-note textarea { resize: none; overflow-y: hidden; }
 kbd {
   padding: .01rem .31rem; line-height: 1.37; border: 1px solid currentColor;
@@ -714,6 +744,7 @@ dialog::backdrop { background: var(--overlay); }
   padding: .48rem .65rem;
   min-height: 2.6rem; border-radius: var(--radius-small); color: var(--ink);
   font-size: .93rem; line-height: 1.38; cursor: pointer;
+  transition: color var(--motion), background var(--motion);
 }
 .popup-item span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .popup-item .icon { width: 1.05rem; height: 1.05rem; color: var(--accent); }
@@ -782,6 +813,7 @@ dialog::backdrop { background: var(--overlay); }
 .chart-switch button {
   min-width: 0; min-height: 2.25rem; padding: .4rem .7rem; border: 0; border-radius: .55rem;
   background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-size: .85rem;
+  transition: color var(--motion), background var(--motion), transform var(--motion) var(--motion-ease);
 }
 .chart-switch button:hover { background: var(--hover); color: var(--ink); }
 .chart-switch button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); font-weight: 620; }
@@ -806,3 +838,44 @@ dialog::backdrop { background: var(--overlay); }
 .data-guide strong { color: var(--ink); font-weight: 600; }
 .construction-details { margin-top: .15rem; color: var(--muted); font-size: .82rem; }
 .construction-details summary { width: fit-content; cursor: pointer; }
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes panel-appear {
+    from { opacity: .52; transform: translateY(7px); }
+  }
+  @keyframes dialog-appear {
+    from { opacity: 0; transform: var(--dialog-offset, translateY(8px) scale(.99)); }
+  }
+  @keyframes backdrop-appear {
+    from { background-color: transparent; }
+  }
+  #review-start:not([hidden]), #flashcard:not([hidden]), #review-empty.is-day-complete:not([hidden]),
+  #vote-actions:not([hidden]), .notice:not([hidden]), .chart-enter {
+    animation: panel-appear var(--motion-panel) var(--motion-ease);
+  }
+  @supports not (transition-behavior: allow-discrete) {
+    dialog[open] { animation: dialog-appear var(--motion-panel) var(--motion-ease); }
+    dialog[open]::backdrop { animation: backdrop-appear var(--motion-panel) ease; }
+  }
+  @supports (transition-behavior: allow-discrete) {
+    dialog {
+      opacity: 0;
+      transform: var(--dialog-offset, translateY(8px) scale(.99));
+      transition: opacity var(--motion-panel) var(--motion-ease), transform var(--motion-panel) var(--motion-ease),
+        display var(--motion-panel) allow-discrete, overlay var(--motion-panel) allow-discrete;
+    }
+    dialog[open] { opacity: 1; transform: none; }
+    dialog:not([open]) { pointer-events: none; }
+    dialog::backdrop {
+      background-color: transparent;
+      transition: background-color var(--motion-panel) ease, display var(--motion-panel) allow-discrete,
+        overlay var(--motion-panel) allow-discrete;
+    }
+    dialog:not([open])::backdrop { pointer-events: none; }
+    dialog[open]::backdrop { background-color: var(--overlay); }
+    @starting-style {
+      dialog[open] { opacity: 0; transform: var(--dialog-offset, translateY(8px) scale(.99)); }
+      dialog[open]::backdrop { background-color: transparent; }
+    }
+  }
+}

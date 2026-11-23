@@ -52,7 +52,7 @@ body.platform-android {
 }
 .platform-android .nav button .wide-label { display: none; }
 .platform-android .nav button .icon { width: 1.19rem; height: 1.19rem; }
-.platform-android .nav button[aria-current="page"]::before { display: none; }
+.platform-android .nav button[aria-current="page"]::before, .platform-android .nav-indicator::before { display: none; }
 .platform-android #open-settings { margin: 0; }
 
 .platform-android button, .platform-android .settings-operation { touch-action: manipulation; }
@@ -167,6 +167,7 @@ body.platform-android {
 .platform-android .dialog-actions, .platform-android .right-actions { gap: .45rem; }
 .platform-android .dialog-footer .button { padding-inline: .63rem; }
 .platform-android .control-popup {
+  --dialog-offset: translateY(18px);
   inset: auto 0 0;
   width: min(100%, 33rem);
   max-width: 100%;
