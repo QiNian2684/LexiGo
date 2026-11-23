@@ -3,6 +3,19 @@ set -euo pipefail
 
 project="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 android_project="$project/android"
+release_args=()
+if [[ "${1:-}" == --release ]]; then
+  release_args=(--release)
+  shift
+  if [[ -z "${WORDREVIEW_KEYSTORE:-}" || ! -f "$WORDREVIEW_KEYSTORE" ]]; then
+    echo 'Release build requires WORDREVIEW_KEYSTORE to point to the existing LexiGo signing keystore.' >&2
+    exit 1
+  fi
+  if [[ -n "${WORDREVIEW_ANDROID_PACKAGE:-}" ]]; then
+    echo 'Release builds must use the package name in AndroidManifest.xml.' >&2
+    exit 1
+  fi
+fi
 output="${1:-$project/dist/LexiGo.apk}"
 mkdir -p "$(dirname "$output")"
 output="$(cd "$(dirname "$output")" && pwd)/$(basename "$output")"
@@ -16,6 +29,7 @@ abi_list="${WORDREVIEW_ANDROID_ABIS:-arm64-v8a x86_64}"
 if [[ "$(uname -s)" == Darwin ]]; then host_tag=darwin-x86_64; else host_tag=linux-x86_64; fi
 clang_dir="$ndk/toolchains/llvm/prebuilt/$host_tag/bin"
 javac_cmd="${java_root:+$java_root/bin/}javac"
+java_cmd="${java_root:+$java_root/bin/}java"
 keytool_cmd="${java_root:+$java_root/bin/}keytool"
 
 if [[ -z "$sdk" || -z "$ndk" || ! -f "$platform" || ! -x "$tools_dir/aapt" ]]; then
@@ -25,6 +39,7 @@ fi
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
+signed_apk="$work/LexiGo.apk"
 mkdir -p "$work/classes" "$work/dex" "$work/apk/lib"
 mapfile_list=()
 while IFS= read -r file; do mapfile_list+=("$file"); done < <(find "$android_project/src/main/java" -name '*.java' -type f | sort)
@@ -82,6 +97,10 @@ if [[ -z "${WORDREVIEW_KEY_PASSWORD:-}" ]]; then
 fi
 export WORDREVIEW_KEY_PASSWORD
 if [[ ! -f "$signing_key" ]]; then
+  if (("${#release_args[@]}")); then
+    echo 'The existing LexiGo release signing keystore is unavailable.' >&2
+    exit 1
+  fi
   mkdir -p "$(dirname "$signing_key")"
   (umask 077; "$keytool_cmd" -genkeypair -keystore "$signing_key" -storetype PKCS12 \
     -storepass:env WORDREVIEW_KEY_PASSWORD -alias "$signing_alias" -keyalg RSA -keysize 3072 \
@@ -90,8 +109,10 @@ fi
 env "JAVA_HOME=$java_root" "$tools_dir/apksigner" sign --ks "$signing_key" --ks-key-alias "$signing_alias" \
   --ks-pass env:WORDREVIEW_KEY_PASSWORD \
   --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
-  --v4-signing-enabled true --out "$output" "$work/aligned.apk"
-test -s "${output}.idsig"
-# Check the older signature schemes as well, even though the app requires API 28.
-env "JAVA_HOME=$java_root" "$tools_dir/apksigner" verify -Werr --verbose --min-sdk-version 23 "$output"
+  --v4-signing-enabled true --out "$signed_apk" "$work/aligned.apk"
+"$tools_dir/zipalign" -c -P 16 4 "$signed_apk"
+"$java_cmd" -cp "$tools_dir/lib/apksigner.jar" "$android_project/VerifyApkSignatures.java" \
+  "$signed_apk" "${release_args[@]}"
+mv -f -- "$signed_apk" "$output"
+mv -f -- "${signed_apk}.idsig" "${output}.idsig"
 echo "$output"
