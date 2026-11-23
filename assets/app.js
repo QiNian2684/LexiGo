@@ -23,6 +23,7 @@ const dayFormat = new Intl.DateTimeFormat("zh-CN", {
 
 let state, revealed, practice, editing, confirmation;
 let view = "review";
+let viewRequest = 0;
 let sectionAnimation;
 let listAnimation;
 let settingsFrom = "review";
@@ -98,6 +99,11 @@ function sameCard(a, b) {
   return a?.key === b?.key && a?.order === b?.order && a?.reviews === b?.reviews;
 }
 
+function motionOptions(token) {
+  const style = getComputedStyle(document.documentElement);
+  return {duration: parseFloat(style.getPropertyValue(token)), easing: style.getPropertyValue("--motion-ease").trim()};
+}
+
 function applyState(next, force = false) {
   const changed = !sameCard(state?.current, next.current) || state?.date !== next.date;
   const displayChanged = state?.settings.showIPA !== next.settings.showIPA;
@@ -166,7 +172,7 @@ function renderReview() {
     el("streak").hidden = !!practice;
     el("streak").textContent = practice ? "" :
       current.recall ? `易错词回顾 · 累计完成 ${current.streak} 天` :
-      `今日连对 ${current.dailyCount} / ${current.dailyTarget} · 累计完成 ${current.streak} / ${next.settings.goal} 天`;
+      `今日连对 ${current.dailyCount} / ${current.dailyTarget} · ` + masteryProgress(current.streak, next.settings.goal);
     updateVoice();
   }
   if (!next.current) {
@@ -174,6 +180,12 @@ function renderReview() {
     else if (next.total === next.mastered && !next.remembered) empty("词库里的单词都掌握了", "可以在词库提前查看，也可以选词重新学习。", "library");
     else empty("今天的任务已完成", "", "", true);
   }
+}
+
+function masteryProgress(days, goal, mastered = false) {
+  if (mastered) return `累计完成 ${days} 天`;
+  if (days >= goal) return `累计完成 ${days} 天 · 需一天首答记住`;
+  return `累计完成 ${days} / ${goal} 天`;
 }
 
 function empty(title, text, action, complete = false) {
@@ -324,7 +336,7 @@ function setAnswerExpanded(expanded, animate = true) {
   el("reveal-label").textContent = expanded ? "收起释义" : "查看中文释义";
 }
 
-async function toggleReveal() {
+async function toggleReveal({animate = true} = {}) {
   const current = practice || state?.current;
   if (!current || (!studying && !practice) || busy) return;
   const trigger = el("reveal");
@@ -345,7 +357,7 @@ async function toggleReveal() {
     }
     revealed = card;
     renderDetails(card);
-    setAnswerExpanded(true, !swiping);
+    setAnswerExpanded(true, animate);
     fitNote();
     renderReview();
   } catch (error) {
@@ -386,13 +398,14 @@ async function flushNote(background = false) {
     }
 }
 
-async function nextCard(fromSwipe = false) {
-  if (!studying || practice || busy || (swiping && !fromSwipe) || !state?.waitingForNext) return;
+async function nextCard(beforeSwap) {
+  if (!studying || practice || busy || !state?.waitingForNext) return;
   busy = true;
   renderReview();
   try {
     await flushNote();
     const result = await api("/api/review/next", {order: state.current.order});
+    if (beforeSwap) await beforeSwap;
     showError();
     applyState(result, true);
     el("review-title").scrollIntoView({block: "nearest"});
@@ -422,8 +435,8 @@ function noteInput(event) {
   if (noteDirty() && !event?.isComposing) noteTimer = setTimeout(() => flushNote().catch(showError), 600);
 }
 
-async function vote(remembered, {fromSwipe = false, passToday = false} = {}) {
-  if (!studying || practice || !state?.current || busy || (swiping && !fromSwipe) || state.waitingForNext ||
+async function vote(remembered, {beforeSwap, passToday = false} = {}) {
+  if (!studying || practice || !state?.current || busy || (swiping && !beforeSwap) || state.waitingForNext ||
       (passToday ? state.current.recall : !answerExpanded())) return;
   busy = true;
   renderReview();
@@ -435,6 +448,7 @@ async function vote(remembered, {fromSwipe = false, passToday = false} = {}) {
     const result = await api("/api/vote", {
       key: current.key, reviews: current.reviews, order: current.order, date, remembered, stay: !remembered, passToday,
     });
+    if (beforeSwap) await beforeSwap;
     applyState(result, remembered);
     if (remembered) el("review-title").scrollIntoView({block: "nearest"});
     completed = remembered && ((result.dayPassed && passed < planned) || current.recall) && result.date === date &&
@@ -451,24 +465,25 @@ async function vote(remembered, {fromSwipe = false, passToday = false} = {}) {
   if (completed && view === "review") window.WordReviewCelebrate(el("review-empty"));
 }
 
-async function undo(fromSwipe = false) {
-  if (view !== "review" || !state?.canUndo || busy || (swiping && !fromSwipe) || practice) return;
+async function undo(beforeSwap) {
+  if (view !== "review" || !state?.canUndo || busy || (swiping && !beforeSwap) || practice) return;
   busy = true;
   let revealAfterUndo = false;
   try {
     await flushNote();
     const wasWaiting = state.waitingForNext;
     const result = await api("/api/undo", {});
-    if (fromSwipe && result.current) {
+    if (beforeSwap) await beforeSwap;
+    if (beforeSwap && result.current) {
       studying = true;
       revealAfterUndo = !result.waitingForNext;
     }
     applyState(result, !wasWaiting);
-    if (fromSwipe) el("review-title").scrollIntoView({block: "nearest"});
+    if (beforeSwap) el("review-title").scrollIntoView({block: "nearest"});
   } catch (error) { showError(error); }
   finally { busy = false; renderReview(); }
   if (state?.waitingForNext) await resumeWaiting();
-  else if (revealAfterUndo && view === "review" && !answerExpanded()) await toggleReveal();
+  else if (revealAfterUndo && view === "review" && !answerExpanded()) await toggleReveal({animate: false});
 }
 
 function canAdvanceReview() {
@@ -480,11 +495,9 @@ function sameReview({card, date, waiting}) {
     waiting === Boolean(state.waitingForNext);
 }
 
-function animateReviewSlide(from, to) {
+function animateReviewSlide(from, to, token, fill = "none") {
   if (reducedMotion.matches || !swipeContent.animate) return;
-  return swipeContent.animate([from, to], {
-    duration: 190, easing: "cubic-bezier(.2,.7,.3,1)",
-  }).finished.catch(() => {});
+  return swipeContent.animate([from, to], {...motionOptions(token), fill});
 }
 
 function resetReviewSlide() {
@@ -498,29 +511,34 @@ async function slideReview({offset = 0, reversing = false} = {}) {
       (reversing ? !state.canUndo : !canAdvanceReview())) return;
   const {current: card, date, waitingForNext} = state;
   const waiting = Boolean(waitingForNext);
-  const animated = !reducedMotion.matches && swipeContent.animate;
+  const direction = reversing ? 1 : -1;
+  let outgoing, incoming;
   swiping = true;
   renderReview();
   try {
-    if (animated && !el("flashcard").hidden) {
-      const exit = (reversing ? 1 : -1) * swipeContent.clientWidth;
-      await animateReviewSlide({transform: `translateX(${offset}px)`, opacity: 1},
-        {transform: `translateX(${exit}px)`, opacity: 0});
-      swipeContent.style.opacity = "0";
-    } else {
+    if (!el("flashcard").hidden) {
+      const distance = Math.min(124, swipeContent.clientWidth * .26);
+      const exit = direction * Math.max(distance, Math.abs(offset) + 28);
+      outgoing = animateReviewSlide({transform: `translateX(${offset}px)`, opacity: 1},
+        {transform: `translateX(${exit}px)`, opacity: .14}, "--motion-card-out", "forwards");
+    }
+    const beforeSwap = outgoing?.finished.catch(() => {}) ?? Promise.resolve();
+    // Let the local request and exit run together. Swap only after both
+    // finish, keeping the old card in place if the response takes longer.
+    if (reversing) await undo(beforeSwap);
+    else if (waiting) await nextCard(beforeSwap);
+    else await vote(true, {beforeSwap});
+    const changed = !sameReview({card, date, waiting});
+    if (!el("flashcard").hidden) {
+      const start = changed ? {transform: `translateX(${-direction * 32}px)`, opacity: .58}
+        : {transform: getComputedStyle(swipeContent).transform, opacity: getComputedStyle(swipeContent).opacity};
+      outgoing?.cancel();
       resetReviewSlide();
-    }
-    if (view === "review" && sameReview({card, date, waiting})) {
-      if (reversing) await undo(true);
-      else if (waiting) await nextCard(true);
-      else await vote(true, {fromSwipe: true});
-    }
-    resetReviewSlide();
-    if (animated && !el("flashcard").hidden) {
-      await animateReviewSlide({transform: `translateX(${reversing ? -22 : 22}px)`, opacity: .45},
-        {transform: "translateX(0)", opacity: 1});
+      incoming = animateReviewSlide(start, {transform: "translateX(0)", opacity: 1}, "--motion-card-in");
+      await incoming?.finished.catch(() => {});
     }
   } finally {
+    outgoing?.cancel();
     resetReviewSlide();
     swiping = false;
     renderReview();
@@ -561,14 +579,16 @@ function displayView(next) {
   }
   positionNavigationIndicator();
   const section = el(next + "-view");
-  if (previous !== next && !reducedMotion.matches && section.animate) {
+  if (previous !== next) {
     sectionAnimation?.cancel();
-    const direction = Math.sign(views.indexOf(next) - views.indexOf(previous));
-    const offset = mobile ? `translateX(${direction * 10}px)` : `translateY(${direction * 8}px)`;
-    sectionAnimation = section.animate([
-      {opacity: .68, transform: offset},
-      {opacity: 1, transform: "none"},
-    ], {duration: 220, easing: "cubic-bezier(.2,.7,.3,1)"});
+    if (!reducedMotion.matches && section.animate) {
+      const direction = Math.sign(views.indexOf(next) - views.indexOf(previous));
+      const offset = mobile ? `translateX(${direction * 24}px)` : `translateY(${direction * 15}px)`;
+      sectionAnimation = section.animate([
+        {opacity: .75, transform: offset},
+        {opacity: 1, transform: "none"},
+      ], motionOptions("--motion-page"));
+    }
   }
   if (windowsReview && next === "review") fitNote();
 }
@@ -576,13 +596,14 @@ function displayView(next) {
 function pageScroller() { return windowsReview ? shell : window; }
 
 async function changeView(next, temporary) {
-  if (swiping) return;
-  if (next === "settings") return openSettings();
-  if (busy) return;
-  if (view === "settings" && next === settingsFrom && !temporary) return closeSettings();
+  if (swiping || busy) return;
+  const intent = ++viewRequest;
+  if (next === "settings") return openSettings(intent);
+  if (view === "settings" && next === settingsFrom && !temporary) return closeSettings(intent);
   try {
     if (view === "settings") await flushSettings();
     await flushNote();
+    if (intent !== viewRequest) return;
     controls.close(false);
     const wasPractice = !!practice;
     practice = temporary;
@@ -888,7 +909,7 @@ async function refreshLibrary(animate = false) {
     meaning.textContent = entry.meaning || (entry.lookup === "pending" ? "等待词典补充" : "暂无中文释义");
     const timing = document.createElement("small");
     const progress = entry.legacyMastered ? `旧规则连续 ${entry.legacyStreak || 0} 次` :
-      `累计完成 ${entry.streak}${entry.mastered ? "" : " / " + data.goal} 天`;
+      masteryProgress(entry.streak, data.goal, entry.mastered);
     const legacy = entry.legacyStreak && !entry.legacyMastered ? ` · 旧规则记录 ${entry.legacyStreak} 次` : "";
     timing.textContent = `${progress}${legacy} · 最近复习 ${entry.lastTry || "—"}`;
     main.append(title, meaning, timing);
@@ -902,7 +923,7 @@ async function refreshLibrary(animate = false) {
   const list = el("word-list");
   if (animate === true && !reducedMotion.matches && list.animate) {
     listAnimation?.cancel();
-    listAnimation = list.animate([{opacity: .55}, {opacity: 1}], {duration: 170, easing: "ease-out"});
+    listAnimation = list.animate([{opacity: .7}, {opacity: 1}], motionOptions("--motion-panel"));
   }
 }
 
@@ -1182,11 +1203,12 @@ function commitExamDate() {
   settingsDraft.examDate = date === "12-20" ? undefined : date;
 }
 
-async function openSettings() {
+async function openSettings(intent = ++viewRequest) {
   if (view === "settings" || busy || swiping) return;
   try {
     await flushNote();
     if (!state) await refreshState();
+    if (intent !== viewRequest) return;
     const prefs = state.settings;
     settingsDraft = {...prefs};
     settingsSaved = {...prefs};
@@ -1216,9 +1238,10 @@ async function openSettings() {
   } catch (error) { showError(error); }
 }
 
-async function closeSettings() {
+async function closeSettings(intent = ++viewRequest) {
   if (view !== "settings") return;
   try { await flushSettings(); } catch { return; }
+  if (intent !== viewRequest) return;
   controls.close(false);
   // Returning from appearance settings leaves the current card and the queue in place.
   displayView(settingsFrom);
@@ -1517,7 +1540,9 @@ if (mobile) {
     const x = drag.offset;
     drag = undefined;
     resetReviewSlide();
-    if (x && !el("flashcard").hidden) animateReviewSlide({transform: `translateX(${x}px)`}, {transform: "translateX(0)"});
+    if (x && !el("flashcard").hidden) {
+      animateReviewSlide({transform: `translateX(${x}px)`}, {transform: "translateX(0)"}, "--motion-card-in");
+    }
   }
   let suppressClickUntil = 0;
   document.addEventListener("click", event => {
@@ -1705,7 +1730,7 @@ el("pick-restore").onclick = () => el("restore-file").click();
 el("restore-file").onchange = restoreFile;
 el("start-review").onclick = startReview;
 el("undo").onclick = () => undo();
-el("reveal").onclick = toggleReveal;
+el("reveal").onclick = () => toggleReveal();
 el("forgot").onclick = () => state?.waitingForNext ? slideReview() : vote(false);
 el("pass").onclick = () => slideReview();
 el("pass-today").onclick = () => vote(true, {passToday: true});

@@ -37,7 +37,7 @@ func (p *progress) answer(day string, correct, passToday bool, options settings,
 			p.DailyCount++
 		}
 		if p.DailyCount >= p.DailyTarget {
-			p.passDaily(day, options, dayAlreadyCredited, entry)
+			p.passDaily(day, dayAlreadyCredited, entry)
 			return
 		}
 	} else {
@@ -62,15 +62,49 @@ func (p *progress) recordAnswer(day string, correct bool, entry *event) {
 	}
 }
 
-func (p *progress) passDaily(day string, options settings, dayAlreadyCredited bool, entry *event) {
+func (p *progress) passDaily(day string, dayAlreadyCredited bool, entry *event) {
 	p.LastPass = day
 	p.RepeatAt, p.RetryGap = 0, 0
 	entry.DayPassed = true
 	if !dayAlreadyCredited {
 		p.Streak++
 		entry.Credit = true
-		p.Mastered = p.Streak >= options.Goal
 	}
+}
+
+func (p progress) qualifiesForMastery(goal int, id uint64, history []event) bool {
+	if p.Streak < goal {
+		return false
+	}
+	type reviewDay struct {
+		first    string
+		credited bool
+	}
+	days := make(map[string]reviewDay)
+	for i := len(history) - 1; i >= 0; i-- {
+		item := history[i]
+		if item.Card != id || item.Undone || item.Legacy || item.Practice || item.Recall {
+			continue
+		}
+		if item.Kind == "reset" || item.Kind == "reimport" {
+			break
+		}
+		if item.Kind == "yes" || item.Kind == "no" {
+			earliest := days[item.Day]
+			earliest.first = item.Kind
+			earliest.credited = earliest.credited || item.Credit
+			days[item.Day] = earliest
+		}
+	}
+	firstMisses := 0
+	for _, day := range days {
+		if day.credited && day.first == "no" {
+			firstMisses++
+		}
+	}
+	// Defer only when the history proves every credited day began with a miss.
+	// Older backups can have credited progress without the full answer history.
+	return firstMisses < p.Streak
 }
 
 func (p *progress) reviseDailyGoal(day string, options settings, credited bool, lastAnswer *event) {
@@ -81,7 +115,7 @@ func (p *progress) reviseDailyGoal(day string, options settings, credited bool, 
 			return
 		}
 		p.DailyCount = options.DailyGoal
-		p.passDaily(day, options, credited, lastAnswer)
+		p.passDaily(day, credited, lastAnswer)
 	}
 	p.DailyTarget = options.DailyGoal
 }

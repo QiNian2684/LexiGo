@@ -404,9 +404,11 @@ func upgradePassCounts(db *database) ([]string, int) {
 	var keys []string
 	for key, card := range db.Words {
 		total := max(card.Streak, len(days[card.ID]))
-		mastered := card.Mastered || total >= db.Settings.Goal
-		if total != card.Streak || mastered != card.Mastered {
-			card.Streak, card.Mastered = total, mastered
+		status := card.progress
+		status.Streak = total
+		status.Mastered = card.Mastered || status.qualifiesForMastery(db.Settings.Goal, card.ID, db.Events)
+		if status != card.progress {
+			card.progress = status
 			keys = append(keys, key)
 		}
 	}

@@ -53,6 +53,79 @@ func TestFirstPassThenFirstAnswerPassesOnLaterLearningDays(t *testing.T) {
 	}
 }
 
+func TestMasteryWaitsForFirstAnswerRecallWhenEveryPassStartedWithAMiss(t *testing.T) {
+	s, path := newTestStore(t)
+	const first, second, third, fourth, fifth = "2026-11-01", "2026-11-02", "2026-11-04", "2026-11-06", "2026-11-07"
+	options := s.db.Settings
+	options.Goal, options.DailyGoal = 3, 2
+	if _, err := s.changeSettings(first, options); err != nil {
+		t.Fatal(err)
+	}
+	importTest(t, s, first, "apple")
+	for _, day := range []string{first, second, third} {
+		nextVote(t, s, day, false)
+		if result := passWord(t, s, day, 2); !result.Credited || result.Graduated || result.Due != 0 || result.Remembered != 1 {
+			t.Fatalf("%s: daily success must count without mastering the word: %+v", day, result)
+		}
+	}
+	if err := s.io.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := openStore(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.io.Close()
+	options.Goal = 2
+	before, err := reopened.changeSettings(fourth, options)
+	if err != nil || before.Current == nil || before.Current.Streak != 3 {
+		t.Fatalf("reopening or lowering the goal bypassed the extra review: %+v (%v)", before, err)
+	}
+	nextVote(t, reopened, fourth, false)
+	if result := passWord(t, reopened, fourth, 2); result.Graduated || !result.Credited {
+		t.Fatalf("another first miss must extend the review again: %+v", result)
+	}
+	if result := passWord(t, reopened, fifth, 1); !result.Graduated || result.Mastered != 1 {
+		t.Fatalf("first-try recall should end the extra reviews: %+v", result)
+	}
+	back, err := reopened.undo(fifth)
+	if err != nil || back.Current == nil || back.Current.Streak != 4 || back.Mastered != 0 {
+		t.Fatalf("undo must restore the outstanding first-try requirement: %+v (%v)", back, err)
+	}
+	nextVote(t, reopened, fifth, false)
+	if result := passWord(t, reopened, fifth, 2); result.Graduated {
+		t.Fatalf("undone first-try recall must not count: %+v", result)
+	}
+}
+
+func TestMasteryUsesFirstAnswersFromCompletedDaysSinceReset(t *testing.T) {
+	s, _ := newTestStore(t)
+	const first, unfinished, second, third = "2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04"
+	options := s.db.Settings
+	options.Goal, options.DailyGoal = 1, 2
+	if _, err := s.changeSettings(first, options); err != nil {
+		t.Fatal(err)
+	}
+	importTest(t, s, first, "apple")
+	if result := passWord(t, s, first, 2); !result.Graduated {
+		t.Fatalf("expected mastery in the first learning cycle: %+v", result)
+	}
+	if _, err := s.batch(unfinished, selection{Keys: []string{"apple"}}, "reset"); err != nil {
+		t.Fatal(err)
+	}
+	nextVote(t, s, unfinished, true)
+	nextVote(t, s, second, false)
+	nextVote(t, s, second, true)
+	options.DailyGoal = 1
+	updated, err := s.changeSettings(second, options)
+	if err != nil || updated.Due != 0 || updated.Mastered != 0 || s.db.Words["apple"].Streak != 1 {
+		t.Fatalf("a shorter daily target passed the day, but must not bypass mastery: %+v (%v)", updated, err)
+	}
+	if result := passWord(t, s, third, 1); !result.Graduated {
+		t.Fatalf("the first completed day with first-try recall must grant mastery: %+v", result)
+	}
+}
+
 func TestWrongAnswerAndRollover(t *testing.T) {
 	s, path := newTestStore(t)
 	importTest(t, s, "2026-11-01", "apple")

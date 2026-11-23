@@ -215,7 +215,7 @@
               <div class="number-unit"><input type="number" inputmode="numeric" min="1" max="99" step="1" id="daily-goal" required><span aria-hidden="true">次</span></div>
             </div>
             <div class="setting-row">
-              <div class="setting-text"><label for="goal">长期掌握所需累计天数</label><p>每个词完成当天的记忆后计 1 天。这些天可以不连续。</p></div>
+              <div class="setting-text"><label for="goal">长期掌握所需累计天数</label><p>每天完成记忆计 1 天，天数可不连续。如果每个完成日的第一次都选了「没记住」，词会继续排到后续学习日，直到有一天首答记住并完成记忆。</p></div>
               <div class="number-unit"><input type="number" inputmode="numeric" min="1" max="99" step="1" id="goal" required><span aria-hidden="true">天</span></div>
             </div>
             <div class="setting-row" id="exam-mode-row">
@@ -357,7 +357,7 @@
             <div>
               <p><strong>第一次记这个词。</strong> 默认需要在同一个学习日连对 3 次。完成前，这个词通常隔约 15 张其他卡片再出现。当天剩下的词很少时，会提前出现。</p>
               <p><strong>之后再复习。</strong> 已完成过一天记忆的词，下次复习时第一次选「记住了」，当天就完成了。如果先选「没记住」，当天需要再连对设定的次数。</p>
-              <p><strong>累计到长期掌握。</strong> 每个词完成当天的记忆后计 1 天。累计到设定的天数，词库会把它标为「已掌握」。中间隔几天，已经累计的天数也会保留。</p>
+              <p><strong>累计到长期掌握。</strong> 每个词完成当天的记忆后计 1 天，中间隔几天也会保留进度。例如目标为 3 天，3 天都是从「没记住」开始，仍会继续安排这个词。以后有一天第一次就选「记住了」并完成记忆，词库才会标为「已掌握」。</p>
             </div>
             <figure class="guide-figure">
               <img class="guide-light" src="/guide/rules.webp" width="754" height="754" alt="学习设置可调整每日复习上限、连对次数和长期掌握所需累计天数" loading="lazy">

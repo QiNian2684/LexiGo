@@ -173,6 +173,9 @@ func (s *store) recordVote(day, key string, version int, order uint64, remembere
 	}
 
 	s.db.Events = append(s.db.Events, entry)
+	if entry.DayPassed && card.qualifiesForMastery(s.db.Settings.Goal, card.ID, s.db.Events) {
+		card.Mastered = true
+	}
 	if err := s.save([]string{key}, count); err != nil {
 		card.progress, s.db.NextOrder, s.db.Events = before, oldOrder, s.db.Events[:count]
 		return voteResult{}, err
@@ -240,7 +243,6 @@ func (s *store) undo(day string) (reviewState, error) {
 	item := &s.db.Events[index]
 	old := card.progress
 	card.progress = *item.Before
-	card.Mastered = card.Mastered || card.Streak >= s.db.Settings.Goal
 	wasWaiting := item.Waiting
 	item.Waiting = false
 	item.Undone = true
@@ -255,6 +257,7 @@ func (s *store) undo(day string) (reviewState, error) {
 		}
 		card.reviseDailyGoal(day, s.db.Settings, s.attendance(day).credited[card.ID], adjusted)
 	}
+	card.Mastered = card.Mastered || card.qualifiesForMastery(s.db.Settings.Goal, card.ID, s.db.Events)
 	if err := s.save([]string{card.Key}, firstEvent); err != nil {
 		card.progress = old
 		item.Waiting = wasWaiting
@@ -294,7 +297,7 @@ func (s *store) changeSettings(day string, target settings) (reviewState, error)
 	var last map[uint64]int
 	var credited map[uint64]bool
 	for key, card := range s.db.Words {
-		if !card.Mastered && target.Goal < old.Goal && card.Streak >= target.Goal {
+		if !card.Mastered && target.Goal < old.Goal && card.qualifiesForMastery(target.Goal, card.ID, s.db.Events) {
 			keys = append(keys, key)
 			oldProgress[key] = card.progress
 			card.Mastered = true
@@ -319,6 +322,9 @@ func (s *store) changeSettings(day string, target settings) (reviewState, error)
 		keys = append(keys, key)
 		oldProgress[key] = card.progress
 		card.reviseDailyGoal(day, target, credited[card.ID], lastAnswer)
+		if lastAnswer != nil && card.qualifiesForMastery(target.Goal, card.ID, s.db.Events) {
+			card.Mastered = true
+		}
 	}
 	if err := s.save(keys, firstEvent); err != nil {
 		s.db.Settings = old
