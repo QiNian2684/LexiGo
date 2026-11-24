@@ -135,18 +135,26 @@ func TestPortableMigrationRejectsBusyAndBrokenSource(t *testing.T) {
 
 func TestDirectoryUsesExecutableLocation(t *testing.T) {
 	appDir := t.TempDir()
+	realDir, err := filepath.EvalSymlinks(appDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	exePath := filepath.Join(appDir, "背词本.exe")
 	if err := os.WriteFile(exePath, []byte("fake executable path"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	dir, err := portableDataDirectory(exePath)
-	if err != nil || dir != filepath.Join(appDir, "Data") {
+	if err != nil || dir != filepath.Join(realDir, "Data") {
 		t.Fatalf("directory = %q, err = %v", dir, err)
 	}
 }
 
 func TestInstalledDirectoryUsesChosenPathAndKeepsPortableDefault(t *testing.T) {
 	appDir := t.TempDir()
+	realDir, err := filepath.EvalSymlinks(appDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	exePath := filepath.Join(appDir, "LexiGo.exe")
 	if err := os.WriteFile(exePath, nil, 0600); err != nil {
 		t.Fatal(err)
@@ -168,7 +176,7 @@ func TestInstalledDirectoryUsesChosenPathAndKeepsPortableDefault(t *testing.T) {
 		t.Fatalf("configured directory = %q (%v)", dir, err)
 	}
 	writePath("Data")
-	if dir, err := portableDataDirectory(exePath); err != nil || dir != filepath.Join(appDir, "Data") {
+	if dir, err := portableDataDirectory(exePath); err != nil || dir != filepath.Join(realDir, "Data") {
 		t.Fatalf("relative directory = %q (%v)", dir, err)
 	}
 	writePath(filepath.Join("not", "absolute"))

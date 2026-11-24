@@ -54,6 +54,7 @@ func TestMorphologyCoverageBenchmark(t *testing.T) {
 	var candidates, visible int
 	newRoles, associationRoles := map[string]int{}, map[string]int{}
 	for line := range strings.SplitSeq(string(input), "\n") {
+		line = strings.TrimSuffix(line, "\r")
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
