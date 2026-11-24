@@ -34,7 +34,6 @@ mkdir -p "$ANDROID_HOME" "$ANDROID_USER_HOME" "$ANDROID_AVD_HOME"
 download "$repository/build-tools_r35_linux.zip" 2cfaa0bbb2336e9ec18ed3ecea84fa2e2af607bc .
 download "$repository/platform-tools_r37.0.3-linux.zip" e1579b288a7ae4e9bc28dedec6a154d78b3c04ed .
 download "$repository/emulator-linux_x64-16970787.zip" 5f7314368fc6c05c937f6991bb4106214dc389e7 .
-download "$repository/commandlinetools-linux-14742923_latest.zip" 48833c34b761c10cb20bcd16582129395d121b27 .
 image="system-images/android-36/google_apis"
 mkdir -p "$ANDROID_HOME/$image"
 download "$repository/sys-img/google_apis/x86_64-36_r07.zip" c6bf44bdcd885bb902b4ba752d111a073ad7a817 "$image"
@@ -42,8 +41,29 @@ if [[ -e /dev/kvm && ! -w /dev/kvm ]]; then
   sudo setfacl -m "u:$(id -un):rw" /dev/kvm
 fi
 
-echo no | "$ANDROID_HOME/cmdline-tools/bin/avdmanager" create avd --force --name lexigo-test \
-  --package 'system-images;android-36;google_apis;x86_64'
+test -s "$ANDROID_HOME/$image/x86_64/system.img"
+cat >"$ANDROID_AVD_HOME/lexigo-test.ini" <<CONFIG
+avd.ini.encoding=UTF-8
+path=$ANDROID_AVD_HOME/lexigo-test.avd
+target=android-36
+CONFIG
+mkdir "$ANDROID_AVD_HOME/lexigo-test.avd"
+cat >"$ANDROID_AVD_HOME/lexigo-test.avd/config.ini" <<CONFIG
+AvdId=lexigo-test
+abi.type=x86_64
+disk.dataPartition.size=2048M
+hw.cpu.arch=x86_64
+hw.cpu.ncore=2
+hw.gpu.enabled=yes
+hw.keyboard=yes
+hw.lcd.density=240
+hw.lcd.height=1280
+hw.lcd.width=720
+hw.ramSize=2048
+image.sysdir.1=$image/x86_64/
+tag.display=Google APIs
+tag.id=google_apis
+CONFIG
 "$ANDROID_HOME/emulator/emulator" -avd lexigo-test -no-window -no-audio -no-snapshot -no-boot-anim \
   -gpu swiftshader_indirect -accel auto >"$work/emulator.log" 2>&1 &
 emulator_pid=$!
