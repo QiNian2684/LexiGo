@@ -34,7 +34,7 @@ type openFilename struct {
 	reservedFlags, flagsEx  uint32
 }
 
-func chooseTransferFile(save bool, suggested string) (string, error) {
+func chooseDataFile(save bool, suggested, extension string) (string, error) {
 	transferDialog.Lock()
 	defer transferDialog.Unlock()
 	runtime.LockOSThread()
@@ -42,20 +42,24 @@ func chooseTransferFile(save bool, suggested string) (string, error) {
 
 	dialog := syscall.NewLazyDLL("comdlg32.dll")
 	procedure, title := "GetOpenFileNameW", "导入完整学习数据"
+	description := "LexiGo 学习数据"
 	flags := uint32(0x00080000 | 0x00000800 | 0x00000008) // Explorer, existing path, unchanged working directory.
 	file := make([]uint16, 32768)
 	if save {
 		procedure, title = "GetSaveFileNameW", "导出完整学习数据"
+		if extension == ".csv" {
+			title, description = "导出词库 CSV", "CSV 词库"
+		}
 		flags |= 0x00000002 // Confirm overwriting.
 		copy(file, utf16.Encode([]rune(suggested)))
 	} else {
 		flags |= 0x00001000 // Existing file.
 	}
-	filter := utf16.Encode([]rune("LexiGo 学习数据 (*.lexi)\x00*.lexi\x00\x00"))
+	filter := utf16.Encode([]rune(description + " (*" + extension + ")\x00*" + extension + "\x00\x00"))
 	name, _ := syscall.UTF16PtrFromString(title)
 	var ext *uint16
 	if save {
-		ext, _ = syscall.UTF16PtrFromString(studyFileExt[1:])
+		ext, _ = syscall.UTF16PtrFromString(extension[1:])
 	}
 	foreground := syscall.NewLazyDLL("user32.dll").NewProc("GetForegroundWindow")
 	owner, _, _ := foreground.Call()
@@ -75,8 +79,8 @@ func chooseTransferFile(save bool, suggested string) (string, error) {
 		return "", nil
 	}
 	path := syscall.UTF16ToString(file)
-	if !strings.EqualFold(filepath.Ext(path), studyFileExt) {
-		return "", fmt.Errorf("请选择扩展名为 %s 的 LexiGo 学习数据文件。", studyFileExt)
+	if !strings.EqualFold(filepath.Ext(path), extension) {
+		return "", fmt.Errorf("请选择扩展名为 %s 的文件。", extension)
 	}
 	return path, nil
 }

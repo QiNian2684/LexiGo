@@ -102,7 +102,7 @@ jobs:
           grep -F "package: name='$package' versionCode='$version_code' versionName='$version'" "$signing/badging.txt"
           grep -E "^native-code: ('arm64-v8a' 'x86_64'|'x86_64' 'arm64-v8a')[[:space:]]*$" "$signing/badging.txt"
           (cd dist && sha256sum "$apk" "$apk.idsig" > SHA256SUMS)
-          printf 'tag=v%s\n' "$version" >> "$GITHUB_OUTPUT"
+          printf 'tag=v%s-android\n' "$version" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: verified-android-release
@@ -114,8 +114,29 @@ jobs:
           compression-level: 0
           retention-days: 7
 
-  publish:
+  install:
     needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
+        with:
+          name: verified-android-release
+          path: dist
+      - name: Test standalone install and upgrade on Android 16
+        run: |
+          (cd dist && sha256sum --check SHA256SUMS)
+          bash scripts/test-android-install.sh dist/*.apk
+
+  publish:
+    needs: [build, install]
     if: inputs.publish
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -135,7 +156,9 @@ jobs:
       - name: Publish the verified files
         run: |
           set -euo pipefail
-          apk="LexiGo-Android-${TAG#v}.apk"
+          version="${TAG#v}"
+          version="${version%-android}"
+          apk="LexiGo-Android-$version.apk"
           (cd dist && sha256sum --check SHA256SUMS)
           notes=(--generate-notes)
           if [[ -f "android/releases/$TAG.md" ]]; then
@@ -146,7 +169,7 @@ jobs:
             gh release upload "$TAG" "dist/$apk" "dist/$apk.idsig" --clobber
           else
             gh release create "$TAG" "dist/$apk" "dist/$apk.idsig" --draft \
-              --target "$GITHUB_SHA" --title "LexiGo ${TAG#v}" "${notes[@]}"
+              --target "$GITHUB_SHA" --title "LexiGo $version Android" "${notes[@]}"
           fi
           remote="$(mktemp -d)"
           gh release download "$TAG" --dir "$remote" --pattern "$apk" --pattern "$apk.idsig"

@@ -1,0 +1,50 @@
+name: Windows build
+
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2025
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: go.mod
+      - name: Download NSIS, build and test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Join-Path $env:RUNNER_TEMP 'nsis-3.11.zip'
+          Invoke-WebRequest -Uri 'https://downloads.sourceforge.net/project/nsis/NSIS%203/3.11/nsis-3.11.zip' -OutFile $archive
+          if ((Get-FileHash $archive).Hash -ne 'c7d27f780ddb6cffb4730138cd1591e841f4b7edb155856901cdf5f214394fa1') {
+              throw 'NSIS download checksum mismatch.'
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP
+          $compiler = Join-Path $env:RUNNER_TEMP 'nsis-3.11\makensis.exe'
+          .\build.ps1 -MakeNSIS $compiler
+          python scripts/test_http.py dist/LexiGo.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Windows HTTP tests failed.' }
+          python scripts/test_portable.py dist/LexiGo.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Windows portable tests failed.' }
+          $setup = Get-Item 'dist\LexiGo-Setup-*.exe'
+          $installDir = Join-Path $env:RUNNER_TEMP 'lexigo-test-install'
+          $installer = Start-Process -FilePath $setup.FullName -ArgumentList '/S', "/D=$installDir" -PassThru -Wait
+          if ($installer.ExitCode -ne 0) { throw "Installer returned $($installer.ExitCode)." }
+          $installed = Join-Path $installDir 'LexiGo.exe'
+          if ((Get-FileHash -LiteralPath $installed).Hash -ne (Get-FileHash -LiteralPath 'dist\LexiGo.exe').Hash) {
+              throw 'Installed executable differs from the Windows build.'
+          }
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: windows-build-for-signing
+          path: dist/*.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

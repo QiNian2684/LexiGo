@@ -108,6 +108,7 @@ if [[ ! -f "$signing_key" ]]; then
 fi
 env "JAVA_HOME=$java_root" "$tools_dir/apksigner" sign --ks "$signing_key" --ks-key-alias "$signing_alias" \
   --ks-pass env:WORDREVIEW_KEY_PASSWORD \
+  --v1-signer-name CERT \
   --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
   --v4-signing-enabled true --out "$signed_apk" "$work/aligned.apk"
 "$tools_dir/zipalign" -c -P 16 4 "$signed_apk"

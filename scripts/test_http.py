@@ -51,7 +51,8 @@ with tempfile.TemporaryDirectory() as temp:
     directory=Path(temp)
     process,call,load,vote=start(directory)
     try:
-        call('/api/settings',{'goal':1,'dailyGoal':1,'limit':2,'showIPA':True,'online':False})
+        assert call('/api/settings',{'goal':1,'dailyGoal':1,'limit':2,'showIPA':True,'online':False,
+                                    'rollover':'00:00'})['settings']['rollover']=='00:00'
         row=load('crucial, abundance, subtle, CRUCIAL, 中文')
         assert (row['new'],row['duplicates'],len(row['invalid']))==(3,1,1)
         assert call('/api/card/crucial')['exampleTranslation']
@@ -80,6 +81,7 @@ with tempfile.TemporaryDirectory() as temp:
         call('/api/card/crucial',{'word':'crucially','meaning':'新的释义'})
         assert call('/api/history/crucially')
         csv_data=call('/api/export',{'all':True,'query':'新的'},raw=True)
+        assert call('/api/export/filename')['filename']=='WordReview-words-'+call('/api/state')['date']+'.csv'
         rows=list(csv.DictReader(io.StringIO(csv_data.decode('utf-8-sig'))))
         assert rows[0]['word']=='crucially' and rows[0]['personalNote'].replace('\r\n','\n')=='备注\n本地持久化'
         assert call('/api/batch/remove',{'all':True,'query':'新的'})['count']==1
@@ -94,6 +96,7 @@ with tempfile.TemporaryDirectory() as temp:
         process.wait()
     process,call,load,vote=start(directory)
     try:
+        assert call('/api/state')['settings']['rollover']=='00:00'
         assert call('/api/state')['reviewed']==3
         assert call('/api/state')['due']==1
         assert call('/api/card/solar%20flare')['personalNote']=='天文'

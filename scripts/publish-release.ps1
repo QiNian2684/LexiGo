@@ -1,45 +1,27 @@
 param(
-    [Parameter(Mandatory)][ValidatePattern('\Av[0-9]+\.[0-9]+\.[0-9]+\z')][string]$Tag,
-    [Parameter(Mandatory)][string]$AndroidBuildTools,
+    [Parameter(Mandatory)][ValidatePattern('\Av[0-9]+\.[0-9]+\.[0-9]+-windows\z')][string]$Tag,
     [string]$Artifacts = 'dist',
     [string]$SignTool = 'signtool.exe',
-    [string]$SigningCertificateThumbprint = $env:LEXIGO_WINDOWS_SIGNING_THUMBPRINT,
-    [string]$Java = 'java.exe'
+    [string]$SigningCertificateThumbprint = $env:LEXIGO_WINDOWS_SIGNING_THUMBPRINT
 )
 $ErrorActionPreference = 'Stop'
 $repo = 'QiNian2684/LexiGo'
 $project = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'windows-signatures.ps1')
 
-$version = $Tag.Substring(1)
+$version = $Tag.Substring(1, $Tag.Length - 'v-windows'.Length)
 $thumbprint = Get-CodeSigningThumbprint $SigningCertificateThumbprint
 $root = (Resolve-Path -LiteralPath $Artifacts).Path
-$names = @('LexiGo.exe', "LexiGo-Setup-$version.exe", "LexiGo-Android-$version.apk", "LexiGo-Android-$version.apk.idsig")
+$names = @('LexiGo.exe', "LexiGo-Setup-$version.exe")
 $files = @($names | ForEach-Object { Join-Path $root $_ })
 foreach ($file in $files) {
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing release asset: $file" }
 }
 
-foreach ($file in $files[0..1]) {
+foreach ($file in $files) {
     Assert-WindowsSignature $file $SignTool $thumbprint
     $fileVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($file).ProductVersion
     if ($fileVersion -notin @($version, "$version.0")) { throw "Incorrect product version in ${file}: $fileVersion" }
-}
-
-$apk = $files[2]
-& (Join-Path $AndroidBuildTools 'zipalign.exe') -c -P 16 4 $apk
-if ($LASTEXITCODE -ne 0) { throw 'APK alignment verification failed.' }
-& $Java -cp (Join-Path $AndroidBuildTools 'lib\apksigner.jar') (Join-Path $project 'android\VerifyApkSignatures.java') $apk --release
-if ($LASTEXITCODE -ne 0) { throw 'APK signature verification failed.' }
-
-$manifest = [xml](Get-Content -LiteralPath (Join-Path $project 'android\src\main\AndroidManifest.xml') -Raw)
-$androidNamespace = 'http://schemas.android.com/apk/res/android'
-$versionCode = $manifest.DocumentElement.GetAttribute('versionCode', $androidNamespace)
-$package = $manifest.DocumentElement.GetAttribute('package')
-$badging = & (Join-Path $AndroidBuildTools 'aapt.exe') dump badging $apk
-$packageLine = "package: name='$package' versionCode='$versionCode' versionName='$version'"
-if ($LASTEXITCODE -ne 0 -or -not ($badging -like "$packageLine *")) {
-    throw 'APK package name or version does not match the LexiGo release.'
 }
 
 $hashes = @{}
@@ -71,7 +53,7 @@ if ($found) {
         throw 'Release draft contains unexpected assets. Review them before publishing.'
     }
 } else {
-    gh release create $Tag --repo $repo --verify-tag --draft --title "LexiGo $version" --generate-notes
+    gh release create $Tag --repo $repo --verify-tag --draft --title "LexiGo $version Windows" --generate-notes
     if ($LASTEXITCODE -ne 0) { throw 'Unable to create a draft release for the existing tag.' }
     $attached = @()
 }
@@ -94,7 +76,7 @@ try {
             throw "Downloaded asset differs from the verified build: $($file.Name)"
         }
     }
-    gh release edit $Tag --repo $repo --draft=false
+    gh release edit $Tag --repo $repo --draft=false --latest=false
     if ($LASTEXITCODE -ne 0) { throw 'Unable to publish the verified GitHub release.' }
 } finally {
     Remove-Item -LiteralPath $download -Recurse -Force

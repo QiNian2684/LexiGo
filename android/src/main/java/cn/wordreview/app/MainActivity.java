@@ -447,14 +447,28 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
             }
             body = latest.getName();
         }
+        String csvFilename = null;
+        if ("csv".equals(kind)) {
+            try {
+                JSONObject export = new JSONObject(body);
+                csvFilename = export.getString("filename");
+                if (!csvFilename.matches("WordReview-words-[0-9]{4}-[0-9]{2}-[0-9]{2}\\.csv")) {
+                    sendResult(kind, null, "CSV 文件名无效。");
+                    return;
+                }
+                body = export.getJSONObject("selection").toString();
+            } catch (org.json.JSONException error) {
+                sendResult(kind, null, "CSV 导出范围无效。");
+                return;
+            }
+        }
         operation = new Operation(kind, body);
         Intent selector;
         if ("import".equals(kind)) {
             selector = document(Intent.ACTION_OPEN_DOCUMENT, "*/*");
         } else if ("csv".equals(kind)) {
             selector = document(Intent.ACTION_CREATE_DOCUMENT, "text/csv");
-            String day = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT).format(new java.util.Date());
-            selector.putExtra(Intent.EXTRA_TITLE, "WordReview-words-" + day + ".csv");
+            selector.putExtra(Intent.EXTRA_TITLE, csvFilename);
         } else {
             // An explicit JSON MIME type may make document providers append .json to the title.
             selector = document(Intent.ACTION_CREATE_DOCUMENT, "application/vnd.lexigo.learning");

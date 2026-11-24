@@ -601,7 +601,10 @@ async function changeView(next, temporary) {
   if (next === "settings") return openSettings(intent);
   if (view === "settings" && next === settingsFrom && !temporary) return closeSettings(intent);
   try {
-    if (view === "settings") await flushSettings();
+    if (view === "settings") {
+      commitFocusedSetting();
+      await flushSettings();
+    }
     await flushNote();
     if (intent !== viewRequest) return;
     controls.close(false);
@@ -979,8 +982,13 @@ function batchAction(action, items, count) {
 }
 
 async function exportCSV(items) {
+  if (windowsReview) {
+    await api("/api/export/windows", items);
+    return;
+  }
+  const {filename} = await api("/api/export/filename");
   if (window.WordReviewFiles) {
-    window.WordReviewFiles.pickFile("csv", JSON.stringify(items));
+    window.WordReviewFiles.pickFile("csv", JSON.stringify({filename, selection: items}));
     return;
   }
   const response = await request("/api/export", items);
@@ -988,7 +996,7 @@ async function exportCSV(items) {
   const url = URL.createObjectURL(await response.blob());
   const item = document.createElement("a");
   item.href = url;
-  item.download = "WordReview-words-" + state.date + ".csv";
+  item.download = filename;
   item.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -1241,6 +1249,7 @@ async function openSettings(intent = ++viewRequest) {
 
 async function closeSettings(intent = ++viewRequest) {
   if (view !== "settings") return;
+  commitFocusedSetting();
   try { await flushSettings(); } catch { return; }
   if (intent !== viewRequest) return;
   controls.close(false);
@@ -1290,6 +1299,11 @@ function commitSetting(input) {
   }
   input.removeAttribute("aria-invalid");
   settingsDraft[key] = input.type === "checkbox" ? input.checked : Number(input.value);
+}
+
+function commitFocusedSetting() {
+  const field = document.activeElement;
+  if (view === "settings" && ["number", "date", "time"].includes(field?.type)) commitSetting(field);
 }
 
 function hasSettingChanges() {
@@ -1699,9 +1713,13 @@ el("settings-form").addEventListener("change", event => {
 });
 el("settings-form").onsubmit = event => event.preventDefault();
 el("settings-form").addEventListener("keydown", event => {
-  if (event.target.type !== "number" || event.key !== "Enter" || event.isComposing || event.keyCode === 229) return;
+  const field = event.target;
+  if ((field.type !== "number" && !(windowsReview && field.id === "study-rollover")) ||
+      event.key !== "Enter" || event.isComposing || event.keyCode === 229) return;
   event.preventDefault();
-  event.target.blur();
+  commitSetting(field);
+  field.blur();
+  flushSettings().catch(() => {});
 });
 const examDateInput = el("exam-date");
 const showExamPicker = event => {
@@ -1736,6 +1754,9 @@ el("download-backup").onclick = event => {
   if (window.WordReviewFiles) {
     event.preventDefault();
     window.WordReviewFiles.pickFile("backup", "");
+  } else if (windowsReview) {
+    event.preventDefault();
+    api("/api/backup/windows", {}).catch(error => message("settings-status", error.message));
   }
 };
 el("pick-restore").onclick = () => el("restore-file").click();
@@ -1787,7 +1808,7 @@ el("txt-file").onchange = readWordFile;
 el("add-input").oninput = () => { if (!el("add-input").value.trim()) fileFormat = "words"; };
 document.addEventListener("keydown", keyboard);
 function flushOnHide() {
-  if (view === "settings" && document.activeElement?.type === "number") commitSetting(document.activeElement);
+  commitFocusedSetting();
   flushSettings(true).catch(() => {});
   flushNote(true).catch(showError);
   flushEdit(false, true).catch(editError);
@@ -1796,8 +1817,7 @@ if (window.wordReviewFinishClose) {
   window.wordReviewPrepareClose = async () => {
     let saved = false;
     try {
-      const field = document.activeElement;
-      if (view === "settings" && ["number", "date"].includes(field?.type)) commitSetting(field);
+      commitFocusedSetting();
       await flushSettings();
       await flushNote();
       if (editing) await flushEdit(true);
@@ -1819,7 +1839,7 @@ window.addEventListener("pagehide", event => {
   if (ticket && !event.persisted) request("/api/window/closed", {ticket}, {keepalive: true}).catch(() => {});
 });
 if (windowsReview) window.addEventListener("beforeunload", event => {
-  if (view === "settings" && document.activeElement?.type === "number") commitSetting(document.activeElement);
+  commitFocusedSetting();
   if (noteDirty() || editJob || hasSettingChanges() || Object.keys(editedFields(true)).length) {
     flushOnHide();
     if (editing) flushEdit(true).catch(editError);

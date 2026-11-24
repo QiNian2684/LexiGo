@@ -1,10 +1,10 @@
-# LexiGo 3.5.0
+# LexiGo 3.5.1
 
 个人使用的英语词库与复习软件。支持 Windows 10/11 x64 和 Android 9 及以上。两端共用词典、SQLite 表结构、数据交换格式和复习逻辑。
 
 ## 使用
 
-Windows 运行对应版本的安装程序，先选择程序位置，再选择数据文件夹和桌面快捷方式。默认程序位置为 `%LOCALAPPDATA%\Programs\LexiGo`，默认数据文件夹为程序目录下的 `Data`。直接运行 `LexiGo.exe` 也可以使用便携模式。Windows 使用 WebView2 Runtime，窗口配置保存在数据目录的 `WebView2` 子目录。Android 安装 `LexiGo-Android-3.5.0.apk` 后打开「LexiGo」。运行无需安装 Go、Python 或数据库服务器。
+Windows 运行对应版本的安装程序，先选择程序位置，再选择数据文件夹和桌面快捷方式。默认程序位置为 `%LOCALAPPDATA%\Programs\LexiGo`，默认数据文件夹为程序目录下的 `Data`。直接运行 `LexiGo.exe` 也可以使用便携模式。Windows 使用 WebView2 Runtime，窗口配置保存在数据目录的 `WebView2` 子目录。Android 安装 `LexiGo-Android-3.5.1.apk` 后打开「LexiGo」。运行无需安装 Go、Python 或数据库服务器。
 
 启动时显示可滚动的使用手册。手册配有操作截图，涵盖添加单词、每日记忆与长期掌握、词库、统计、设置和备份迁移，并显示本平台的快捷键或手势。勾选「以后不再提示」并点「确认」后，可以从「设置 → 使用说明」随时重开。
 
@@ -112,13 +112,13 @@ Android 3.5.0 使用独立的包名和已保存的新发行签名，可与 3.3.1
 
 ## 构建与测试
 
-使用 Go 1.25 或更新版本和支持 `amd64-unicode` 目标的 NSIS 3.11 或更新版本。若 `makensis` 不在 PATH，可通过 `-MakeNSIS` 指定 `makensis.exe`。在 Windows PowerShell 执行以下命令。
+使用 Go 1.25 或更新版本和 NSIS 3.11 或更新版本。若 `makensis` 不在 PATH，可通过 `-MakeNSIS` 指定 `makensis.exe`。在 Windows PowerShell 执行以下命令。
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-脚本运行 Go 测试并生成便携版 `dist\LexiGo.exe` 和安装版 `dist\LexiGo-Setup-3.5.0.exe`。首次从源码构建需要取得 `go.mod` 和 `go.sum` 声明的依赖。已编入的词典、界面和应用图标无需重新下载。第三方依赖许可证见 `licenses/`，数据处理脚本在 `scripts/`。
+脚本运行 Go 测试并生成便携版 `dist\LexiGo.exe` 和安装版 `dist\LexiGo-Setup-3.5.1.exe`。首次从源码构建需要取得 `go.mod` 和 `go.sum` 声明的依赖。已编入的词典、界面和应用图标无需重新下载。第三方依赖许可证见 `licenses/`，数据处理脚本在 `scripts/`。
 
 也可用 `go test ./...` 单独测试核心规则。用 Python 3 运行 `python scripts/test_http.py 路径\LexiGo.exe` 可以在独立临时词库上测试离线工作流和中止进程后恢复。还可运行 `python scripts/test_portable.py .\dist\LexiGo.exe`，用独立临时目录验证 EXE 路径、移动后重新打开和隔离的旧库迁移。脚本经过 EXE 的 `--serve` 模式测试后端，WebView2 窗口的验证需在 Windows 上双击 EXE。
 
@@ -126,10 +126,7 @@ Android 的开发环境、签名方式和命令见 `android/README.md`。两端�
 
 ## GitHub 发行
 
-在 Actions 中手动运行「Android release」即可使用仓库的 `LEXIGO_ANDROID_SIGNING` 加密配置构建 Android 包。选择发布时，流程会先校验签名，再上传并重新下载草稿附件进行 SHA-256 核对。
+Android 与 Windows 各有独立的发布页。Android 使用 `v3.5.1-android`，Windows 使用 `v3.5.1-windows`。
 
-双平台构建和发布步骤如下。
-
-1. 在 Windows 构建机的当前用户个人证书库中准备受信任的代码签名证书及私钥。将证书指纹设为 `LEXIGO_WINDOWS_SIGNING_THUMBPRINT`，运行 `.\build.ps1 -Release`。如有需要，用 `-SignTool` 指定 Windows SDK 的 `signtool.exe`。脚本会先签署便携版，再将它打包进安装程序并签署安装程序。
-2. 使用当前 Android 发行密钥库按 [Android 构建说明](android/README.md) 生成 APK 和 `.idsig`，将它们与两个 EXE 放在同一目录。把对应源码提交标记为 `v3.5.0` 并推送标签。
-3. 在已登录 GitHub CLI 的 Windows 构建机上运行 `.\scripts\publish-release.ps1 -Tag v3.5.0 -AndroidBuildTools <Build Tools 35.0.0 的路径>`。脚本验证四个文件的签名和版本，将它们上传到草稿，从 GitHub 下载并逐一比对 SHA-256，全部通过后才公开发布。
+- Android 在 Actions 中手动运行「Android release」。流程使用 `LEXIGO_ANDROID_SIGNING`，在 Android 16 验证只用 APK 安装和覆盖升级，通过后才公开发布。
+- Windows 在 Actions 中手动运行「Windows build」，该工作流验证编译、安装和便携版行为。正式签名由 Windows 签名机执行。在 Windows 构建机按 `LEXIGO_WINDOWS_SIGNING_THUMBPRINT` 指定受信任的代码签名证书，执行 `.\build.ps1 -Release`。签名流程先签署便携版，再打包和签署 Setup。推送对应的 Windows 标签后，运行 `.\scripts\publish-release.ps1 -Tag v3.5.1-windows`。脚本校验两个 EXE 的签名和版本，并从 GitHub 回读核对上传的文件。

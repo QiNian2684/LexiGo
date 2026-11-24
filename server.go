@@ -122,6 +122,44 @@ func (a *application) currentStudyDay() string {
 	return a.store.db.studyDay(time.Now())
 }
 
+func (a *application) csvFilename() string {
+	return "WordReview-words-" + a.currentStudyDay() + ".csv"
+}
+
+func (a *application) exportCSV(req selection) ([]byte, error) {
+	a.store.mu.Lock()
+	defer a.store.mu.Unlock()
+	return asCSV(a.store.selected(req))
+}
+
+func (a *application) backupBytes() ([]byte, error) {
+	a.store.mu.Lock()
+	defer a.store.mu.Unlock()
+	return json.Marshal(a.store.snapshotDatabase(a.store.db.studyDay(time.Now())))
+}
+
+func saveWindowsFile(w http.ResponseWriter, name, extension string, contents func() ([]byte, error)) {
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
+	target, err := chooseDataFile(true, name, extension)
+	if err != nil {
+		problem(w, 400, err.Error())
+		return
+	}
+	if target == "" {
+		respond(w, 200, map[string]bool{"cancelled": true})
+		return
+	}
+	data, err := contents()
+	if err == nil {
+		err = atomicWrite(target, data)
+	}
+	if err != nil {
+		problem(w, 500, fmt.Sprintf("保存文件失败：%v", err))
+		return
+	}
+	respond(w, 200, map[string]bool{"ok": true})
+}
+
 func (a *application) poke() {
 	select {
 	case a.wake <- struct{}{}:
@@ -700,29 +738,37 @@ func (a *application) handler() http.Handler {
 			return nil
 		})
 	})
+	mux.HandleFunc("GET /api/export/filename", func(w http.ResponseWriter, _ *http.Request) {
+		respond(w, 200, map[string]string{"filename": a.csvFilename()})
+	})
 	mux.HandleFunc("POST /api/export", func(w http.ResponseWriter, r *http.Request) {
 		var req selection
 		if !requestJSON(w, r, 2<<20, &req) {
 			return
 		}
-		a.store.mu.Lock()
-		data, err := asCSV(a.store.selected(req))
-		a.store.mu.Unlock()
+		data, err := a.exportCSV(req)
 		if err != nil {
 			saveError(w, err)
 			return
 		}
-		download(w, "text/csv; charset=utf-8", "WordReview-words-"+a.currentStudyDay()+".csv", data)
+		download(w, "text/csv; charset=utf-8", a.csvFilename(), data)
+	})
+	mux.HandleFunc("POST /api/export/windows", func(w http.ResponseWriter, r *http.Request) {
+		var req selection
+		if requestJSON(w, r, 2<<20, &req) {
+			saveWindowsFile(w, a.csvFilename(), ".csv", func() ([]byte, error) { return a.exportCSV(req) })
+		}
 	})
 	mux.HandleFunc("GET /api/backup", func(w http.ResponseWriter, _ *http.Request) {
-		a.store.mu.Lock()
-		data, err := json.Marshal(a.store.snapshotDatabase(a.store.db.studyDay(time.Now())))
-		a.store.mu.Unlock()
+		data, err := a.backupBytes()
 		if err != nil {
 			saveError(w, err)
 			return
 		}
 		download(w, "application/json", transferFilename(time.Now()), data)
+	})
+	mux.HandleFunc("POST /api/backup/windows", func(w http.ResponseWriter, _ *http.Request) {
+		saveWindowsFile(w, transferFilename(time.Now()), studyFileExt, a.backupBytes)
 	})
 	mux.HandleFunc("POST /api/restore", func(w http.ResponseWriter, r *http.Request) {
 		var incoming database

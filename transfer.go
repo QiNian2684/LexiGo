@@ -374,7 +374,7 @@ func (a *application) transferRoutes(mux *http.ServeMux) {
 			problem(w, 404, "没有可导出的覆盖前备份。")
 			return
 		}
-		target, err := chooseTransferFile(true, transferFilename(time.Now()))
+		target, err := chooseDataFile(true, transferFilename(time.Now()), studyFileExt)
 		if err != nil {
 			saveError(w, err)
 			return
@@ -417,7 +417,7 @@ func (a *application) transferRoutes(mux *http.ServeMux) {
 		}
 		mux.HandleFunc("POST /api/transfer/windows/"+mode, func(w http.ResponseWriter, _ *http.Request) {
 			_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
-			file, err := chooseTransferFile(save, transferFilename(time.Now()))
+			file, err := chooseDataFile(save, transferFilename(time.Now()), studyFileExt)
 			if err != nil {
 				problem(w, 500, err.Error())
 				return

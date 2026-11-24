@@ -1,12 +1,13 @@
-Target amd64-unicode
+Unicode true
 RequestExecutionLevel user
 ManifestDPIAware true
 
 !include "MUI2.nsh"
 !include "nsDialogs.nsh"
 !include "FileFunc.nsh"
+!include "x64.nsh"
 
-!define VERSION "3.5.0"
+!define VERSION "3.5.1"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\LexiGo"
 !define DATA_CONFIG "LexiGo.data-dir"
 
@@ -55,6 +56,10 @@ Var DataLock
 Var InstallError
 
 Function .onInit
+  ${IfNot} ${RunningX64}
+    MessageBox MB_OK|MB_ICONSTOP "LexiGo 需要 64 位 Windows。"
+    Abort
+  ${EndIf}
   SetRegView 64
   SetShellVarContext current
   StrCpy $MakeShortcut ${BST_CHECKED}
