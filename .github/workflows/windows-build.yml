@@ -6,8 +6,50 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  package:
     if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: go.mod
+      - name: Build the Windows executable and Setup
+        run: |
+          set -euo pipefail
+          nsis="$(mktemp -d)"
+          source=https://deb.debian.org/debian/pool/main/n/nsis
+          cd "$nsis"
+          curl -fsSL --retry 3 "$source/nsis_3.11-1_amd64.deb" -o nsis.deb
+          curl -fsSL --retry 3 "$source/nsis-common_3.11-1_all.deb" -o nsis-common.deb
+          sha256sum --check <<'CHECKSUMS'
+          e6eb6ffb70f0df09e95dedb2d2cf55ad3c2679f7c2ae357d0c00cc4c83178690  nsis.deb
+          103a3284c1a5356efa0aba90fdfc391c3cde8e7df8726377cef0f98471584047  nsis-common.deb
+          CHECKSUMS
+          dpkg-deb -x nsis-common.deb "$nsis"
+          dpkg-deb -x nsis.deb "$nsis"
+          cd "$GITHUB_WORKSPACE"
+          version="$(sed -n 's/^!define VERSION "\([0-9.]*\)"$/\1/p' installer/LexiGo.nsi)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -trimpath \
+            -ldflags='-s -w -H=windowsgui' -o dist/LexiGo.exe .
+          cd installer
+          NSISDIR="$nsis/usr/share/nsis" "$nsis/usr/bin/makensis" \
+            "-DPACKAGE_EXE=$GITHUB_WORKSPACE/dist/LexiGo.exe" \
+            "-DPACKAGE_SETUP=$GITHUB_WORKSPACE/dist/LexiGo-Setup-$version.exe" LexiGo.nsi
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: windows-packaged
+          path: dist/*.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+  verify:
+    needs: package
     runs-on: windows-2025
     timeout-minutes: 25
     steps:
@@ -17,18 +59,16 @@ jobs:
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
           go-version-file: go.mod
-      - name: Download NSIS, build and test
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
+        with:
+          name: windows-packaged
+          path: dist
+      - name: Run Windows tests and install Setup
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $archive = Join-Path $env:RUNNER_TEMP 'nsis-3.11.zip'
-          Invoke-WebRequest -Uri 'https://downloads.sourceforge.net/project/nsis/NSIS%203/3.11/nsis-3.11.zip' -OutFile $archive
-          if ((Get-FileHash $archive).Hash -ne 'c7d27f780ddb6cffb4730138cd1591e841f4b7edb155856901cdf5f214394fa1') {
-              throw 'NSIS download checksum mismatch.'
-          }
-          Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP
-          $compiler = Join-Path $env:RUNNER_TEMP 'nsis-3.11\makensis.exe'
-          .\build.ps1 -MakeNSIS $compiler
+          go test -buildvcs=false ./...
+          if ($LASTEXITCODE -ne 0) { throw 'Windows Go tests failed.' }
           python scripts/test_http.py dist/LexiGo.exe
           if ($LASTEXITCODE -ne 0) { throw 'Windows HTTP tests failed.' }
           python scripts/test_portable.py dist/LexiGo.exe
