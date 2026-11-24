@@ -5,9 +5,9 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 
 class VerifyApkSignatures {
-    // SHA-256 of the signing certificate in the published v3.3.0 and v3.3.1 APKs.
+    // SHA-256 of the release certificate for cn.wordreview.app.lexigo.android.
     private static final String RELEASE_CERTIFICATE =
-        "39a3b160ad579f439000ccd7a14e767ff46c62f1bfae0d2dafbf8d71f015ee8c";
+        "2684b553b2221ec91c2cde3a3494f029e440f201d4b142963a6d7cac4ab2df95";
 
     public static void main(String[] args) throws Exception {
         if (args.length < 1 || args.length > 2 || (args.length == 2 && !args[1].equals("--release"))) {
@@ -45,7 +45,7 @@ class VerifyApkSignatures {
         byte[] certificate = result.getSignerCertificates().get(0).getEncoded();
         String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(certificate));
         if (args.length == 2 && !RELEASE_CERTIFICATE.equals(digest)) {
-            throw new IllegalArgumentException("APK signer differs from the published LexiGo certificate: " + digest);
+            throw new IllegalArgumentException("APK signer differs from the LexiGo release certificate: " + digest);
         }
         System.out.println("APK signatures v1/v2/v3/v4 verified. Signer SHA-256: " + digest);
     }

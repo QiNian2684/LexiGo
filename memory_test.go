@@ -53,7 +53,7 @@ func TestFirstPassThenFirstAnswerPassesOnLaterLearningDays(t *testing.T) {
 	}
 }
 
-func TestMasteryWaitsForFirstAnswerRecallWhenEveryPassStartedWithAMiss(t *testing.T) {
+func TestMasteryWaitsWhenTheLastRequiredDayStartsWithAMiss(t *testing.T) {
 	s, path := newTestStore(t)
 	const first, second, third, fourth, fifth = "2026-11-01", "2026-11-02", "2026-11-04", "2026-11-06", "2026-11-07"
 	options := s.db.Settings
@@ -63,8 +63,13 @@ func TestMasteryWaitsForFirstAnswerRecallWhenEveryPassStartedWithAMiss(t *testin
 	}
 	importTest(t, s, first, "apple")
 	for _, day := range []string{first, second, third} {
-		nextVote(t, s, day, false)
-		if result := passWord(t, s, day, 2); !result.Credited || result.Graduated || result.Due != 0 || result.Remembered != 1 {
+		target := 2
+		if day == second {
+			target = 1
+		} else {
+			nextVote(t, s, day, false)
+		}
+		if result := passWord(t, s, day, target); !result.Credited || result.Graduated || result.Due != 0 || result.Remembered != 1 {
 			t.Fatalf("%s: daily success must count without mastering the word: %+v", day, result)
 		}
 	}
@@ -197,8 +202,11 @@ func TestLaterDayFallbackUsesConfiguredTargetAndUndoRestoresFirstAnswer(t *testi
 		t.Fatalf("undo of the quick pass did not restore progress: %+v (%v)", back, err)
 	}
 	nextVote(t, s, review, false)
-	if r := passWord(t, s, review, 4); !r.Graduated || r.Due != 0 {
-		t.Fatalf("fallback did not require four consecutive answers: %+v", r)
+	if r := passWord(t, s, review, 4); r.Graduated || !r.Credited || r.Due != 0 {
+		t.Fatalf("fallback must credit the day without granting mastery: %+v", r)
+	}
+	if r := passWord(t, s, "2026-11-04", 1); !r.Graduated {
+		t.Fatalf("first correct answer on the next completed day must grant mastery: %+v", r)
 	}
 }
 

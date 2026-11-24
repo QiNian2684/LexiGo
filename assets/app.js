@@ -171,7 +171,7 @@ function renderReview() {
     el("word").classList.toggle("long-word", current.word.length > 18);
     el("streak").hidden = !!practice;
     el("streak").textContent = practice ? "" :
-      current.recall ? `易错词回顾 · 累计完成 ${current.streak} 天` :
+      current.recall ? (waiting ? "易错词回顾 · 已顺延到下一学习日" : "易错词回顾 · 答对即通过") :
       `今日连对 ${current.dailyCount} / ${current.dailyTarget} · ` + masteryProgress(current.streak, next.settings.goal);
     updateVoice();
   }
@@ -1216,6 +1216,7 @@ async function openSettings(intent = ++viewRequest) {
     el("custom-limit").value = prefs.limit || 20;
     el("goal").value = prefs.goal;
     el("daily-goal").value = prefs.dailyGoal;
+    el("study-rollover").value = prefs.rollover || "05:00";
     el("online").checked = prefs.online;
     el("show-ipa").checked = prefs.showIPA;
     const fixed = prefs.examDate?.length === 10;
@@ -1257,6 +1258,17 @@ async function closeSettings(intent = ++viewRequest) {
 
 function commitSetting(input) {
   if (view !== "settings" || !settingsDraft) return;
+  if (input.id === "study-rollover") {
+    if (!input.value || !input.validity.valid) {
+      input.setAttribute("aria-invalid", "true");
+      message("study-settings-status", "请输入有效的学习日结束时间。");
+      return;
+    }
+    input.removeAttribute("aria-invalid");
+    message("study-settings-status");
+    settingsDraft.rollover = input.value === "05:00" ? undefined : input.value;
+    return;
+  }
   if (input.id === "exam-mode" || input.id === "exam-date") {
     commitExamDate();
     return;

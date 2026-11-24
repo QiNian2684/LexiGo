@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math/rand/v2"
 	"slices"
 	"sort"
 	"time"
@@ -11,8 +10,9 @@ const recallIntervalDays = 5
 const recallBatchLimit = 10
 
 type recallBatch struct {
-	Day   string   `json:"day"`
-	Cards []uint64 `json:"cards,omitempty"`
+	Day     string   `json:"day"`
+	Cards   []uint64 `json:"cards,omitempty"`
+	Rolling bool     `json:"rolling,omitempty"`
 }
 
 func (b *recallBatch) available(day string) bool {
@@ -20,46 +20,85 @@ func (b *recallBatch) available(day string) bool {
 }
 
 // refreshRecall is called with the store locked, before presenting a review.
-// Pick at most one batch on returning after a break, even if several are due.
 func (s *store) refreshRecall(day string) error {
 	old := s.db.RecallBatch
-	anchor := ""
+	if old != nil && (old.Day > day || (old.Day == day && old.Rolling)) {
+		return nil
+	}
+	current, err := time.Parse(time.DateOnly, day)
+	if err != nil {
+		return err
+	}
+	lastSource := current.AddDate(0, 0, -recallIntervalDays).Format(time.DateOnly)
+	firstSource := lastSource
+	if old != nil && old.Rolling {
+		previous, _ := time.Parse(time.DateOnly, old.Day)
+		firstSource = previous.AddDate(0, 0, 1-recallIntervalDays).Format(time.DateOnly)
+	}
+	active := make(map[uint64]bool, len(s.db.Words))
+	for _, card := range s.db.Words {
+		active[card.ID] = !card.Deleted
+	}
+	failures := make(map[string]map[uint64]int)
+	remembered := make(map[uint64]bool)
+	firstAnswers := make(map[string]map[uint64]bool)
+	for _, item := range s.db.Events {
+		if item.Undone || item.Practice || item.Legacy || !active[item.Card] ||
+			(item.Kind != "no" && item.Kind != "yes") {
+			continue
+		}
+		if item.Kind == "no" && !item.Recall && item.Day >= firstSource && item.Day <= lastSource {
+			if failures[item.Day] == nil {
+				failures[item.Day] = make(map[uint64]int)
+			}
+			failures[item.Day][item.Card]++
+		}
+		if old == nil || item.Day < old.Day || item.Day >= day {
+			continue
+		}
+		if firstAnswers[item.Day] == nil {
+			firstAnswers[item.Day] = make(map[uint64]bool)
+		}
+		if !firstAnswers[item.Day][item.Card] {
+			firstAnswers[item.Day][item.Card] = true
+			remembered[item.Card] = remembered[item.Card] || item.Kind == "yes"
+		}
+	}
+	batch := &recallBatch{Day: day, Rolling: true}
+	queued := make(map[uint64]bool)
 	if old != nil {
-		anchor = old.Day
-	} else {
-		for _, item := range s.db.Events {
-			if item.Day <= day && !item.Undone && !item.Practice && (item.Kind == "yes" || item.Kind == "no") &&
-				(anchor == "" || item.Day < anchor) {
-				anchor = item.Day
+		for _, id := range old.Cards {
+			if active[id] && !remembered[id] {
+				batch.Cards = append(batch.Cards, id)
+				queued[id] = true
 			}
 		}
 	}
-	start, err := time.Parse(time.DateOnly, anchor)
-	if err != nil || day < start.AddDate(0, 0, recallIntervalDays).Format(time.DateOnly) {
-		return nil
+	dates := make([]string, 0, len(failures))
+	for date := range failures {
+		dates = append(dates, date)
 	}
-	eligible := make([]*wordCard, 0)
-	for _, card := range s.db.Words {
-		if !card.Deleted && card.Forgot > 0 && card.Reviews > 0 {
-			eligible = append(eligible, card)
+	slices.Sort(dates)
+	for _, date := range dates {
+		counts := failures[date]
+		ranked := make([]uint64, 0, len(counts))
+		for id := range counts {
+			ranked = append(ranked, id)
+		}
+		sort.Slice(ranked, func(i, j int) bool {
+			a, b := ranked[i], ranked[j]
+			if counts[a] != counts[b] {
+				return counts[a] > counts[b]
+			}
+			return a < b
+		})
+		for _, id := range ranked[:min(len(ranked), recallBatchLimit)] {
+			if !queued[id] {
+				batch.Cards = append(batch.Cards, id)
+				queued[id] = true
+			}
 		}
 	}
-	sort.Slice(eligible, func(i, j int) bool {
-		a, b := eligible[i], eligible[j]
-		aRate, bRate := float64(a.Forgot)/float64(a.Reviews), float64(b.Forgot)/float64(b.Reviews)
-		if aRate != bRate {
-			return aRate > bRate
-		}
-		if a.Forgot != b.Forgot {
-			return a.Forgot > b.Forgot
-		}
-		return a.ID < b.ID
-	})
-	batch := &recallBatch{Day: day}
-	for _, card := range eligible[:min(len(eligible), recallBatchLimit)] {
-		batch.Cards = append(batch.Cards, card.ID)
-	}
-	rand.Shuffle(len(batch.Cards), func(i, j int) { batch.Cards[i], batch.Cards[j] = batch.Cards[j], batch.Cards[i] })
 	s.db.RecallBatch = batch
 	if err := s.save(nil, len(s.db.Events)); err != nil {
 		s.db.RecallBatch = old
@@ -75,11 +114,11 @@ func (p *reviewPlan) addRecall(db database) {
 			ordinary[card.ID] = true
 		}
 	}
-	pending := make(map[uint64]*wordCard)
 	ids := db.RecallBatch.Cards
+	pending := make(map[uint64]*wordCard)
 	for _, card := range db.Words {
 		if !card.Deleted && card.DailyDay <= p.state.Date && !card.passedOn(p.state.Date) &&
-			!ordinary[card.ID] && !p.session.recalled[card.ID] && slices.Contains(ids, card.ID) {
+			!ordinary[card.ID] && !p.session.recalled[card.ID] {
 			pending[card.ID] = card
 		}
 	}

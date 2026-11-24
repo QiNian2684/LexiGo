@@ -28,6 +28,37 @@ func TestStudyDayUsesLocalFiveOClock(t *testing.T) {
 	}
 }
 
+func TestCustomRolloverAndExportKeepStartedDay(t *testing.T) {
+	s, _ := newTestStore(t)
+	loc := time.FixedZone("CST", 8*3600)
+	now := time.Date(2026, 11, 18, 5, 15, 0, 0, loc)
+	importTest(t, s, "2026-11-18", "apple")
+	options := s.db.Settings
+	options.Rollover = "07:45"
+	state, err := s.changeSettingsAt(now, options)
+	if err != nil || state.Date != "2026-11-18" || s.db.StudyDayFloor != state.Date {
+		t.Fatalf("changed time rewound the active day: %+v %v", state, err)
+	}
+	file, err := s.transferBytes(now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backup, err := parseTransfer(file)
+	if err != nil || backup.Database.Settings.Rollover != "07:45" || backup.dateConflict(now) != "" {
+		t.Fatalf("custom rollover failed to round-trip: %+v %v", backup, err)
+	}
+	ends := time.Date(2026, 11, 19, 7, 45, 0, 0, loc)
+	if !backup.DayEnds.Equal(ends) || s.db.studyDay(ends.Add(-time.Second)) != "2026-11-18" ||
+		s.db.studyDay(ends) != "2026-11-19" {
+		t.Fatalf("wrong minute or boundary: %+v", backup.DayEnds)
+	}
+	for _, value := range []string{"7:45", "07:60", "24:00", "03:01:02"} {
+		if validRollover(value) {
+			t.Errorf("accepted invalid rollover %q", value)
+		}
+	}
+}
+
 func TestFreshPriorityAndPinnedReview(t *testing.T) {
 	s, _ := newTestStore(t)
 	const day = "2026-11-18"

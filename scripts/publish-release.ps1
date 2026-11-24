@@ -35,8 +35,9 @@ if ($LASTEXITCODE -ne 0) { throw 'APK signature verification failed.' }
 $manifest = [xml](Get-Content -LiteralPath (Join-Path $project 'android\src\main\AndroidManifest.xml') -Raw)
 $androidNamespace = 'http://schemas.android.com/apk/res/android'
 $versionCode = $manifest.DocumentElement.GetAttribute('versionCode', $androidNamespace)
+$package = $manifest.DocumentElement.GetAttribute('package')
 $badging = & (Join-Path $AndroidBuildTools 'aapt.exe') dump badging $apk
-$packageLine = "package: name='cn.wordreview.app.lexigo.v213' versionCode='$versionCode' versionName='$version'"
+$packageLine = "package: name='$package' versionCode='$versionCode' versionName='$version'"
 if ($LASTEXITCODE -ne 0 -or -not ($badging -like "$packageLine *")) {
     throw 'APK package name or version does not match the LexiGo release.'
 }

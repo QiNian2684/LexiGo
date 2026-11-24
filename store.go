@@ -20,10 +20,11 @@ type settings struct {
 	Online    bool   `json:"online"`
 	ShowIPA   bool   `json:"showIPA"`
 	ExamDate  string `json:"examDate,omitempty"`
+	Rollover  string `json:"rollover,omitempty"`
 }
 
 func (s settings) valid() bool {
-	return s.validLongGoal() && s.DailyGoal >= 1 && s.DailyGoal <= 99 && validExamDate(s.ExamDate)
+	return s.validLongGoal() && s.DailyGoal >= 1 && s.DailyGoal <= 99 && validExamDate(s.ExamDate) && validRollover(s.Rollover)
 }
 
 func (s settings) validLongGoal() bool {
@@ -93,6 +94,7 @@ type metadata struct {
 	NextOrder        uint64       `json:"nextOrder"`
 	CumulativePasses bool         `json:"cumulativePasses,omitempty"`
 	RecallBatch      *recallBatch `json:"recallBatch,omitempty"`
+	StudyDayFloor    string       `json:"studyDayFloor,omitempty"`
 }
 
 type database struct {
@@ -288,8 +290,25 @@ func (s *store) latestAnswerIndexes(day string) map[uint64]int {
 func (s *store) changeSettings(day string, target settings) (reviewState, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.updateSettings(day, s.db.StudyDayFloor, target)
+}
+
+func (s *store) changeSettingsAt(now time.Time, target settings) (reviewState, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	floor := s.db.StudyDayFloor
+	today := s.db.studyDay(now)
+	if target.rolloverTime() != s.db.Settings.rolloverTime() && target.studyDay(now) < today {
+		floor = today
+	}
+	return s.updateSettings(s.activeReviewDay(max(floor, target.studyDay(now))), floor, target)
+}
+
+func (s *store) updateSettings(day, floor string, target settings) (reviewState, error) {
 	old := s.db.Settings
+	oldFloor := s.db.StudyDayFloor
 	s.db.Settings = target
+	s.db.StudyDayFloor = floor
 	var keys []string
 	oldProgress := make(map[string]progress)
 	oldEvents := make(map[int]event)
@@ -328,6 +347,7 @@ func (s *store) changeSettings(day string, target settings) (reviewState, error)
 	}
 	if err := s.save(keys, firstEvent); err != nil {
 		s.db.Settings = old
+		s.db.StudyDayFloor = oldFloor
 		for key, progress := range oldProgress {
 			s.db.Words[key].progress = progress
 		}

@@ -70,7 +70,7 @@ if [[ -n "${WORDREVIEW_ANDROID_PACKAGE:-}" ]]; then
     echo 'Invalid Android package identifier.' >&2
     exit 1
   }
-  sed "s/cn\.wordreview\.app\.lexigo\.v213\.share\"/${WORDREVIEW_ANDROID_PACKAGE}.share\"/" "$manifest" > "$work/AndroidManifest.xml"
+  sed "s/android:authorities=\"[^\"]*\.share\"/android:authorities=\"${WORDREVIEW_ANDROID_PACKAGE}.share\"/" "$manifest" > "$work/AndroidManifest.xml"
   manifest="$work/AndroidManifest.xml"
   package_args=(--rename-manifest-package "$WORDREVIEW_ANDROID_PACKAGE")
 fi

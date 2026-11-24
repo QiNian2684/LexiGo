@@ -73,14 +73,10 @@ func (p *progress) passDaily(day string, dayAlreadyCredited bool, entry *event) 
 }
 
 func (p progress) qualifiesForMastery(goal int, id uint64, history []event) bool {
-	if p.Streak < goal {
+	if p.Streak < goal || p.LastPass == "" {
 		return false
 	}
-	type reviewDay struct {
-		first    string
-		credited bool
-	}
-	days := make(map[string]reviewDay)
+	first := ""
 	for i := len(history) - 1; i >= 0; i-- {
 		item := history[i]
 		if item.Card != id || item.Undone || item.Legacy || item.Practice || item.Recall {
@@ -89,22 +85,11 @@ func (p progress) qualifiesForMastery(goal int, id uint64, history []event) bool
 		if item.Kind == "reset" || item.Kind == "reimport" {
 			break
 		}
-		if item.Kind == "yes" || item.Kind == "no" {
-			earliest := days[item.Day]
-			earliest.first = item.Kind
-			earliest.credited = earliest.credited || item.Credit
-			days[item.Day] = earliest
+		if item.Day == p.LastPass && (item.Kind == "yes" || item.Kind == "no") {
+			first = item.Kind
 		}
 	}
-	firstMisses := 0
-	for _, day := range days {
-		if day.credited && day.first == "no" {
-			firstMisses++
-		}
-	}
-	// Defer only when the history proves every credited day began with a miss.
-	// Older backups can have credited progress without the full answer history.
-	return firstMisses < p.Streak
+	return first == "yes"
 }
 
 func (p *progress) reviseDailyGoal(day string, options settings, credited bool, lastAnswer *event) {

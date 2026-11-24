@@ -316,6 +316,9 @@ func validDatabase(db database) bool {
 		_, err := time.Parse(time.DateOnly, value)
 		return err == nil
 	}
+	if db.StudyDayFloor != "" && !validDate(db.StudyDayFloor) {
+		return false
+	}
 	for key, card := range db.Words {
 		if card == nil || card.ID == 0 || ids[card.ID] || card.Order < card.ID ||
 			card.Order > db.NextOrder || card.Key != key || !validDate(card.AddedDay) ||
@@ -358,7 +361,7 @@ func validDatabase(db database) bool {
 		}
 	}
 	if batch := db.RecallBatch; batch != nil {
-		if !db.CumulativePasses || !validDate(batch.Day) || len(batch.Cards) > recallBatchLimit {
+		if !db.CumulativePasses || !validDate(batch.Day) || (!batch.Rolling && len(batch.Cards) > recallBatchLimit) {
 			return false
 		}
 		seen := make(map[uint64]bool, len(batch.Cards))

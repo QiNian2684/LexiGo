@@ -21,7 +21,7 @@ import (
 
 const (
 	transferFormat  = "wordreview.learning-state"
-	transferVersion = 3
+	transferVersion = 4
 	maxTransfer     = 128 << 20
 	studyFileExt    = ".lexi"
 )
@@ -112,8 +112,8 @@ func (s *store) captureTaskRules(day string, legacy bool) transferTask {
 // Caller holds the store lock while the live database is marshalled.
 func (s *store) transferBytes(now time.Time) ([]byte, error) {
 	_, offset := now.Zone()
-	day := studyDay(now)
-	payload := transferPayload{CreatedAt: now.UTC(), Offset: offset, DayEnds: nextStudyDay(now).UTC(),
+	day := s.db.studyDay(now)
+	payload := transferPayload{CreatedAt: now.UTC(), Offset: offset, DayEnds: s.db.nextStudyDay(now).UTC(),
 		Database: s.snapshotDatabase(day), Task: s.captureTask(day)}
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -155,12 +155,12 @@ func parseTransfer(file []byte) (transferPayload, error) {
 	}
 	if decodeExact(envelope.Payload, &p) != nil || p.Database.Version != 3 || !validDatabase(p.Database) ||
 		p.CreatedAt.IsZero() || p.Offset < -14*3600 || p.Offset > 14*3600 ||
-		!p.DayEnds.After(p.CreatedAt) || p.DayEnds.Sub(p.CreatedAt) > 26*time.Hour {
+		!p.DayEnds.After(p.CreatedAt) || p.DayEnds.Sub(p.CreatedAt) > 50*time.Hour {
 		return transferPayload{}, errors.New("文件中的日期、词库或学习记录无效。")
 	}
 	p.legacy = envelope.Version == 1
 	local := p.CreatedAt.In(time.FixedZone("", p.Offset))
-	day := studyDay(local)
+	day := p.Database.studyDay(local)
 	if p.legacy {
 		day = local.Format(time.DateOnly)
 	}
@@ -197,7 +197,7 @@ func validRanks(pending, ranked []uint64) bool {
 }
 
 func (p transferPayload) dateConflict(now time.Time) string {
-	day := studyDay(now)
+	day := p.Database.studyDay(now)
 	// A pre-1.10 file labels midnight-to-five activity with the civil date.
 	// Keep those historical labels and let the matching study day start at 05:00.
 	if p.legacy {
@@ -229,7 +229,7 @@ func (p transferPayload) dateConflict(now time.Time) string {
 
 func (p transferPayload) summarize(token string, now time.Time) transferSummary {
 	info := transferSummary{
-		Token: token, CreatedAt: p.CreatedAt, SourceDay: p.Task.Day, DeviceDay: studyDay(now),
+		Token: token, CreatedAt: p.CreatedAt, SourceDay: p.Task.Day, DeviceDay: p.Database.studyDay(now),
 		Words: len(p.Database.Words), Events: len(p.Database.Events), Passed: len(p.Task.Passed),
 		Pending: len(p.Task.Pending), Blocked: p.dateConflict(now),
 	}
@@ -304,7 +304,7 @@ func (a *application) commitTransfer(w http.ResponseWriter, r *http.Request) {
 		a.generation++
 		a.resetTranslationQueueLocked()
 		a.paused = time.Time{}
-		if studyDay(now) == draft.payload.Task.Day {
+		if a.store.db.studyDay(now) == draft.payload.Task.Day {
 			ranks := make(map[uint64]int, len(draft.payload.Task.Ranked))
 			for i, id := range draft.payload.Task.Ranked {
 				ranks[id] = i + 1

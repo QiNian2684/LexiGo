@@ -43,20 +43,29 @@ func TestOldLearningHistoryRestoresLostPassDays(t *testing.T) {
 	}
 }
 
-func TestFiveDayRecallUsesWrongRateAndShowsEachCardOnce(t *testing.T) {
+func TestRollingRecallRanksSourceDayMissesAndRetriesOnFollowingDay(t *testing.T) {
 	const first = "2026-11-01"
 	const day = "2026-11-06"
 	s, path := newTestStore(t)
 	created := importTest(t, s, first, "apple,banana,lemon,pear,peach,mango,grape,plum,cherry,lime,melon,fig")
-	nextVote(t, s, first, false) // Set the first practice date.
 	for i, key := range created.Keys {
 		card := s.db.Words[key]
+		before := card.progress
 		card.Mastered, card.Streak, card.Reviews = true, 6, 20+i*5
 		card.Forgot = 5
+		for range 1 + i%3 {
+			s.db.Events = append(s.db.Events, event{Kind: "no", Day: first, Card: card.ID, Word: card.Word, Before: &before})
+		}
+		// Older mistakes must not improve this word's ranking.
+		if i == 9 {
+			for range 12 {
+				s.db.Events = append(s.db.Events, event{Kind: "no", Day: "2026-10-30", Card: card.ID, Word: card.Word, Before: &before})
+			}
+		}
 	}
-	worst := s.db.Words[created.Keys[0]]
 	s.db.Words[created.Keys[1]].Deleted = true
-	worst.Reviews, worst.Forgot = 25, 13
+	// Import keys are in input order. Earlier IDs break ties.
+	worst := s.db.Words[created.Keys[11]]
 	if err := s.save(created.Keys, len(s.db.Events)); err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +78,7 @@ func TestFiveDayRecallUsesWrongRateAndShowsEachCardOnce(t *testing.T) {
 	ids := s.db.RecallBatch.Cards
 	if len(ids) != 10 || !slices.Contains(ids, worst.ID) ||
 		slices.Contains(ids, s.db.Words[created.Keys[1]].ID) ||
-		slices.Contains(ids, s.db.Words[created.Keys[11]].ID) {
+		slices.Contains(ids, s.db.Words[created.Keys[9]].ID) {
 		t.Fatalf("incorrect recall batch: %v", ids)
 	}
 	if next := s.shuffleReview(day); next.RecallDue != 10 || next.Planned != 0 || !next.Current.Recall {
@@ -116,8 +125,16 @@ func TestFiveDayRecallUsesWrongRateAndShowsEachCardOnce(t *testing.T) {
 			t.Fatalf("recall cards should be asked once per batch: %+v", state)
 		}
 	}
-	if err := reopened.refreshRecall("2026-11-11"); err != nil || reopened.review("2026-11-11").RecallDue != 10 {
-		t.Fatalf("recall was not scheduled five days later: %v", err)
+	if err := reopened.refreshRecall("2026-11-07"); err != nil || reopened.review("2026-11-07").RecallDue != 9 {
+		t.Fatalf("failed recalls must come back the next day: %v", err)
+	}
+	for i := 8; i >= 0; i-- {
+		if next := nextVote(t, reopened, "2026-11-07", true); next.RecallDue != i {
+			t.Fatalf("remembering once must clear only the answered recall: %+v", next)
+		}
+	}
+	if err := reopened.refreshRecall("2026-11-11"); err != nil || reopened.review("2026-11-11").RecallDue != 0 {
+		t.Fatalf("recall misses must not generate another five-day batch: %v", err)
 	}
 }
 

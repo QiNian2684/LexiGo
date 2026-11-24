@@ -95,7 +95,7 @@ func (a *application) reviewResponse(now time.Time, pin bool) reviewState {
 	s := a.store
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	day := s.activeReviewDay(studyDay(now))
+	day := s.activeReviewDay(s.db.studyDay(now))
 	if err := s.refreshRecall(day); err != nil {
 		log.Printf("saving recall batch: %v", err)
 	}
@@ -113,7 +113,13 @@ func (a *application) reviewResponse(now time.Time, pin bool) reviewState {
 func (a *application) reviewDay() string {
 	a.store.mu.Lock()
 	defer a.store.mu.Unlock()
-	return a.store.activeReviewDay(localDay())
+	return a.store.activeReviewDay(a.store.db.studyDay(time.Now()))
+}
+
+func (a *application) currentStudyDay() string {
+	a.store.mu.Lock()
+	defer a.store.mu.Unlock()
+	return a.store.db.studyDay(time.Now())
 }
 
 func (a *application) poke() {
@@ -379,7 +385,7 @@ func (a *application) handler() http.Handler {
 	mux.HandleFunc("POST /api/review/start", func(w http.ResponseWriter, _ *http.Request) {
 		now := time.Now()
 		a.store.mu.Lock()
-		day := a.store.activeReviewDay(studyDay(now))
+		day := a.store.activeReviewDay(a.store.db.studyDay(now))
 		if err := a.store.refreshRecall(day); err != nil {
 			a.store.mu.Unlock()
 			saveError(w, err)
@@ -407,7 +413,7 @@ func (a *application) handler() http.Handler {
 	})
 	mux.HandleFunc("GET /api/stats", func(w http.ResponseWriter, _ *http.Request) {
 		a.store.mu.Lock()
-		data := a.store.stats(localDay())
+		data := a.store.stats(a.store.db.studyDay(time.Now()))
 		a.store.mu.Unlock()
 		respond(w, 200, data)
 	})
@@ -528,18 +534,22 @@ func (a *application) handler() http.Handler {
 			problem(w, 400, "考试日期无效，请选择日历上的有效日期。")
 			return
 		}
+		if !validRollover(req.Rollover) {
+			problem(w, 400, "请输入有效的学习日结束时间，例如 05:00。")
+			return
+		}
 		if !req.valid() {
 			problem(w, 400, "每日记忆所需连对次数与长期掌握所需累计天数均须为 1 至 99。每日上限须为 1 至 10,000，或设为全部。")
 			return
 		}
-		state, err := a.store.changeSettings(a.reviewDay(), req)
+		now := time.Now()
+		_, err := a.store.changeSettingsAt(now, req)
 		if err != nil {
 			saveError(w, err)
 			return
 		}
 		a.resumeLookup()
-		setExamDate(&state, time.Now())
-		respond(w, 200, state)
+		respond(w, 200, a.reviewResponse(now, false))
 	})
 	mux.HandleFunc("POST /api/import-preview", func(w http.ResponseWriter, r *http.Request) {
 		_, items, ok := readImport(w, r)
@@ -556,7 +566,7 @@ func (a *application) handler() http.Handler {
 		if !ok {
 			return
 		}
-		result, err := a.store.add(localDay(), items, req.Token, &a.dict)
+		result, err := a.store.add(a.currentStudyDay(), items, req.Token, &a.dict)
 		if errors.Is(err, errImportChanged) {
 			problem(w, 409, err.Error())
 			return
@@ -613,7 +623,7 @@ func (a *application) handler() http.Handler {
 			problem(w, 400, "未知的词库操作。")
 			return
 		}
-		count, err := a.store.batch(localDay(), req, action)
+		count, err := a.store.batch(a.currentStudyDay(), req, action)
 		if err != nil {
 			saveError(w, err)
 			return
@@ -702,11 +712,11 @@ func (a *application) handler() http.Handler {
 			saveError(w, err)
 			return
 		}
-		download(w, "text/csv; charset=utf-8", "WordReview-words-"+localDay()+".csv", data)
+		download(w, "text/csv; charset=utf-8", "WordReview-words-"+a.currentStudyDay()+".csv", data)
 	})
 	mux.HandleFunc("GET /api/backup", func(w http.ResponseWriter, _ *http.Request) {
 		a.store.mu.Lock()
-		data, err := json.Marshal(a.store.snapshotDatabase(localDay()))
+		data, err := json.Marshal(a.store.snapshotDatabase(a.store.db.studyDay(time.Now())))
 		a.store.mu.Unlock()
 		if err != nil {
 			saveError(w, err)
