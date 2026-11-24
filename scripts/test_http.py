@@ -106,7 +106,7 @@ with tempfile.TemporaryDirectory() as temp:
         assert call('/api/cards?filter=trash')['total']==1
         assert call('/api/batch/restore',{'all':True,'filter':'trash'})['count']==1
         call('/api/restore',backup)
-        assert json.loads((directory/'backups'/'before-restore.json').read_text())['words']['crucially']
+        assert json.loads((directory/'backups'/'before-restore.json').read_bytes())['words']['crucially']
         assert call('/api/card/crucial')['meaning']
         assert load('[{"word":"solar flare","meaning":"太阳耀斑","examples":"A flare erupted.","exampleTranslation":"耀斑爆发。","personalNote":"天文"}]','json')['new']==1
     finally:
