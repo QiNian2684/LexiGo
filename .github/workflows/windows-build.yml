@@ -1,6 +1,12 @@
 name: Windows build
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the tested Windows Setup and portable EXE (same signing status as 3.3.1)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -88,3 +94,35 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
+
+  publish:
+    needs: verify
+    if: inputs.publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
+        with:
+          name: windows-build-for-signing
+          path: dist
+      - name: Publish the Windows-only release
+        run: |
+          set -euo pipefail
+          installers=(dist/LexiGo-Setup-*.exe)
+          [[ ${#installers[@]} == 1 && -f "${installers[0]}" ]]
+          setup="${installers[0]##*/}"
+          [[ "$setup" =~ ^LexiGo-Setup-([0-9]+\.[0-9]+\.[0-9]+)\.exe$ ]]
+          version="${BASH_REMATCH[1]}"
+          tag="v$version-windows"
+          notes='Windows x64 安装版和便携版。已在 Windows 验证安装和运行。包含末日首答达标、五日易错词回顾、自定义换日时间以及系统 CSV 和备份保存对话框。与 3.3.1 的 Windows 安装包相同，此版本的 EXE 未做 Authenticode 签名。'
+          gh release create "$tag" "dist/$setup" dist/LexiGo.exe --draft --latest=false \
+            --target "$GITHUB_SHA" --title "LexiGo $version Windows" --notes "$notes"
+          remote="$(mktemp -d)"
+          (cd dist && sha256sum "$setup" LexiGo.exe) > "$remote/checksums"
+          gh release download "$tag" --dir "$remote" --pattern "$setup" --pattern LexiGo.exe
+          (cd "$remote" && sha256sum --check checksums)
+          gh release edit "$tag" --draft=false --latest=false
