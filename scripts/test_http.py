@@ -3,6 +3,7 @@ import http.cookiejar
 import io
 import json
 import os
+import time
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -17,7 +18,24 @@ exe = Path(sys.argv[1]).resolve()
 
 def start(directory):
     process = subprocess.Popen([str(exe), '--serve'], env={**os.environ, 'WORDREVIEW_DATA': str(directory)}, stdout=subprocess.PIPE, text=True)
-    url = process.stdout.readline().strip()
+    if sys.platform == 'win32':
+        # A GUI-subsystem build does not require a console. Its instance record
+        # publishes the same launch URL used by the real WebView2 window.
+        instance = directory / 'instance'
+        for _ in range(200):
+            if process.poll() is not None:
+                raise RuntimeError(f'LexiGo stopped at launch: {process.returncode}')
+            if instance.is_file():
+                url = instance.read_text(encoding='utf-8').strip()
+                if url.startswith('http://127.0.0.1:'):
+                    break
+            time.sleep(.05)
+        else:
+            process.kill()
+            process.wait()
+            raise RuntimeError('LexiGo did not publish its launch URL')
+    else:
+        url = process.stdout.readline().strip()
     assert url.startswith('http://127.0.0.1:'), url
     host = url.split('/start/')[0]
     agent = urllib.request.build_opener(urllib.request.ProxyHandler({}),

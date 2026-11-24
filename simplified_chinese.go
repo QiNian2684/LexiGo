@@ -14,7 +14,7 @@ var exampleSimplifier = sync.OnceValue(func() *strings.Replacer {
 	// The OpenCC-derived table lists longer phrases before their component
 	// characters. This also preserves phrases such as 乾隆 and 瞭望.
 	for line := range strings.Lines(traditionalToSimplified) {
-		if word, simplified, ok := strings.Cut(strings.TrimSuffix(line, "\n"), "\t"); ok {
+		if word, simplified, ok := strings.Cut(strings.TrimRight(line, "\r\n"), "\t"); ok {
 			replacements = append(replacements, word, simplified)
 		}
 	}
