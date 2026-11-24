@@ -35,8 +35,26 @@ jobs:
           java-version: '21'
       - name: Test and prepare Android tools
         run: |
+          set -euo pipefail
           go test ./...
-          sdkmanager --install 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
+          sdk="$RUNNER_TEMP/lexigo-android-sdk"
+          archives="$(mktemp -d)"
+          trap 'rm -rf -- "$archives"' EXIT
+          mkdir -p "$sdk/build-tools" "$sdk/platforms" "$sdk/ndk"
+          download_sdk() {
+            local archive="$1" digest="$2" directory="$3"
+            curl --fail --silent --show-error --location --retry 3 \
+              "https://dl.google.com/android/repository/$archive" -o "$archives/$archive"
+            printf '%s  %s\n' "$digest" "$archives/$archive" | sha256sum --check
+            unzip -q "$archives/$archive" -d "$sdk/$directory"
+            rm -- "$archives/$archive"
+          }
+          download_sdk build-tools_r35_linux.zip bd3a4966912eb8b30ed0d00b0cda6b6543b949d5ffe00bea54c04c81e1561d88 build-tools
+          download_sdk platform-35_r02.zip 0988cacad01b38a18a47bac14a0695f246bc76c1b06c0eeb8eb0dc825ab0c8e0 platforms
+          download_sdk android-ndk-r28c-linux.zip dfb20d396df28ca02a8c708314b814a4d961dc9074f9a161932746f815aa552f ndk
+          mv -- "$sdk/build-tools/android-15" "$sdk/build-tools/35.0.0"
+          mv -- "$sdk/ndk/android-ndk-r28c" "$sdk/ndk/28.2.13676358"
+          printf 'LEXIGO_ANDROID_SDK=%s\n' "$sdk" >> "$GITHUB_ENV"
       - name: Build, sign and verify
         id: build
         env:
@@ -68,8 +86,8 @@ jobs:
             -name "$WORDREVIEW_KEY_ALIAS" -passout env:WORDREVIEW_KEY_PASSWORD -out "$WORDREVIEW_KEYSTORE"
           rm -- "$signing/private_key.der" "$signing/key.pem"
 
-          export ANDROID_SDK_ROOT="$ANDROID_HOME"
-          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
+          export ANDROID_SDK_ROOT="$LEXIGO_ANDROID_SDK"
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/28.2.13676358"
           read -r package version_code version < <(python3 - <<'PY'
           from xml.etree.ElementTree import parse
           manifest = parse("android/src/main/AndroidManifest.xml").getroot()
@@ -80,7 +98,7 @@ jobs:
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           apk="LexiGo-Android-$version.apk"
           bash android/build-android.sh --release "dist/$apk"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "dist/$apk" > "$signing/badging.txt"
+          "$ANDROID_SDK_ROOT/build-tools/35.0.0/aapt" dump badging "dist/$apk" > "$signing/badging.txt"
           grep -F "package: name='$package' versionCode='$version_code' versionName='$version'" "$signing/badging.txt"
           grep -E "^native-code: ('arm64-v8a' 'x86_64'|'x86_64' 'arm64-v8a')[[:space:]]*$" "$signing/badging.txt"
           (cd dist && sha256sum "$apk" "$apk.idsig" > SHA256SUMS)
