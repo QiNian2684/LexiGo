@@ -14,13 +14,14 @@ const defaultDailyGoal = 3
 const defaultLimit = 20
 
 type settings struct {
-	Limit     int    `json:"limit"`
-	Goal      int    `json:"goal"`
-	DailyGoal int    `json:"dailyGoal,omitempty"`
-	Online    bool   `json:"online"`
-	ShowIPA   bool   `json:"showIPA"`
-	ExamDate  string `json:"examDate,omitempty"`
-	Rollover  string `json:"rollover,omitempty"`
+	Limit           int    `json:"limit"`
+	Goal            int    `json:"goal"`
+	DailyGoal       int    `json:"dailyGoal,omitempty"`
+	Online          bool   `json:"online"`
+	ShowIPA         bool   `json:"showIPA"`
+	ExamDate        string `json:"examDate,omitempty"`
+	Rollover        string `json:"rollover,omitempty"`
+	FirstTryMastery bool   `json:"firstTryMastery,omitempty"`
 }
 
 func (s settings) valid() bool {
@@ -71,22 +72,23 @@ type wordCard struct {
 }
 
 type event struct {
-	Kind         string     `json:"kind"`
-	Day          string     `json:"day"`
-	Card         uint64     `json:"card"`
-	Word         string     `json:"word"`
-	Tick         uint64     `json:"tick,omitempty"`
-	Extra        bool       `json:"extra,omitempty"`
-	Legacy       bool       `json:"legacy,omitempty"`
-	DayPassed    bool       `json:"dayPassed,omitempty"`
-	Credit       bool       `json:"credit,omitempty"`
-	Practice     bool       `json:"practice,omitempty"`
-	Recall       bool       `json:"recall,omitempty"`
-	RecallAnswer bool       `json:"recallAnswer,omitempty"`
-	Undone       bool       `json:"undone,omitempty"`
-	Waiting      bool       `json:"waitingForNext,omitempty"`
-	OccurredAt   *time.Time `json:"occurredAt,omitempty"`
-	Before       *progress  `json:"before,omitempty"`
+	Kind             string     `json:"kind"`
+	Day              string     `json:"day"`
+	Card             uint64     `json:"card"`
+	Word             string     `json:"word"`
+	Tick             uint64     `json:"tick,omitempty"`
+	Extra            bool       `json:"extra,omitempty"`
+	Legacy           bool       `json:"legacy,omitempty"`
+	DayPassed        bool       `json:"dayPassed,omitempty"`
+	Credit           bool       `json:"credit,omitempty"`
+	Practice         bool       `json:"practice,omitempty"`
+	Recall           bool       `json:"recall,omitempty"`
+	RecallAnswer     bool       `json:"recallAnswer,omitempty"`
+	FirstTryMastered bool       `json:"firstTryMastered,omitempty"`
+	Undone           bool       `json:"undone,omitempty"`
+	Waiting          bool       `json:"waitingForNext,omitempty"`
+	OccurredAt       *time.Time `json:"occurredAt,omitempty"`
+	Before           *progress  `json:"before,omitempty"`
 }
 
 type metadata struct {
@@ -174,11 +176,22 @@ func (s *store) recordVote(day, key string, version int, order uint64, remembere
 	if entry.Recall {
 		card.recordAnswer(day, remembered, &entry)
 	} else {
-		card.answer(day, remembered, passToday, s.db.Settings, session.credited[card.ID], session.votes, &entry)
+		options := s.db.Settings
+		credited := session.credited[card.ID]
+		// DailyDay survives a change of study day. An ordinary answer sets
+		// it, and a new learning cycle or undo of its first answer clears it.
+		entry.FirstTryMastered = options.FirstTryMastery && remembered && !passToday && before.DailyDay == ""
+		if entry.FirstTryMastered {
+			options.DailyGoal = 1
+			// A fresh cycle records one actual study day even if a cycle
+			// that was reset had already credited this date.
+			credited = false
+		}
+		card.answer(day, remembered, passToday, options, credited, session.votes, &entry)
 	}
 
 	s.db.Events = append(s.db.Events, entry)
-	if entry.DayPassed && card.qualifiesForMastery(s.db.Settings.Goal, card.ID, s.db.Events) {
+	if entry.FirstTryMastered || (entry.DayPassed && card.qualifiesForMastery(s.db.Settings.Goal, card.ID, s.db.Events)) {
 		card.Mastered = true
 	}
 	if err := s.save([]string{key}, count); err != nil {

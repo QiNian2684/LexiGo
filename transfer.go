@@ -20,10 +20,11 @@ import (
 )
 
 const (
-	transferFormat  = "wordreview.learning-state"
-	transferVersion = 5
-	maxTransfer     = 128 << 20
-	studyFileExt    = ".lexi"
+	transferFormat                 = "wordreview.learning-state"
+	transferVersion                = 6
+	transferVersionWithoutFirstTry = 5
+	maxTransfer                    = 128 << 20
+	studyFileExt                   = ".lexi"
 )
 
 type transferEnvelope struct {
@@ -123,7 +124,12 @@ func (s *store) transferBytes(now time.Time) ([]byte, error) {
 		return nil, err
 	}
 	digest := sha256.Sum256(raw)
-	file, err := json.Marshal(transferEnvelope{transferFormat, transferVersion, hex.EncodeToString(digest[:]), raw})
+	version := transferVersionWithoutFirstTry
+	if payload.Database.Settings.FirstTryMastery ||
+		slices.ContainsFunc(payload.Database.Events, func(item event) bool { return item.FirstTryMastered }) {
+		version = transferVersion
+	}
+	file, err := json.Marshal(transferEnvelope{transferFormat, version, hex.EncodeToString(digest[:]), raw})
 	if len(file) > maxTransfer {
 		return nil, errors.New("完整学习数据超过 128 MB。")
 	}

@@ -11,7 +11,8 @@ window.WordReviewChart = (() => {
     answers: [["yes", "记住次数"], ["no", "没记住次数"]],
   };
   let history = [], data = [], range = 7, metric = "words", selected = -1;
-  let bounds, highlight;
+  let bounds, highlight, signature;
+  let drawnWidth = 0;
 
   function svgElement(tag, attributes, label) {
     const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
@@ -31,10 +32,11 @@ window.WordReviewChart = (() => {
   }
 
   function draw(animate = false) {
-    if (!history.length || !surface.clientWidth) return;
+    const width = surface.clientWidth;
+    if (!history.length || !width) return;
+    drawnWidth = width;
     data = history.slice(-range);
     const series = metrics[metric];
-    const width = surface.clientWidth;
     const height = width < 490 ? 210 : 275;
     const top = 12, bottom = height - 32;
     const maximum = Math.max(1, ...data.flatMap(day => series.map(([key]) => day[key])));
@@ -117,8 +119,14 @@ window.WordReviewChart = (() => {
       select(selected + (event.key === "ArrowLeft" ? -1 : 1));
     }
   });
-  new ResizeObserver(() => draw()).observe(surface);
+  new ResizeObserver(() => {
+    if (surface.clientWidth !== drawnWidth) draw();
+  }).observe(surface);
   return {update(rows) {
+    const next = JSON.stringify(rows);
+    if (next === signature) return;
+    signature = next;
+    drawnWidth = 0;
     const previous = history.at(-1)?.day;
     history = rows;
     if (previous !== history.at(-1)?.day) selected = -1;

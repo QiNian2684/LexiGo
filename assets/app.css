@@ -121,20 +121,24 @@ a { color: var(--accent); text-underline-offset: .17em; }
   :root:has(.page-capture) { view-transition-name: none; }
   .shell.page-capture { view-transition-name: study-page; }
   ::view-transition { pointer-events: none; }
-  ::view-transition-group(study-page) { animation: none; }
-  ::view-transition-image-pair(study-page) { isolation: auto; overflow: clip; }
+  /* The destination's bounds also clip a taller outgoing page above the live action bar. */
+  ::view-transition-group(study-page) { animation: none; overflow: clip; }
+  ::view-transition-image-pair(study-page) { isolation: auto; }
   ::view-transition-old(study-page), ::view-transition-new(study-page) {
     animation-duration: var(--motion-page);
     animation-timing-function: var(--motion-ease);
+    animation-fill-mode: both;
     mix-blend-mode: normal;
   }
   ::view-transition-old(study-page) { animation-name: page-out; }
   ::view-transition-new(study-page) { animation-name: page-in; }
   @keyframes page-out {
+    from { opacity: 1; transform: translateX(0); }
     to { opacity: 0; transform: translateX(calc(var(--page-shift, 0px) * -.65)); }
   }
   @keyframes page-in {
     from { opacity: 0; transform: translateX(var(--page-shift, 0px)); }
+    to { opacity: 1; transform: translateX(0); }
   }
 }
 .page-heading {
@@ -377,14 +381,16 @@ body:not([data-view="review"]) > .card-actions { display: none; }
   height: auto;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-width: none;
 }
 :root[data-review-shortcuts="windows"] .shell {
   grid-area: 1 / 2;
   width: min(100%, 106rem);
   min-height: 0;
   overflow-y: auto;
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: stable;
 }
+:root[data-review-shortcuts="windows"] :is(.shell, .dialog-body, .popup-list) { scrollbar-width: thin; }
 :root[data-review-shortcuts="windows"] .compose-card { max-width: none; }
 :root[data-review-shortcuts="windows"] .import-actions { flex-wrap: wrap; }
 :root[data-review-shortcuts="windows"] .meaning-panel p { max-inline-size: 75ch; }
@@ -575,8 +581,8 @@ td:first-child, th:first-child { min-width: 7.4rem; }
   margin-inline: 1.08rem; padding-block: .63rem; border-top: 1px solid var(--line);
 }
 .setting-text { min-width: 0; }
-.setting-text label, .switch-row > span:first-child { display: block; font-size: .96rem; font-weight: 575; line-height: 1.4; }
-.setting-text p { color: var(--muted); font-size: .8rem; margin-top: .23rem; line-height: 1.45; }
+.setting-text label, .setting-text strong, .switch-row > span:first-child { display: block; font-size: .96rem; font-weight: 575; line-height: 1.4; }
+.setting-text p, .setting-help { display: block; font-weight: 400; color: var(--muted); font-size: .8rem; margin-top: .23rem; line-height: 1.45; }
 .setting-control { width: clamp(8rem, 17vw, 10.45rem); }
 #study-rollover { width: 100%; min-width: 0; font-variant-numeric: tabular-nums; }
 .exam-date-box {

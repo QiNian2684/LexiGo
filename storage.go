@@ -347,6 +347,10 @@ func validDatabase(db database) bool {
 		if item.RecallAnswer && (item.Legacy || item.Practice || (item.Kind != "yes" && item.Kind != "no")) {
 			return false
 		}
+		if item.FirstTryMastered && (item.Kind != "yes" || !item.DayPassed || !item.Credit || item.Legacy ||
+			item.Recall || item.Practice || item.Before == nil || item.Before.DailyDay != "") {
+			return false
+		}
 		if !ids[item.Card] || !validDate(item.Day) || item.Tick > db.NextOrder {
 			return false
 		}

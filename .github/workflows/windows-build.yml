@@ -119,7 +119,7 @@ jobs:
           [[ "$setup" =~ ^LexiGo-Setup-([0-9]+\.[0-9]+\.[0-9]+)\.exe$ ]]
           version="${BASH_REMATCH[1]}"
           tag="v$version-windows"
-          notes='Windows x64 安装版和便携版。已在 Windows 验证安装和运行。调整切页、释义和复习卡片动画。易错词首答错后当天连对三次，次日继续回顾，并按不同词计入今日进度。与 3.3.1 的 Windows 安装包相同，此版本的 EXE 未做 Authenticode 签名。'
+          notes='Windows x64 安装版和便携版。已在 Windows 验证安装和运行。修复切页收尾旧画面闪回，精简侧栏滚动条，新增「首次记住即掌握」学习选项，默认关闭。与 3.3.1 的 Windows 安装包相同，此版本的 EXE 未做 Authenticode 签名。'
           gh release create "$tag" "dist/$setup" dist/LexiGo.exe --draft --latest=false \
             --target "$GITHUB_SHA" --title "LexiGo $version Windows" --notes "$notes"
           remote="$(mktemp -d)"

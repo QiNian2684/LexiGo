@@ -1,5 +1,7 @@
 /* Native window fitting supplies the usable WebView bounds. */
 html { height: 100%; overflow: hidden; }
+html, .platform-android, .platform-android * { scrollbar-width: none; }
+::-webkit-scrollbar { display: none; }
 body.platform-android {
   --control: 3rem;
   --phone-nav: 4.35rem;

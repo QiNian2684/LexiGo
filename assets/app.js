@@ -24,7 +24,9 @@ const dayFormat = new Intl.DateTimeFormat("zh-CN", {
 let state, revealed, practice, editing, confirmation;
 let view = "review";
 let viewRequest = 0;
+let pendingNavigation;
 let pageTransition;
+let fallbackPageAnimation;
 let answerAnimation;
 let listAnimation;
 let settingsFrom = "review";
@@ -126,7 +128,6 @@ async function refreshState(intent = viewRequest) {
   if (old && (old.date !== next.date || !old.current && next.current) && studying && reviewing && !practice && !noteDirty()) {
     next = await api("/api/review/start", {});
   }
-  await afterPageMotion();
   if (intent === viewRequest && state === old && !noteDirty()) applyState(next);
 }
 
@@ -607,26 +608,37 @@ function positionNavigationIndicator() {
 
 function pageScroller() { return mobile || windowsReview ? shell : window; }
 
-async function displayView(next, {intent = viewRequest, top = 0, prepare} = {}) {
+async function displayView(next, {intent, top = 0, prepare, focus} = {}) {
   const previous = view;
-  pageTransition?.skipTransition();
+  if (intent !== viewRequest) return;
   const update = () => {
     if (intent !== viewRequest) return;
     if (next !== "library") closeWordPreview();
     if (previous !== next && shell.contains(document.activeElement)) document.activeElement.blur();
-    prepare?.();
     view = next;
     document.body.dataset.view = next;
     for (const id of views) el(id + "-view").hidden = id !== next;
+    prepare?.();
     for (const item of navigationButtons) {
       if (item.dataset.view === next) item.setAttribute("aria-current", "page");
       else item.removeAttribute("aria-current");
     }
     positionNavigationIndicator();
     pageScroller().scrollTo({top});
+    focus?.focus({preventScroll: true});
     if (next === "review") fitNote();
   };
-  if (previous === next || reducedMotion.matches) {
+  if (previous === next) {
+    update();
+    return;
+  }
+  pageTransition?.skipTransition();
+  fallbackPageAnimation?.cancel();
+  if (listAnimation) {
+    listAnimation.cancel();
+    listAnimation = undefined;
+  }
+  if (reducedMotion.matches) {
     update();
     return;
   }
@@ -634,30 +646,49 @@ async function displayView(next, {intent = viewRequest, top = 0, prepare} = {}) 
   if (!document.startViewTransition) {
     update();
     const offset = mobile ? `translateX(${direction * 12}px)` : `translateY(${direction * 5}px)`;
-    el(next + "-view").animate?.([{opacity: .7, transform: offset}, {opacity: 1, transform: "none"}],
-      motionOptions("--motion-page"));
+    fallbackPageAnimation = el(next + "-view").animate?.([
+      {opacity: .7, transform: offset}, {opacity: 1, transform: "none"},
+    ], motionOptions("--motion-page"));
     return;
   }
 
-  // Capture only the content scroller. Navigation and the Android bars stay live.
+  // Only the scroller is captured. Navigation and action buttons stay live.
+  const root = document.documentElement;
   shell.classList.add("page-capture");
-  document.documentElement.style.setProperty("--page-shift", mobile ? `${direction * 16}px` : "0px");
+  root.style.setProperty("--page-shift", mobile ? `${direction * 16}px` : "0px");
   const transition = document.startViewTransition(update);
   pageTransition = transition;
-  transition.finished.catch(() => {}).then(() => {
+  const cleanup = () => {
     if (pageTransition !== transition) return;
     pageTransition = undefined;
     shell.classList.remove("page-capture");
-  });
+    root.style.removeProperty("--page-shift");
+  };
+  transition.ready.catch(() => {}); // A newer tap can supersede the transition before capture.
+  transition.finished.then(cleanup, cleanup);
   await transition.updateCallbackDone;
+}
+
+function isViewDestination(next, intent) {
+  return intent === viewRequest && next === (pendingNavigation?.next ?? view);
+}
+
+function refreshViewContent(next) {
+  if (next === "library") return refreshLibrary();
+  if (next === "stats") return refreshStats();
+  if (next === "add" && imported.length) return updateImportStatus();
 }
 
 async function changeView(next, temporary) {
   if (swiping || busy) return;
+  const staying = next === view && !temporary && !(next === "review" && practice);
+  if (!temporary && (pendingNavigation ? next === pendingNavigation.next && !pendingNavigation.temporary : staying)) return;
   const intent = ++viewRequest;
-  if (next === "settings") return openSettings(intent);
-  if (view === "settings" && next === settingsFrom && !temporary) return closeSettings(intent);
+  pendingNavigation = {next, temporary};
   try {
+    if (staying) return;
+    if (next === "settings") return await openSettings(intent);
+    if (view === "settings" && next === settingsFrom && !temporary) return await closeSettings(intent);
     if (view === "settings") {
       commitFocusedSetting();
       await flushSettings();
@@ -666,23 +697,25 @@ async function changeView(next, temporary) {
     if (intent !== viewRequest) return;
     controls.close(false);
     const previous = view === "settings" ? settingsFrom : view;
-    await displayView(next, {intent, prepare() {
+    const transition = displayView(next, {intent, prepare() {
       const wasPractice = !!practice;
       practice = temporary;
       if (wasPractice || practice) clearAnswer();
       showError();
       if (next === "review") renderReview();
     }});
+    await Promise.all([transition, refreshViewContent(next)]);
     if (intent !== viewRequest) return;
     if (next === "review") {
       if (previous !== next && studying && !practice) await startReview(intent);
       else await refreshState(intent);
       if (intent === viewRequest) await resumeWaiting();
     }
-    if (next === "library") await refreshLibrary();
-    if (next === "stats") await refreshStats();
-    if (next === "add" && imported.length) await updateImportStatus();
-  } catch (error) { if (intent === viewRequest) showError(error); }
+  } catch (error) {
+    if (intent === viewRequest) showError(error);
+  } finally {
+    if (intent === viewRequest) pendingNavigation = undefined;
+  }
 }
 
 async function startReview(intent) {
@@ -696,11 +729,10 @@ async function startReview(intent) {
   }
   try {
     const result = await api("/api/review/start", {});
-    if (!manual) await afterPageMotion();
     if (intent !== viewRequest || view !== "review" || (!manual && (state !== old || busy || swiping))) return;
     studying = true;
     practice = undefined;
-    applyState(result, true);
+    applyState(result, manual);
     if (windowsReview && result.current) el("reveal").focus({preventScroll: true});
   } catch (error) {
     if (intent === viewRequest) showError(error);
@@ -713,8 +745,6 @@ async function startReview(intent) {
     if (intent === viewRequest && state?.waitingForNext && !answerExpanded()) await toggleReveal();
   }
 }
-
-function afterPageMotion() { return pageTransition?.finished.catch(() => {}); }
 
 function englishVoice() {
   if (!window.speechSynthesis) return;
@@ -929,9 +959,9 @@ function addWordActions(row, entry, progress) {
 
 async function refreshLibrary(animate = false) {
   const requestID = ++listRequest;
+  const intent = viewRequest;
   const data = await api("/api/cards?" + new URLSearchParams({...libraryQuery(), page: listPage}));
-  await afterPageMotion();
-  if (requestID !== listRequest || view !== "library") return;
+  if (requestID !== listRequest || !isViewDestination("library", intent)) return;
   if (listPage && !data.rows.length) {
     listPage = Math.max(0, Math.ceil(data.total / 24) - 1);
     return refreshLibrary(animate);
@@ -946,11 +976,11 @@ async function refreshLibrary(animate = false) {
   if (signature === listSignature) return;
   listSignature = signature;
   closeWordPreview();
-  el("word-list").replaceChildren();
+  const rows = document.createDocumentFragment();
   if (!data.rows.length) {
     const paragraph = document.createElement("p");
     paragraph.textContent = el("search").value || el("filter").value ? "没有符合条件的单词。" : "还没有添加单词。";
-    el("word-list").append(paragraph);
+    rows.append(paragraph);
   }
   for (const entry of data.rows) {
     const row = document.createElement("article");
@@ -988,13 +1018,14 @@ async function refreshLibrary(animate = false) {
     main.append(title, meaning, timing);
     addWordPreview(main, row, entry, timing.textContent);
     row.append(checkTarget, main, addWordActions(row, entry, timing.textContent));
-    el("word-list").append(row);
+    rows.append(row);
   }
+  const list = el("word-list");
+  list.replaceChildren(rows);
   el("results").textContent = data.total ? `共 ${data.total} 个 · 第 ${listPage + 1} 页` : "共 0 个";
   el("prev-page").disabled = listPage === 0;
   el("next-page").disabled = (listPage + 1) * 24 >= data.total;
-  const list = el("word-list");
-  if (animate === true && !reducedMotion.matches && list.animate) {
+  if (animate === true && !pageTransition && !reducedMotion.matches && list.animate) {
     listAnimation?.cancel();
     listAnimation = list.animate([{opacity: .7}, {opacity: 1}], motionOptions("--motion-panel"));
   }
@@ -1083,7 +1114,7 @@ async function openHistory(entry) {
   };
   el("history-list").replaceChildren(...history.map(row => {
     const item = document.createElement("li");
-    const rule = row.legacy ? "（旧规则）" : row.recall ? "（易错词回顾）" : row.dayPassed ? (row.credit ? "（完成今日记忆）" : "（当天已计入）") : "";
+    const rule = row.firstTryMastered ? "（首次记住即掌握）" : row.legacy ? "（旧规则）" : row.recall ? "（易错词回顾）" : row.dayPassed ? (row.credit ? "（完成今日记忆）" : "（当天已计入）") : "";
     const suffix = rule + (row.undone ? "（已撤销）" : "");
     item.textContent = [row.day, items[row.kind] + suffix].join(" · ");
     return item;
@@ -1202,7 +1233,9 @@ async function submitWords(event) {
 
 async function updateImportStatus() {
   if (!imported.length) return;
-  const data = await api("/api/import-status", {keys: imported});
+  const keys = imported;
+  const data = await api("/api/import-status", {keys});
+  if (keys !== imported) return;
   importPending = data.pending > 0;
   if (!data.pending && !data.partial) {
     message("import-lookup");
@@ -1234,8 +1267,7 @@ async function readWordFile(event) {
 async function refreshStats() {
   const intent = viewRequest;
   const data = await api("/api/stats");
-  await afterPageMotion();
-  if (view !== "stats" || intent !== viewRequest) return;
+  if (!isViewDestination("stats", intent)) return;
   const today = data.days[data.days.length - 1];
   const stats = [
     ["历史累计录入不同词", data.imported], ["当前词库", data.current], ["已掌握", data.mastered],
@@ -1243,15 +1275,19 @@ async function refreshStats() {
     ["今天记住操作", today.yes], ["今天没记住操作", today.no], ["累计复习操作", data.totalReviews],
     ["累计没记住操作", data.totalForgot], ["累计重新录入", data.totalReimport],
   ];
-  el("stats-counts").replaceChildren(...stats.map(([label, value]) => {
-    const item = document.createElement("div");
-    const title = document.createElement("span");
-    const amount = document.createElement("strong");
-    title.textContent = label;
-    amount.textContent = value;
-    item.append(title, amount);
-    return item;
-  }));
+  const counts = el("stats-counts");
+  for (const [index, [label, value]] of stats.entries()) {
+    let amount = counts.children[index]?.lastElementChild;
+    if (!amount) {
+      const item = document.createElement("div");
+      const title = document.createElement("span");
+      amount = document.createElement("strong");
+      title.textContent = label;
+      item.append(title, amount);
+      counts.append(item);
+    }
+    if (amount.textContent !== String(value)) amount.textContent = value;
+  }
   window.WordReviewChart.update(data.days);
 }
 
@@ -1284,58 +1320,54 @@ function commitExamDate() {
   settingsDraft.examDate = date === "12-20" ? undefined : date;
 }
 
-async function openSettings(intent = ++viewRequest) {
-  if (view === "settings" || busy || swiping) return;
-  try {
-    await flushNote();
-    if (!state) await refreshState();
-    if (intent !== viewRequest) return;
-    const prefs = state.settings;
-    settingsDraft = {...prefs};
-    settingsSaved = {...prefs};
-    el("daily-limit").value = [0, 10, 20, 40, 100, 200].includes(prefs.limit) ? String(prefs.limit) : "custom";
-    el("custom-limit").value = prefs.limit || 20;
-    el("goal").value = prefs.goal;
-    el("daily-goal").value = prefs.dailyGoal;
-    el("study-rollover").value = prefs.rollover || "05:00";
-    el("online").checked = prefs.online;
-    el("show-ipa").checked = prefs.showIPA;
-    const fixed = prefs.examDate?.length === 10;
-    el("exam-mode").value = fixed ? "fixed" : "annual";
-    el("exam-date").value = fixed ? prefs.examDate : state.exam.date;
-    renderExamDate();
-    customLimit();
-    controls.syncSelect(el("daily-limit"));
-    controls.syncSelect(el("exam-mode"));
-    message("settings-status");
-    message("study-settings-status");
-    for (const input of el("settings-form").querySelectorAll("[aria-invalid]")) input.removeAttribute("aria-invalid");
-    controls.close(false);
-    settingsFrom = view;
-    settingsOffset = (mobile || windowsReview) ? shell.scrollTop : window.scrollY;
-    await displayView("settings", {intent});
-    if (intent !== viewRequest) return;
-    el("settings-title").focus({preventScroll: true});
-    await refreshRecovery();
-  } catch (error) { showError(error); }
+async function openSettings(intent) {
+  await flushNote();
+  if (!state) await refreshState(intent);
+  if (intent !== viewRequest) return;
+  const prefs = state.settings;
+  settingsDraft = {...prefs};
+  settingsSaved = {...prefs};
+  el("daily-limit").value = [0, 10, 20, 40, 100, 200].includes(prefs.limit) ? String(prefs.limit) : "custom";
+  el("custom-limit").value = prefs.limit || 20;
+  el("goal").value = prefs.goal;
+  el("daily-goal").value = prefs.dailyGoal;
+  el("first-try-mastery").checked = !!prefs.firstTryMastery;
+  el("study-rollover").value = prefs.rollover || "05:00";
+  el("online").checked = prefs.online;
+  el("show-ipa").checked = prefs.showIPA;
+  const fixed = prefs.examDate?.length === 10;
+  el("exam-mode").value = fixed ? "fixed" : "annual";
+  el("exam-date").value = fixed ? prefs.examDate : state.exam.date;
+  renderExamDate();
+  customLimit();
+  controls.syncSelect(el("daily-limit"));
+  controls.syncSelect(el("exam-mode"));
+  message("settings-status");
+  message("study-settings-status");
+  for (const input of el("settings-form").querySelectorAll("[aria-invalid]")) input.removeAttribute("aria-invalid");
+  controls.close(false);
+  settingsFrom = view;
+  settingsOffset = (mobile || windowsReview) ? shell.scrollTop : window.scrollY;
+  await Promise.all([
+    displayView("settings", {intent, focus: el("settings-title")}),
+    refreshRecovery(intent),
+  ]);
 }
 
-async function closeSettings(intent = ++viewRequest) {
-  if (view !== "settings") return;
+async function closeSettings(intent) {
   commitFocusedSetting();
-  try { await flushSettings(); } catch { return; }
+  await flushSettings();
   if (intent !== viewRequest) return;
   controls.close(false);
-  // Returning from appearance settings leaves the current card and the queue in place.
-  await displayView(settingsFrom, {intent, top: settingsOffset});
-  if (intent !== viewRequest) return;
-  const focus = settingsFrom === "review" && !el("flashcard").hidden ? el("reveal")
-    : document.querySelector('button[data-view="' + settingsFrom + '"]');
-  focus?.focus({preventScroll: true});
-  try {
-    if (view === "add") await updateImportStatus();
-    if (view === "library") await refreshLibrary();
-  } catch (error) { showError(error); }
+  // Keep the current card and scroll position when returning from settings.
+  const next = settingsFrom;
+  const focus = next === "review" && !el("flashcard").hidden ? el("reveal")
+    : navigationButtons.find(button => button.dataset.view === next);
+  await Promise.all([
+    displayView(next, {intent, top: settingsOffset, focus}),
+    refreshViewContent(next),
+  ]);
+  if (intent === viewRequest && next === "review") await resumeWaiting();
 }
 
 function commitSetting(input) {
@@ -1363,7 +1395,10 @@ function commitSetting(input) {
     } else settingsDraft.limit = Number(input.value);
     return;
   }
-  const key = {"custom-limit": "limit", "daily-goal": "dailyGoal", goal: "goal", "show-ipa": "showIPA", online: "online"}[input.id];
+  const key = {
+    "custom-limit": "limit", "daily-goal": "dailyGoal", goal: "goal",
+    "first-try-mastery": "firstTryMastery", "show-ipa": "showIPA", online: "online",
+  }[input.id];
   if (!key || (input.id === "custom-limit" && input.hidden)) return;
   if (!input.validity.valid || (input.type === "number" && input.value === "")) {
     input.setAttribute("aria-invalid", "true");
@@ -1408,8 +1443,10 @@ async function showRestored() {
   listSignature = undefined;
   imported = [];
   importPending = false;
-  if (view === "settings") await displayView(settingsFrom);
+  settingsDraft = settingsSaved = undefined;
+  settingsOffset = 0;
   el("action-dialog").close();
+  await refreshState();
   await changeView("review");
 }
 
@@ -1437,10 +1474,9 @@ ${plan}
     }, true);
 }
 
-async function refreshRecovery() {
+async function refreshRecovery(intent) {
   const data = await api("/api/transfer/recovery");
-  await afterPageMotion();
-  el("transfer-recovery").hidden = !data.available;
+  if (isViewDestination("settings", intent)) el("transfer-recovery").hidden = !data.available;
 }
 
 async function pickTransfer(kind) {
@@ -1474,7 +1510,7 @@ if (mobile) {
       else if (last.id !== "action-dialog" || !el("action-confirm").disabled) last.close();
       return true;
     }
-    if (view === "settings") { closeSettings(); return true; }
+    if (view === "settings") { changeView(settingsFrom); return true; }
     if (practice || studying && view === "review") {
       stopReview();
       return true;
@@ -1496,8 +1532,9 @@ if (mobile) {
       const result = JSON.parse(data);
       if (result.cancelled) return;
       if (kind === "import") {
-        if (view !== "settings") openSettings().then(() => showTransferPreview(result));
-        else showTransferPreview(result);
+        changeView("settings").then(() => {
+          if (view === "settings") showTransferPreview(result);
+        });
       }
     } catch (e) { message(target, e.message); }
   };
@@ -1542,7 +1579,7 @@ function keyboard(event) {
   }
   if (view === "settings" && event.key === "Escape" && !controls.isOpen() && !document.querySelector("dialog[open]")) {
     event.preventDefault();
-    closeSettings();
+    changeView(settingsFrom);
     return;
   }
   if (windowsReview && event.key === "Enter" && reviewKeyAllowed(event)) {
@@ -1931,7 +1968,7 @@ if (windowsReview) window.addEventListener("beforeunload", event => {
 });
 let tick = 0;
 setInterval(async () => {
-  if (busy || swiping) return;
+  if (busy || swiping || pendingNavigation) return;
   tick++;
   try {
     if (view === "library" && !controls.isOpen() && !document.querySelector("dialog[open]")) await refreshLibrary();
