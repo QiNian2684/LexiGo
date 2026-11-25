@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#f5f7fa">
   <title>LexiGo</title>
@@ -61,21 +61,19 @@
             </button>
           </div>
         </div>
-        <div class="answer-panel" id="answer" aria-hidden="true" inert>
-          <div class="answer-clip">
-            <div class="answer">
-              <section id="details" class="meaning-panel" tabindex="0" aria-label="释义和例句"></section>
-              <section class="memory-panel" aria-label="我的备注">
-                <div class="personal-note">
-                  <label for="personal-note">我的备注</label>
-                  <textarea id="personal-note" rows="4" maxlength="12000" placeholder="写下你的联想、易混点或任何想记的内容。"></textarea>
-                  <div class="note-actions">
-                    <span id="note-status" role="status"></span>
-                  </div>
+        <div class="answer-panel" id="answer" aria-hidden="true" hidden inert>
+          <div class="answer">
+            <section id="details" class="meaning-panel" tabindex="0" aria-label="释义和例句"></section>
+            <section class="memory-panel" aria-label="我的备注">
+              <div class="personal-note">
+                <label for="personal-note">我的备注</label>
+                <textarea id="personal-note" rows="4" maxlength="12000" placeholder="写下你的联想、易混点或任何想记的内容。"></textarea>
+                <div class="note-actions">
+                  <span id="note-status" role="status"></span>
                 </div>
-                <div id="card-metadata"></div>
-              </section>
-            </div>
+              </div>
+              <div id="card-metadata"></div>
+            </section>
           </div>
         </div>
         </div>
@@ -369,7 +367,7 @@
               <figcaption>在「设置 → 学习」调整连对次数和长期掌握所需天数。</figcaption>
             </figure>
           </div>
-          <p class="guide-note">学习日默认在本机时间 05:00 换日，可在设置修改。每天回顾恰好 5 个学习日前答错次数最多的 10 个词。每词每天回顾一次，答对即通过，答错顺延到下一个学习日。</p>
+          <p class="guide-note">学习日默认在本机时间 05:00 换日，可在设置修改。每天回顾恰好 5 个学习日前答错次数最多的 10 个词。首答记住即通过。首答没记住时，当天需连对 3 次，即使完成也会顺延，直到某天首答记住。易错词计入今日进度，与普通复习重叠时只计一个词。</p>
         </section>
 
         <section class="guide-section" aria-labelledby="guide-library">

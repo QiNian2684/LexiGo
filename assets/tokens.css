@@ -53,12 +53,13 @@
   --radius-dialog: 1.25rem;
   --control: 2.75rem;
   --rail-size: 13.5rem;
-  --motion: 185ms;
-  --motion-panel: 320ms;
-  --motion-page: 360ms;
-  --motion-answer: 365ms;
-  --motion-card-out: 205ms;
-  --motion-card-in: 300ms;
+  --motion: 135ms;
+  --motion-panel: 215ms;
+  --motion-page: 265ms;
+  --motion-answer: 165ms;
+  --motion-card-out: 180ms;
+  --motion-card-in: 190ms;
+  --motion-card-ease: cubic-bezier(.2,.7,.3,1);
   --motion-ease: cubic-bezier(.22,.58,.31,1);
 }
 
@@ -101,5 +102,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { --motion: 0ms; --motion-panel: 0ms; --motion-page: 0ms; --motion-answer: 0ms; }
+  :root { --motion: 0ms; --motion-panel: 0ms; --motion-page: 0ms; --motion-answer: 0ms; --motion-card-out: 0ms; --motion-card-in: 0ms; }
 }

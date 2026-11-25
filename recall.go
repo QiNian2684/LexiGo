@@ -8,11 +8,14 @@ import (
 
 const recallIntervalDays = 5
 const recallBatchLimit = 10
+const recallRetestGoal = 3
 
 type recallBatch struct {
-	Day     string   `json:"day"`
-	Cards   []uint64 `json:"cards,omitempty"`
-	Rolling bool     `json:"rolling,omitempty"`
+	Day         string   `json:"day"`
+	Cards       []uint64 `json:"cards,omitempty"`
+	Rolling     bool     `json:"rolling,omitempty"`
+	Retest      bool     `json:"retest,omitempty"`
+	RetestAfter uint64   `json:"retestAfter,omitempty"`
 }
 
 func (b *recallBatch) available(day string) bool {
@@ -22,8 +25,15 @@ func (b *recallBatch) available(day string) bool {
 // refreshRecall is called with the store locked, before presenting a review.
 func (s *store) refreshRecall(day string) error {
 	old := s.db.RecallBatch
-	if old != nil && (old.Day > day || (old.Day == day && old.Rolling)) {
+	if old != nil && (old.Day > day || (old.Day == day && old.Rolling && old.Retest)) {
 		return nil
+	}
+	// A batch already in progress keeps the old completion decisions made
+	// before the upgrade. New answers use the new rule.
+	if old != nil && old.Day == day && old.Rolling {
+		batch := *old
+		batch.Retest, batch.RetestAfter = true, s.db.NextOrder
+		return s.saveRecallBatch(&batch)
 	}
 	current, err := time.Parse(time.DateOnly, day)
 	if err != nil {
@@ -64,7 +74,7 @@ func (s *store) refreshRecall(day string) error {
 			remembered[item.Card] = remembered[item.Card] || item.Kind == "yes"
 		}
 	}
-	batch := &recallBatch{Day: day, Rolling: true}
+	batch := &recallBatch{Day: day, Rolling: true, Retest: true}
 	queued := make(map[uint64]bool)
 	if old != nil {
 		for _, id := range old.Cards {
@@ -99,6 +109,11 @@ func (s *store) refreshRecall(day string) error {
 			}
 		}
 	}
+	return s.saveRecallBatch(batch)
+}
+
+func (s *store) saveRecallBatch(batch *recallBatch) error {
+	old := s.db.RecallBatch
 	s.db.RecallBatch = batch
 	if err := s.save(nil, len(s.db.Events)); err != nil {
 		s.db.RecallBatch = old
@@ -107,7 +122,7 @@ func (s *store) refreshRecall(day string) error {
 	return nil
 }
 
-func (p *reviewPlan) addRecall(db database) {
+func (p *reviewPlan) addLegacyRecall(db database) {
 	ordinary := make(map[uint64]bool)
 	for _, group := range [][]*wordCard{p.old, p.new, p.extras, p.repeats} {
 		for _, card := range group {
@@ -128,4 +143,76 @@ func (p *reviewPlan) addRecall(db database) {
 		}
 	}
 	p.state.RecallDue = len(p.recall)
+}
+
+type recallProgress struct {
+	last      int
+	retesting bool
+	count     int
+	done      bool
+}
+
+func (r recallProgress) answer(correct bool, position int) recallProgress {
+	if r.done {
+		return r
+	}
+	if r.last == 0 && correct {
+		return recallProgress{last: position, done: true}
+	}
+	r.last, r.retesting = position, true
+	if correct {
+		r.count++
+	} else {
+		r.count = 0
+	}
+	r.done = r.count == recallRetestGoal
+	return r
+}
+
+// Track recall and ordinary work independently, counting each word once.
+func (p *reviewPlan) addRecall(db database) {
+	ordinary := make(map[uint64]bool)
+	for _, group := range [][]*wordCard{p.old, p.new, p.extras, p.repeats} {
+		for _, card := range group {
+			ordinary[card.ID] = true
+		}
+	}
+	cards := make(map[uint64]*wordCard, len(db.RecallBatch.Cards))
+	for _, card := range db.Words {
+		if _, selected := p.session.recallProgress[card.ID]; selected && !card.Deleted && card.DailyDay <= p.state.Date {
+			cards[card.ID] = card
+		}
+	}
+	for _, id := range db.RecallBatch.Cards {
+		card := cards[id]
+		if card == nil {
+			continue
+		}
+		progress := p.session.recallProgress[id]
+		passed := card.passedOn(p.state.Date)
+		if !passed && !ordinary[id] {
+			p.state.TaskTotal++
+			if progress.done {
+				p.state.TaskDone++
+			}
+		}
+		if progress.done {
+			continue
+		}
+		p.state.RecallDue++
+		if passed {
+			p.state.TaskDone--
+		}
+		if ordinary[id] {
+			continue
+		}
+		p.recall = append(p.recall, card)
+		p.state.Due++
+		if progress.last > 0 {
+			p.retests = append(p.retests, card)
+		}
+	}
+	slices.SortFunc(p.retests, func(a, b *wordCard) int {
+		return p.lastRetest(a) - p.lastRetest(b)
+	})
 }

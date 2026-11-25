@@ -17,32 +17,37 @@ if len(sys.argv) != 2:
 exe = Path(sys.argv[1]).resolve()
 
 def start(directory):
+    instance = directory / 'instance'
+    previous_url = instance.read_text(encoding='utf-8').strip() if instance.is_file() else None
     process = subprocess.Popen([str(exe), '--serve'], env={**os.environ, 'WORDREVIEW_DATA': str(directory)}, stdout=subprocess.PIPE, text=True)
-    if sys.platform == 'win32':
-        # A GUI-subsystem build does not require a console. Its instance record
-        # publishes the same launch URL used by the real WebView2 window.
-        instance = directory / 'instance'
-        for _ in range(200):
-            if process.poll() is not None:
-                raise RuntimeError(f'LexiGo stopped at launch: {process.returncode}')
-            if instance.is_file():
-                url = instance.read_text(encoding='utf-8').strip()
-                if url.startswith('http://127.0.0.1:'):
-                    break
-            time.sleep(.05)
-        else:
-            process.kill()
-            process.wait()
-            raise RuntimeError('LexiGo did not publish its launch URL')
-    else:
-        url = process.stdout.readline().strip()
-    assert url.startswith('http://127.0.0.1:'), url
-    host = url.split('/start/')[0]
     agent = urllib.request.build_opener(urllib.request.ProxyHandler({}),
         urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
-    with agent.open(url) as response:
-        assert response.status == 200 and '<title>LexiGo</title>' in response.read().decode()
-    records = {}
+    try:
+        if sys.platform == 'win32':
+            # The GUI binary publishes its URL in the instance record. A hard
+            # stop can leave the previous URL there until the new process starts.
+            for _ in range(200):
+                if process.poll() is not None:
+                    raise RuntimeError(f'LexiGo stopped at launch: {process.returncode}')
+                try:
+                    url = instance.read_text(encoding='utf-8').strip()
+                except FileNotFoundError:
+                    url = ''
+                if url.startswith('http://127.0.0.1:') and '/start/' in url and url != previous_url:
+                    break
+                time.sleep(.05)
+            else:
+                raise RuntimeError('LexiGo did not publish its launch URL')
+        else:
+            url = process.stdout.readline().strip()
+        assert url.startswith('http://127.0.0.1:'), url
+        host = url.split('/start/')[0]
+        with agent.open(url, timeout=10) as response:
+            assert response.status == 200 and '<title>LexiGo</title>' in response.read().decode()
+    except Exception:
+        process.kill()
+        process.wait()
+        raise
     def call(path, body=None, raw=False, expect=200):
         headers = {'Origin': host, 'Content-Type': 'application/json'} if body is not None else {}
         req = urllib.request.Request(host+path, data=None if body is None else json.dumps(body).encode(), headers=headers)

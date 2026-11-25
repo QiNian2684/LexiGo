@@ -73,7 +73,7 @@ func (s *store) pinnedCard(day string) *wordCard {
 	}
 	card := s.db.Words[s.presented.key]
 	if card == nil || card.Order != s.presented.order || card.Deleted ||
-		(card.Mastered && !s.presented.recall) || card.passedOn(day) || card.DailyDay > day {
+		(!s.presented.recall && (card.Mastered || card.passedOn(day))) || card.DailyDay > day {
 		return nil
 	}
 	return card

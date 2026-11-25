@@ -71,21 +71,22 @@ type wordCard struct {
 }
 
 type event struct {
-	Kind       string     `json:"kind"`
-	Day        string     `json:"day"`
-	Card       uint64     `json:"card"`
-	Word       string     `json:"word"`
-	Tick       uint64     `json:"tick,omitempty"`
-	Extra      bool       `json:"extra,omitempty"`
-	Legacy     bool       `json:"legacy,omitempty"`
-	DayPassed  bool       `json:"dayPassed,omitempty"`
-	Credit     bool       `json:"credit,omitempty"`
-	Practice   bool       `json:"practice,omitempty"`
-	Recall     bool       `json:"recall,omitempty"`
-	Undone     bool       `json:"undone,omitempty"`
-	Waiting    bool       `json:"waitingForNext,omitempty"`
-	OccurredAt *time.Time `json:"occurredAt,omitempty"`
-	Before     *progress  `json:"before,omitempty"`
+	Kind         string     `json:"kind"`
+	Day          string     `json:"day"`
+	Card         uint64     `json:"card"`
+	Word         string     `json:"word"`
+	Tick         uint64     `json:"tick,omitempty"`
+	Extra        bool       `json:"extra,omitempty"`
+	Legacy       bool       `json:"legacy,omitempty"`
+	DayPassed    bool       `json:"dayPassed,omitempty"`
+	Credit       bool       `json:"credit,omitempty"`
+	Practice     bool       `json:"practice,omitempty"`
+	Recall       bool       `json:"recall,omitempty"`
+	RecallAnswer bool       `json:"recallAnswer,omitempty"`
+	Undone       bool       `json:"undone,omitempty"`
+	Waiting      bool       `json:"waitingForNext,omitempty"`
+	OccurredAt   *time.Time `json:"occurredAt,omitempty"`
+	Before       *progress  `json:"before,omitempty"`
 }
 
 type metadata struct {
@@ -138,11 +139,12 @@ func (s *store) reset(card *wordCard, day string, extra bool) {
 
 type voteResult struct {
 	reviewState
-	Graduated   bool `json:"graduated"`
-	Credited    bool `json:"credited"`
-	DayPassed   bool `json:"dayPassed"`
-	DailyCount  int  `json:"dailyCount"`
-	DailyTarget int  `json:"dailyTarget"`
+	Graduated     bool `json:"graduated"`
+	Credited      bool `json:"credited"`
+	DayPassed     bool `json:"dayPassed"`
+	TaskCompleted bool `json:"taskCompleted"`
+	DailyCount    int  `json:"dailyCount"`
+	DailyTarget   int  `json:"dailyTarget"`
 }
 
 var errStaleReview = errors.New("复习卡已更新，请按当前卡片继续。")
@@ -167,7 +169,8 @@ func (s *store) recordVote(day, key string, version int, order uint64, remembere
 	session := plan.session
 	now := time.Now().UTC()
 	entry := event{Day: day, OccurredAt: &now, Card: card.ID, Word: card.Word, Tick: card.Order, Before: &before, Extra: card.ExtraDay == day, Recall: state.Current.Recall,
-		Waiting: hold && !remembered}
+		Waiting:      hold && !remembered,
+		RecallAnswer: state.Current.RecallPending && !(passToday && state.Current.RecallRetesting)}
 	if entry.Recall {
 		card.recordAnswer(day, remembered, &entry)
 	} else {
@@ -182,8 +185,10 @@ func (s *store) recordVote(day, key string, version int, order uint64, remembere
 		card.progress, s.db.NextOrder, s.db.Events = before, oldOrder, s.db.Events[:count]
 		return voteResult{}, err
 	}
+	after := s.review(day)
 	return voteResult{
-		reviewState: s.review(day), Graduated: !before.Mastered && card.Mastered, Credited: entry.Credit,
+		reviewState: after, TaskCompleted: state.TaskDone < state.TaskTotal && after.TaskDone > state.TaskDone && after.Due == 0 && after.TaskDone == after.TaskTotal,
+		Graduated: !before.Mastered && card.Mastered, Credited: entry.Credit,
 		DayPassed: entry.DayPassed, DailyCount: card.DailyCount, DailyTarget: card.DailyTarget,
 	}, nil
 }

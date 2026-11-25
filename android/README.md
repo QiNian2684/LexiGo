@@ -17,7 +17,7 @@ bash android/build-android.sh dist/LexiGo.apk
 
 脚本会编译两个架构、打包资源、对齐 APK、签名并验证签名。首次运行会要求输入密码并生成本地签名库。也可通过 `WORDREVIEW_KEYSTORE` 和 `WORDREVIEW_KEY_ALIAS` 指向已有签名库。安装更新必须沿用同一包名和签名。自行签名的构建如果与已安装版本的签名不同，先通过应用导出数据，保管好文件后再卸载原版本、安装自签版本并导入。发行签名密钥由构建方保存，源码不含私钥。
 
-发布构建需要通过 `WORDREVIEW_KEYSTORE` 指定当前包名使用的发行密钥库，再运行 `bash android/build-android.sh --release dist/LexiGo-Android-3.5.1.apk`。脚本会校验内嵌签名、对应的 `.idsig` 和当前发行证书指纹。两份文件均通过校验后才会进入输出目录。
+发布构建需要通过 `WORDREVIEW_KEYSTORE` 指定当前包名使用的发行密钥库，再运行 `bash android/build-android.sh --release dist/LexiGo-Android-3.5.2.apk`。脚本会校验内嵌签名、对应的 `.idsig` 和当前发行证书指纹。两份文件均通过校验后才会进入输出目录。
 
 GitHub Actions 的「Android release」在运行时从仓库的加密 Secret `LEXIGO_ANDROID_SIGNING` 取得发行签名。公开源码保留证书指纹。
 

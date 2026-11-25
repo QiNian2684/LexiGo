@@ -24,7 +24,8 @@ const dayFormat = new Intl.DateTimeFormat("zh-CN", {
 let state, revealed, practice, editing, confirmation;
 let view = "review";
 let viewRequest = 0;
-let sectionAnimation;
+let pageTransition;
+let answerAnimation;
 let listAnimation;
 let settingsFrom = "review";
 let settingsOffset = 0;
@@ -99,9 +100,9 @@ function sameCard(a, b) {
   return a?.key === b?.key && a?.order === b?.order && a?.reviews === b?.reviews;
 }
 
-function motionOptions(token) {
+function motionOptions(token, easing = "--motion-ease") {
   const style = getComputedStyle(document.documentElement);
-  return {duration: parseFloat(style.getPropertyValue(token)), easing: style.getPropertyValue("--motion-ease").trim()};
+  return {duration: parseFloat(style.getPropertyValue(token)), easing: style.getPropertyValue(easing).trim()};
 }
 
 function applyState(next, force = false) {
@@ -117,14 +118,16 @@ function applyState(next, force = false) {
   if (next.waitingForNext && studying && view === "review" && !practice && !busy && !answerExpanded() && !el("reveal").disabled) toggleReveal();
 }
 
-async function refreshState() {
+async function refreshState(intent = viewRequest) {
   const old = state;
   let next = await api("/api/state");
+  if (intent !== viewRequest) return;
   const reviewing = view === "review" || (view === "settings" && settingsFrom === "review");
   if (old && (old.date !== next.date || !old.current && next.current) && studying && reviewing && !practice && !noteDirty()) {
     next = await api("/api/review/start", {});
   }
-  if (state === old && !noteDirty()) applyState(next);
+  await afterPageMotion();
+  if (intent === viewRequest && state === old && !noteDirty()) applyState(next);
 }
 
 function renderReview() {
@@ -136,13 +139,13 @@ function renderReview() {
   title.textContent = practice ? "提前复习" : days === 0 ? "今天考试"
     : days < 0 ? "考试日期已过" : `距考试还有 ${days} 天`;
   el("date").textContent = dayFormat.format(new Date(next.date + "T12:00:00"));
-  el("study-summary").hidden = !!practice || !next.planned || !next.current;
-  el("day-completion").textContent = practice ? "" : `今日进度 ${next.remembered} / ${next.planned}`;
-  el("day-meter").max = Math.max(1, next.planned);
-  el("day-meter").value = next.remembered;
+  el("study-summary").hidden = !!practice || !next.taskTotal;
+  const completion = `今日进度 ${next.taskDone} / ${next.taskTotal}`;
+  if (el("day-completion").textContent !== completion) el("day-completion").textContent = completion;
+  el("day-meter").max = Math.max(1, next.taskTotal);
+  el("day-meter").value = next.taskDone;
   el("review-empty").removeAttribute("aria-busy");
   el("session-tools").hidden = mobile || !studying || !!practice;
-  el("undo").disabled = !next.canUndo || busy || swiping;
   const waiting = !practice && next.waitingForNext;
   el("session-hint").textContent = next.current
     ? waiting ? "1 下一单词" : "Enter 查看释义 · 1 没记住 · 2 记住了"
@@ -151,35 +154,46 @@ function renderReview() {
   el("forgot-label").textContent = waiting ? "下一单词" : "没记住";
   el("vote-actions").classList.toggle("awaiting-next", !!waiting);
   const concealed = !answerExpanded();
-  el("pass").disabled = busy || swiping || concealed || !!waiting;
-  el("forgot").disabled = busy || swiping || concealed;
+  updateReviewControls();
   el("pass-today").hidden = !studying || !!practice || !next.current || !!next.current.recall;
-  el("pass-today").disabled = busy || swiping || !!waiting;
   const current = practice || (studying && next.current);
   el("flashcard").hidden = !current;
   el("review-start").hidden = !!practice || !!studying || !next.current;
   el("review-empty").hidden = !!practice || !!next.current;
-  const recallDue = next.recallDue || 0;
-  const regularDue = next.due - recallDue;
+  const regularDue = next.planned - next.remembered;
+  const recallDue = next.due - regularDue;
   el("start-summary").textContent = regularDue
     ? `还有 ${regularDue} 个词待记忆${recallDue ? " · " + recallDue + " 个易错词待回顾" : ""}`
     : recallDue ? `${recallDue} 个易错词待回顾` : "";
   el("vote-actions").hidden = !current || !!practice || (concealed && !windowsReview);
-  document.body.classList.toggle("has-vote", !el("vote-actions").hidden);
   if (current) {
     el("word").textContent = current.word;
     el("word").classList.toggle("long-word", current.word.length > 18);
     el("streak").hidden = !!practice;
-    el("streak").textContent = practice ? "" :
-      current.recall ? (waiting ? "易错词回顾 · 已顺延到下一学习日" : "易错词回顾 · 答对即通过") :
-      `今日连对 ${current.dailyCount} / ${current.dailyTarget} · ` + masteryProgress(current.streak, next.settings.goal);
+    const regularProgress = `今日连对 ${current.dailyCount} / ${current.dailyTarget}`;
+    const recallProgress = current.recallRetesting
+      ? `易错词回顾 · 今日连对 ${current.recallCount || 0} / 3`
+      : "易错词回顾 · 答对即通过";
+    el("streak").textContent = practice ? "" : (current.recallPending || current.recall)
+      ? (current.recall ? recallProgress : `${recallProgress} · 普通复习 ${current.dailyCount} / ${current.dailyTarget}`)
+      : regularProgress + " · " + masteryProgress(current.streak, next.settings.goal);
     updateVoice();
   }
   if (!next.current) {
     if (!next.total) empty("词库还是空的", "先添加一批单词，再开始复习。", "add");
-    else if (next.total === next.mastered && !next.remembered) empty("词库里的单词都掌握了", "可以在词库提前查看，也可以选词重新学习。", "library");
+    else if (next.total === next.mastered && !next.taskTotal) empty("词库里的单词都掌握了", "可以在词库提前查看，也可以选词重新学习。", "library");
     else empty("今天的任务已完成", "", "", true);
   }
+}
+
+function updateReviewControls() {
+  const blocked = busy || swiping;
+  const waiting = !practice && state?.waitingForNext;
+  const concealed = !answerExpanded();
+  el("undo").disabled = !state?.canUndo || blocked;
+  el("pass").disabled = blocked || concealed || !!waiting;
+  el("forgot").disabled = blocked || concealed;
+  el("pass-today").disabled = blocked || !!waiting;
 }
 
 function masteryProgress(days, goal, mastered = false) {
@@ -205,7 +219,6 @@ function clearAnswer() {
   savedNote = "";
   setAnswerExpanded(false, false);
   el("vote-actions").hidden = true;
-  document.body.classList.remove("has-vote");
   el("personal-note").value = "";
   el("note-status").textContent = "";
   el("details").replaceChildren();
@@ -329,34 +342,53 @@ async function refreshRevealedDetails() {
 function answerExpanded() { return answerPanel.getAttribute("aria-hidden") === "false"; }
 
 function setAnswerExpanded(expanded, animate = true) {
-  answerPanel.classList.toggle("animate-answer", animate);
+  const changed = answerExpanded() !== expanded;
+  answerAnimation?.cancel();
+  answerAnimation = undefined;
   answerPanel.setAttribute("aria-hidden", String(!expanded));
   answerPanel.inert = !expanded;
   el("reveal").setAttribute("aria-expanded", String(expanded));
   el("reveal-label").textContent = expanded ? "收起释义" : "查看中文释义";
+  if (!changed || !animate || reducedMotion.matches || !answerPanel.animate) {
+    answerPanel.hidden = !expanded;
+    return;
+  }
+  answerPanel.hidden = false;
+  const shown = {opacity: 1, transform: "translateY(0)"};
+  const concealed = {opacity: 0, transform: "translateY(-5px)"};
+  const animation = answerPanel.animate(expanded ? [concealed, shown] : [shown, concealed],
+    {...motionOptions(expanded ? "--motion-answer" : "--motion"), fill: "forwards"});
+  answerAnimation = animation;
+  animation.finished.then(() => {
+    if (answerAnimation !== animation) return;
+    answerPanel.hidden = !expanded;
+    animation.cancel();
+    answerAnimation = undefined;
+  }).catch(() => {});
 }
 
 async function toggleReveal({animate = true} = {}) {
   const current = practice || state?.current;
-  if (!current || (!studying && !practice) || busy) return;
+  if (!current || (!studying && !practice) || busy || view !== "review") return;
   const trigger = el("reveal");
   if (answerExpanded()) {
     if (!practice && state?.waitingForNext) return;
+    if (answerPanel.contains(document.activeElement)) trigger.focus({preventScroll: true});
     setAnswerExpanded(false);
     renderReview();
     return;
   }
   trigger.disabled = true;
   try {
-    const card = await api("/api/card/" + keyPath(current.key));
-    if ((practice || state?.current)?.key !== current.key || (!studying && !practice)) return;
     if (!revealed) {
+      const card = await api("/api/card/" + keyPath(current.key));
+      if (view !== "review" || !sameCard(practice || state?.current, current) || (!studying && !practice)) return;
       savedNote = card.personalNote;
       el("personal-note").value = savedNote;
       noteClock = Math.max(noteClock, card.noteClock || 0);
+      revealed = card;
+      renderDetails(card);
     }
-    revealed = card;
-    renderDetails(card);
     setAnswerExpanded(true, animate);
     fitNote();
     renderReview();
@@ -368,7 +400,7 @@ async function toggleReveal({animate = true} = {}) {
 function noteDirty() { return !!revealed && el("personal-note").value !== savedNote; }
 
 function fitNote() {
-  if ((!mobile && !windowsReview) || view !== "review" || !answerExpanded()) return;
+  if ((!mobile && !windowsReview) || CSS.supports("field-sizing", "content") || view !== "review" || !answerExpanded()) return;
   const note = el("personal-note");
   note.style.height = "auto";
   note.style.height = (note.scrollHeight + note.offsetHeight - note.clientHeight) + "px";
@@ -401,21 +433,21 @@ async function flushNote(background = false) {
 async function nextCard(beforeSwap) {
   if (!studying || practice || busy || !state?.waitingForNext) return;
   busy = true;
-  renderReview();
+  updateReviewControls();
   try {
     await flushNote();
     const result = await api("/api/review/next", {order: state.current.order});
     if (beforeSwap) await beforeSwap;
     showError();
     applyState(result, true);
-    el("review-title").scrollIntoView({block: "nearest"});
+    pageScroller().scrollTo({top: 0});
   } catch (error) {
     if (error.status === 409) await refreshState().catch(() => {});
     showError(error);
   } finally {
     busy = false;
-    renderReview();
-    if (state?.current && !state.waitingForNext) el("reveal").focus({preventScroll: true});
+    updateReviewControls();
+    if (windowsReview && state?.current && !state.waitingForNext) el("reveal").focus({preventScroll: true});
   }
 }
 
@@ -439,28 +471,27 @@ async function vote(remembered, {beforeSwap, passToday = false} = {}) {
   if (!studying || practice || !state?.current || busy || (swiping && !beforeSwap) || state.waitingForNext ||
       (passToday ? state.current.recall : !answerExpanded())) return;
   busy = true;
-  renderReview();
+  updateReviewControls();
   showError();
   let completed = false;
   try {
     await flushNote();
-    const {current, date, due, planned, remembered: passed} = state;
+    const {current, date} = state;
     const result = await api("/api/vote", {
       key: current.key, reviews: current.reviews, order: current.order, date, remembered, stay: !remembered, passToday,
     });
     if (beforeSwap) await beforeSwap;
     applyState(result, remembered);
-    if (remembered) el("review-title").scrollIntoView({block: "nearest"});
-    completed = remembered && ((result.dayPassed && passed < planned) || current.recall) && result.date === date &&
-      due > 0 && result.planned > 0 && result.remembered === result.planned &&
-      result.due === 0 && !result.current && !result.waitingForNext;
+    if (remembered) pageScroller().scrollTo({top: 0});
+    completed = result.taskCompleted && result.date === date &&
+      result.taskDone === result.taskTotal && !result.current;
   } catch (error) {
     if (error.status === 409) await refreshState().catch(() => {});
     showError(error);
   } finally {
     busy = false;
-    renderReview();
-    if (state?.current && studying) (state.waitingForNext ? el("forgot") : el("reveal")).focus({preventScroll: true});
+    updateReviewControls();
+    if (windowsReview && state?.current && studying) (state.waitingForNext ? el("forgot") : el("reveal")).focus({preventScroll: true});
   }
   if (completed && view === "review") window.WordReviewCelebrate(el("review-empty"));
 }
@@ -474,14 +505,11 @@ async function undo(beforeSwap) {
     const wasWaiting = state.waitingForNext;
     const result = await api("/api/undo", {});
     if (beforeSwap) await beforeSwap;
-    if (beforeSwap && result.current) {
-      studying = true;
-      revealAfterUndo = !result.waitingForNext;
-    }
+    if (beforeSwap && result.current && studying) revealAfterUndo = !result.waitingForNext;
     applyState(result, !wasWaiting);
-    if (beforeSwap) el("review-title").scrollIntoView({block: "nearest"});
+    if (beforeSwap) pageScroller().scrollTo({top: 0});
   } catch (error) { showError(error); }
-  finally { busy = false; renderReview(); }
+  finally { busy = false; updateReviewControls(); }
   if (state?.waitingForNext) await resumeWaiting();
   else if (revealAfterUndo && view === "review" && !answerExpanded()) await toggleReveal({animate: false});
 }
@@ -497,7 +525,7 @@ function sameReview({card, date, waiting}) {
 
 function animateReviewSlide(from, to, token, fill = "none") {
   if (reducedMotion.matches || !swipeContent.animate) return;
-  return swipeContent.animate([from, to], {...motionOptions(token), fill});
+  return swipeContent.animate([from, to], {...motionOptions(token, "--motion-card-ease"), fill});
 }
 
 function resetReviewSlide() {
@@ -506,32 +534,36 @@ function resetReviewSlide() {
   swipeCue.style.opacity = "";
 }
 
-async function slideReview({offset = 0, reversing = false} = {}) {
+async function slideReview({offset = 0, reversing = false, passToday = false} = {}) {
   if (view !== "review" || !state || practice || busy || swiping ||
-      (reversing ? !state.canUndo : !canAdvanceReview())) return;
+      (reversing ? !state.canUndo : passToday
+        ? !studying || !state.current || state.current.recall || state.waitingForNext
+        : !canAdvanceReview())) return;
   const {current: card, date, waitingForNext} = state;
   const waiting = Boolean(waitingForNext);
   const direction = reversing ? 1 : -1;
   let outgoing, incoming;
+  const animated = !reducedMotion.matches && swipeContent.animate;
+  const distance = animated && !el("flashcard").hidden ? swipeContent.clientWidth : 0;
   swiping = true;
-  renderReview();
+  updateReviewControls();
   try {
-    if (!el("flashcard").hidden) {
-      const distance = Math.min(124, swipeContent.clientWidth * .26);
-      const exit = direction * Math.max(distance, Math.abs(offset) + 28);
+    if (distance) {
+      const exit = direction * Math.max(distance, Math.abs(offset) + 24);
       outgoing = animateReviewSlide({transform: `translateX(${offset}px)`, opacity: 1},
-        {transform: `translateX(${exit}px)`, opacity: .14}, "--motion-card-out", "forwards");
+        {transform: `translateX(${exit}px)`, opacity: 0}, "--motion-card-out", "forwards");
     }
     const beforeSwap = outgoing?.finished.catch(() => {}) ?? Promise.resolve();
     // Let the local request and exit run together. Swap only after both
     // finish, keeping the old card in place if the response takes longer.
     if (reversing) await undo(beforeSwap);
     else if (waiting) await nextCard(beforeSwap);
-    else await vote(true, {beforeSwap});
+    else await vote(true, {beforeSwap, passToday});
     const changed = !sameReview({card, date, waiting});
-    if (!el("flashcard").hidden) {
-      const start = changed ? {transform: `translateX(${-direction * 32}px)`, opacity: .58}
-        : {transform: getComputedStyle(swipeContent).transform, opacity: getComputedStyle(swipeContent).opacity};
+    if (animated && !el("flashcard").hidden) {
+      const style = changed ? null : getComputedStyle(swipeContent);
+      const start = changed ? {transform: `translateX(${-direction * 24}px)`, opacity: .55}
+        : {transform: style.transform, opacity: style.opacity};
       outgoing?.cancel();
       resetReviewSlide();
       incoming = animateReviewSlide(start, {transform: "translateX(0)", opacity: 1}, "--motion-card-in");
@@ -541,7 +573,7 @@ async function slideReview({offset = 0, reversing = false} = {}) {
     outgoing?.cancel();
     resetReviewSlide();
     swiping = false;
-    renderReview();
+    updateReviewControls();
   }
 }
 
@@ -560,40 +592,65 @@ async function stopReview() {
 }
 
 function positionNavigationIndicator() {
-  const active = navigation.querySelector('button[aria-current="page"]');
-  navigationIndicator.style.width = active.offsetWidth + "px";
-  navigationIndicator.style.height = active.offsetHeight + "px";
-  navigationIndicator.style.transform = `translate(${active.offsetLeft}px, ${active.offsetTop}px)`;
+  const index = views.indexOf(view);
+  if (mobile) {
+    navigation.style.setProperty("--nav-index", index);
+  } else {
+    const active = navigationButtons[index];
+    const {offsetWidth, offsetHeight, offsetLeft, offsetTop} = active;
+    navigationIndicator.style.width = offsetWidth + "px";
+    navigationIndicator.style.height = offsetHeight + "px";
+    navigationIndicator.style.transform = `translate(${offsetLeft}px, ${offsetTop}px)`;
+  }
   navigation.classList.add("has-indicator");
 }
 
-function displayView(next) {
-  const previous = view;
-  if (next !== "library") closeWordPreview();
-  view = next;
-  document.body.dataset.view = next;
-  for (const id of views) el(id + "-view").hidden = id !== next;
-  for (const item of navigationButtons) {
-    if (item.dataset.view === next) item.setAttribute("aria-current", "page");
-    else item.removeAttribute("aria-current");
-  }
-  positionNavigationIndicator();
-  const section = el(next + "-view");
-  if (previous !== next) {
-    sectionAnimation?.cancel();
-    if (!reducedMotion.matches && section.animate) {
-      const direction = Math.sign(views.indexOf(next) - views.indexOf(previous));
-      const offset = mobile ? `translateX(${direction * 24}px)` : `translateY(${direction * 15}px)`;
-      sectionAnimation = section.animate([
-        {opacity: .75, transform: offset},
-        {opacity: 1, transform: "none"},
-      ], motionOptions("--motion-page"));
-    }
-  }
-  if (windowsReview && next === "review") fitNote();
-}
+function pageScroller() { return mobile || windowsReview ? shell : window; }
 
-function pageScroller() { return windowsReview ? shell : window; }
+async function displayView(next, {intent = viewRequest, top = 0, prepare} = {}) {
+  const previous = view;
+  pageTransition?.skipTransition();
+  const update = () => {
+    if (intent !== viewRequest) return;
+    if (next !== "library") closeWordPreview();
+    if (previous !== next && shell.contains(document.activeElement)) document.activeElement.blur();
+    prepare?.();
+    view = next;
+    document.body.dataset.view = next;
+    for (const id of views) el(id + "-view").hidden = id !== next;
+    for (const item of navigationButtons) {
+      if (item.dataset.view === next) item.setAttribute("aria-current", "page");
+      else item.removeAttribute("aria-current");
+    }
+    positionNavigationIndicator();
+    pageScroller().scrollTo({top});
+    if (next === "review") fitNote();
+  };
+  if (previous === next || reducedMotion.matches) {
+    update();
+    return;
+  }
+  const direction = Math.sign(views.indexOf(next) - views.indexOf(previous));
+  if (!document.startViewTransition) {
+    update();
+    const offset = mobile ? `translateX(${direction * 12}px)` : `translateY(${direction * 5}px)`;
+    el(next + "-view").animate?.([{opacity: .7, transform: offset}, {opacity: 1, transform: "none"}],
+      motionOptions("--motion-page"));
+    return;
+  }
+
+  // Capture only the content scroller. Navigation and the Android bars stay live.
+  shell.classList.add("page-capture");
+  document.documentElement.style.setProperty("--page-shift", mobile ? `${direction * 16}px` : "0px");
+  const transition = document.startViewTransition(update);
+  pageTransition = transition;
+  transition.finished.catch(() => {}).then(() => {
+    if (pageTransition !== transition) return;
+    pageTransition = undefined;
+    shell.classList.remove("page-capture");
+  });
+  await transition.updateCallbackDone;
+}
 
 async function changeView(next, temporary) {
   if (swiping || busy) return;
@@ -608,44 +665,56 @@ async function changeView(next, temporary) {
     await flushNote();
     if (intent !== viewRequest) return;
     controls.close(false);
-    const wasPractice = !!practice;
-    practice = temporary;
-    if (wasPractice || practice) clearAnswer();
     const previous = view === "settings" ? settingsFrom : view;
-    displayView(next);
-    showError();
-    pageScroller().scrollTo({top: 0});
+    await displayView(next, {intent, prepare() {
+      const wasPractice = !!practice;
+      practice = temporary;
+      if (wasPractice || practice) clearAnswer();
+      showError();
+      if (next === "review") renderReview();
+    }});
+    if (intent !== viewRequest) return;
     if (next === "review") {
-      renderReview();
-      if (previous !== next && studying && !practice) await startReview();
-      else await refreshState();
-      await resumeWaiting();
+      if (previous !== next && studying && !practice) await startReview(intent);
+      else await refreshState(intent);
+      if (intent === viewRequest) await resumeWaiting();
     }
     if (next === "library") await refreshLibrary();
     if (next === "stats") await refreshStats();
     if (next === "add" && imported.length) await updateImportStatus();
-  } catch (error) { showError(error); }
+  } catch (error) { if (intent === viewRequest) showError(error); }
 }
 
-async function startReview() {
+async function startReview(intent) {
   if (busy) return;
-  busy = true;
-  el("start-review").disabled = true;
+  const manual = intent === undefined;
+  const old = state;
+  if (manual) {
+    intent = viewRequest;
+    busy = true;
+    el("start-review").disabled = true;
+  }
   try {
     const result = await api("/api/review/start", {});
+    if (!manual) await afterPageMotion();
+    if (intent !== viewRequest || view !== "review" || (!manual && (state !== old || busy || swiping))) return;
     studying = true;
     practice = undefined;
     applyState(result, true);
-    if (result.current) el("reveal").focus({preventScroll: true});
+    if (windowsReview && result.current) el("reveal").focus({preventScroll: true});
   } catch (error) {
-    showError(error);
+    if (intent === viewRequest) showError(error);
   } finally {
-    busy = false;
-    el("start-review").disabled = false;
-    renderReview();
-    if (state?.waitingForNext && !answerExpanded()) await toggleReveal();
+    if (manual) {
+      busy = false;
+      el("start-review").disabled = false;
+      updateReviewControls();
+    }
+    if (intent === viewRequest && state?.waitingForNext && !answerExpanded()) await toggleReveal();
   }
 }
+
+function afterPageMotion() { return pageTransition?.finished.catch(() => {}); }
 
 function englishVoice() {
   if (!window.speechSynthesis) return;
@@ -861,6 +930,7 @@ function addWordActions(row, entry, progress) {
 async function refreshLibrary(animate = false) {
   const requestID = ++listRequest;
   const data = await api("/api/cards?" + new URLSearchParams({...libraryQuery(), page: listPage}));
+  await afterPageMotion();
   if (requestID !== listRequest || view !== "library") return;
   if (listPage && !data.rows.length) {
     listPage = Math.max(0, Math.ceil(data.total / 24) - 1);
@@ -1162,7 +1232,10 @@ async function readWordFile(event) {
 }
 
 async function refreshStats() {
+  const intent = viewRequest;
   const data = await api("/api/stats");
+  await afterPageMotion();
+  if (view !== "stats" || intent !== viewRequest) return;
   const today = data.days[data.days.length - 1];
   const stats = [
     ["历史累计录入不同词", data.imported], ["当前词库", data.current], ["已掌握", data.mastered],
@@ -1239,9 +1312,9 @@ async function openSettings(intent = ++viewRequest) {
     for (const input of el("settings-form").querySelectorAll("[aria-invalid]")) input.removeAttribute("aria-invalid");
     controls.close(false);
     settingsFrom = view;
-    settingsOffset = windowsReview ? shell.scrollTop : window.scrollY;
-    displayView("settings");
-    pageScroller().scrollTo({top: 0});
+    settingsOffset = (mobile || windowsReview) ? shell.scrollTop : window.scrollY;
+    await displayView("settings", {intent});
+    if (intent !== viewRequest) return;
     el("settings-title").focus({preventScroll: true});
     await refreshRecovery();
   } catch (error) { showError(error); }
@@ -1254,8 +1327,8 @@ async function closeSettings(intent = ++viewRequest) {
   if (intent !== viewRequest) return;
   controls.close(false);
   // Returning from appearance settings leaves the current card and the queue in place.
-  displayView(settingsFrom);
-  pageScroller().scrollTo({top: settingsOffset});
+  await displayView(settingsFrom, {intent, top: settingsOffset});
+  if (intent !== viewRequest) return;
   const focus = settingsFrom === "review" && !el("flashcard").hidden ? el("reveal")
     : document.querySelector('button[data-view="' + settingsFrom + '"]');
   focus?.focus({preventScroll: true});
@@ -1335,7 +1408,7 @@ async function showRestored() {
   listSignature = undefined;
   imported = [];
   importPending = false;
-  if (view === "settings") displayView(settingsFrom);
+  if (view === "settings") await displayView(settingsFrom);
   el("action-dialog").close();
   await changeView("review");
 }
@@ -1365,7 +1438,9 @@ ${plan}
 }
 
 async function refreshRecovery() {
-  el("transfer-recovery").hidden = !(await api("/api/transfer/recovery")).available;
+  const data = await api("/api/transfer/recovery");
+  await afterPageMotion();
+  el("transfer-recovery").hidden = !data.available;
 }
 
 async function pickTransfer(kind) {
@@ -1479,7 +1554,7 @@ function keyboard(event) {
       event.defaultPrevented || !(event.target instanceof Element) || event.target.isContentEditable ||
       event.target.closest("textarea,input,select,[contenteditable]") || controls.isOpen() || document.querySelector("dialog[open]")) return;
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
-    event.preventDefault(); undo(); return;
+    event.preventDefault(); slideReview({reversing: true}); return;
   }
   if (event.ctrlKey || event.metaKey) return;
   if (event.code === "Space" && !event.target.closest("button,a,.meaning-panel,.memory-panel")) {
@@ -1497,7 +1572,7 @@ function keyboard(event) {
 }
 
 if (windowsReview || mobile) document.body.append(el("vote-actions"));
-if (windowsReview) {
+if (windowsReview && !CSS.supports("field-sizing", "content")) {
   let noteWidth;
   new ResizeObserver(([entry]) => {
     if (entry.contentRect.width === noteWidth) return;
@@ -1536,6 +1611,7 @@ if (mobile) {
   const viewport = window.visualViewport;
   let nativeKeyboard;
   let fullHeight = viewport?.height || window.innerHeight;
+  let editingFrame, visibleHeight;
   const updateEditing = () => {
     const editing = document.activeElement?.matches(textField);
     const height = viewport?.height || window.innerHeight;
@@ -1543,14 +1619,20 @@ if (mobile) {
     else fullHeight = Math.max(fullHeight, height);
     const shown = nativeKeyboard ?? (editing && fullHeight - height > 95);
     document.body.classList.toggle("editing-input", Boolean(shown));
-    document.documentElement.style.setProperty("--visible-height", height + "px");
+    if (visibleHeight !== height) {
+      visibleHeight = height;
+      document.documentElement.style.setProperty("--visible-height", height + "px");
+    }
   };
-  window.wordReviewKeyboardChanged = shown => { nativeKeyboard = shown; updateEditing(); };
-  document.addEventListener("focusin", updateEditing);
-  document.addEventListener("focusout", () => setTimeout(updateEditing, 0));
-  viewport?.addEventListener("resize", updateEditing);
-  window.addEventListener("resize", updateEditing);
-  window.addEventListener("resize", fitNote);
+  const scheduleEditing = () => {
+    if (editingFrame) return;
+    editingFrame = requestAnimationFrame(() => { editingFrame = undefined; updateEditing(); });
+  };
+  window.wordReviewKeyboardChanged = shown => { nativeKeyboard = shown; scheduleEditing(); };
+  document.addEventListener("focusin", scheduleEditing);
+  document.addEventListener("focusout", scheduleEditing);
+  viewport?.addEventListener("resize", scheduleEditing);
+  window.addEventListener("resize", () => { scheduleEditing(); fitNote(); });
   updateEditing();
 }
 
@@ -1629,12 +1711,12 @@ if (mobile) {
 }
 
 positionNavigationIndicator();
-const navigationResize = new ResizeObserver(positionNavigationIndicator);
-navigationResize.observe(navigation);
-for (const item of navigationButtons) {
-  navigationResize.observe(item);
-  item.addEventListener("click", () => changeView(item.dataset.view));
+if (!mobile) {
+  const navigationResize = new ResizeObserver(positionNavigationIndicator);
+  navigationResize.observe(navigation);
+  for (const item of navigationButtons) navigationResize.observe(item);
 }
+for (const item of navigationButtons) item.addEventListener("click", () => changeView(item.dataset.view));
 wordPreview.addEventListener("pointerenter", () => clearTimeout(previewDismiss));
 wordPreview.addEventListener("pointerleave", event => {
   if (!preview?.row.contains(event.relatedTarget)) delayPreviewClose();
@@ -1761,12 +1843,12 @@ el("download-backup").onclick = event => {
 };
 el("pick-restore").onclick = () => el("restore-file").click();
 el("restore-file").onchange = restoreFile;
-el("start-review").onclick = startReview;
-el("undo").onclick = () => undo();
+el("start-review").onclick = () => startReview();
+el("undo").onclick = () => slideReview({reversing: true});
 el("reveal").onclick = () => toggleReveal();
 el("forgot").onclick = () => state?.waitingForNext ? slideReview() : vote(false);
 el("pass").onclick = () => slideReview();
-el("pass-today").onclick = () => vote(true, {passToday: true});
+el("pass-today").onclick = () => slideReview({passToday: true});
 el("personal-note").oninput = noteInput;
 el("personal-note").oncompositionend = noteInput;
 el("personal-note").onblur = () => flushNote().catch(showError);

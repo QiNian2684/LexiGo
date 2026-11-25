@@ -70,8 +70,7 @@ a { color: var(--accent); text-underline-offset: .17em; }
   pointer-events: none;
   border-radius: var(--radius-control);
   background: var(--accent-soft);
-  transition: transform var(--motion-page) var(--motion-ease), width var(--motion-page) var(--motion-ease),
-    height var(--motion-page) var(--motion-ease);
+  transition: transform var(--motion-page) var(--motion-ease);
 }
 .nav button {
   position: relative;
@@ -118,6 +117,26 @@ a { color: var(--accent); text-underline-offset: .17em; }
   padding: clamp(1.65rem, 3.5vw, 3.5rem) clamp(1.4rem, 4vw, 4.25rem) 1.75rem;
 }
 .shell > section { min-width: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  :root:has(.page-capture) { view-transition-name: none; }
+  .shell.page-capture { view-transition-name: study-page; }
+  ::view-transition { pointer-events: none; }
+  ::view-transition-group(study-page) { animation: none; }
+  ::view-transition-image-pair(study-page) { isolation: auto; overflow: clip; }
+  ::view-transition-old(study-page), ::view-transition-new(study-page) {
+    animation-duration: var(--motion-page);
+    animation-timing-function: var(--motion-ease);
+    mix-blend-mode: normal;
+  }
+  ::view-transition-old(study-page) { animation-name: page-out; }
+  ::view-transition-new(study-page) { animation-name: page-in; }
+  @keyframes page-out {
+    to { opacity: 0; transform: translateX(calc(var(--page-shift, 0px) * -.65)); }
+  }
+  @keyframes page-in {
+    from { opacity: 0; transform: translateX(var(--page-shift, 0px)); }
+  }
+}
 .page-heading {
   display: flex;
   justify-content: space-between;
@@ -303,14 +322,7 @@ body:not(.platform-android) .swipe-cue { display: none; }
 #reveal[aria-expanded="true"] .icon { transform: rotate(180deg); }
 .select-control > button[aria-expanded="true"] .icon:last-child { transform: rotate(180deg); }
 
-.answer-panel { display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden; }
-.answer-panel[aria-hidden="false"] { grid-template-rows: 1fr; opacity: 1; visibility: visible; }
-.answer-panel.animate-answer {
-  transition: grid-template-rows var(--motion-answer) var(--motion-ease),
-    opacity var(--motion-answer) var(--motion-ease), visibility 0ms var(--motion-answer);
-}
-.answer-panel.animate-answer[aria-hidden="false"] { transition-delay: 0ms; }
-.answer-clip { min-height: 0; overflow: hidden; }
+.answer-panel { overflow: clip; }
 .answer {
   display: grid;
   grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr);
@@ -851,8 +863,8 @@ dialog::backdrop { background: var(--overlay); }
   @keyframes backdrop-appear {
     from { background-color: transparent; }
   }
-  #review-start:not([hidden]), #flashcard:not([hidden]), #review-empty.is-day-complete:not([hidden]),
-  #vote-actions:not([hidden]), .notice:not([hidden]), .chart-enter {
+  #review-start:not([hidden]), #review-empty.is-day-complete:not([hidden]),
+  .notice:not([hidden]), .chart-enter {
     animation: panel-appear var(--motion-panel) var(--motion-ease);
   }
   @supports not (transition-behavior: allow-discrete) {
@@ -879,5 +891,14 @@ dialog::backdrop { background: var(--overlay); }
       dialog[open] { opacity: 0; transform: var(--dialog-offset, translateY(8px) scale(.99)); }
       dialog[open]::backdrop { background-color: transparent; }
     }
+  }
+}
+
+
+@supports (field-sizing: content) {
+  .platform-android .personal-note textarea,
+  :root[data-review-shortcuts="windows"] .personal-note textarea {
+    field-sizing: content;
+    min-height: 6rem;
   }
 }

@@ -88,7 +88,7 @@ func TestRollingRecallRanksSourceDayMissesAndRetriesOnFollowingDay(t *testing.T)
 	card := s.db.Words[current.Key]
 	original := card.progress
 	hold, err := s.recordVote(day, card.Key, card.Reviews, card.Order, false, true, false)
-	if err != nil || !hold.Waiting || !hold.Current.Recall || hold.RecallDue != 9 {
+	if err != nil || !hold.Waiting || !hold.Current.Recall || hold.RecallDue != 10 || !hold.Current.RecallRetesting || hold.TaskDone != 0 {
 		t.Fatalf("recall wrong answer: %+v (%v)", hold, err)
 	}
 	if card.Forgot != original.Forgot+1 || card.Streak != original.Streak || !card.Mastered {
@@ -120,9 +120,18 @@ func TestRollingRecallRanksSourceDayMissesAndRetriesOnFollowingDay(t *testing.T)
 	if err := reopened.refreshRecall(day); err != nil || !slices.Equal(reopened.db.RecallBatch.Cards, ids) {
 		t.Fatalf("recall batch was regenerated on restart: %v", err)
 	}
-	for i := 8; i >= 0; i-- {
-		if state := nextVote(t, reopened, day, false); state.Due != i || state.RecallDue != i {
-			t.Fatalf("recall cards should be asked once per batch: %+v", state)
+	for range 9 {
+		if state := nextVote(t, reopened, day, false); state.Due != 9 || state.RecallDue != 9 || state.TaskDone != 1 || state.TaskTotal != 10 {
+			t.Fatalf("a missed word must remain an unfinished task: %+v", state)
+		}
+	}
+	for i := range 27 {
+		result := nextVote(t, reopened, day, true)
+		if i == 26 && result.TaskDone != 10 {
+			t.Fatalf("third correct answer did not complete all today's recalls: %+v", result)
+		}
+		if result.TaskTotal != 10 || result.TaskCompleted != (i == 26) {
+			t.Fatalf("recall changed today's target or completion: %+v", result)
 		}
 	}
 	if err := reopened.refreshRecall("2026-11-07"); err != nil || reopened.review("2026-11-07").RecallDue != 9 {
@@ -147,7 +156,7 @@ func TestRecallDoesNotDuplicateOrdinaryCard(t *testing.T) {
 		t.Fatal(err)
 	}
 	state := s.review(day)
-	if state.Due != 1 || state.RecallDue != 0 || state.Current.Recall {
+	if state.Due != 1 || state.RecallDue != 1 || state.TaskTotal != 1 || state.Current.Recall || !state.Current.RecallPending {
 		t.Fatalf("ordinary card duplicated in recall queue: %+v", state)
 	}
 	card := state.Current
@@ -157,4 +166,183 @@ func TestRecallDoesNotDuplicateOrdinaryCard(t *testing.T) {
 	if _, err := s.recordVote(day, card.Key, card.Reviews, card.Order, true, false, true); !errors.Is(err, errStaleReview) {
 		t.Fatalf("replayed answer was not rejected: %v", err)
 	}
+}
+
+func TestRecallRetestResetUndoAndTransfer(t *testing.T) {
+	s, path := newTestStore(t)
+	const first, day = "2026-11-01", "2026-11-06"
+	importTest(t, s, first, "crucial")
+	nextVote(t, s, first, false)
+	card := s.db.Words["crucial"]
+	card.Mastered, card.Streak = true, 6
+	card.Reviews = 8
+	if err := s.save([]string{card.Key}, len(s.db.Events)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.refreshRecall(day); err != nil {
+		t.Fatal(err)
+	}
+	for _, vote := range []struct {
+		yes   bool
+		count int
+	}{{false, 0}, {true, 1}, {true, 2}, {false, 0}, {true, 1}, {true, 2}} {
+		got := nextVote(t, s, day, vote.yes)
+		if got.Current == nil || !got.Current.RecallRetesting || got.Current.RecallCount != vote.count ||
+			got.TaskDone != 0 || got.TaskTotal != 1 || got.DayPassed || got.TaskCompleted {
+			t.Fatalf("recall after %+v: %+v / %+v", vote, got, got.Current)
+		}
+	}
+	if final := nextVote(t, s, day, true); !final.TaskCompleted || final.TaskDone != 1 || final.Due != 0 || final.Remembered != 0 {
+		t.Fatalf("completed recall should count once without ordinary credit: %+v", final)
+	}
+	undone, err := s.undo(day)
+	if err != nil || undone.TaskDone != 0 || undone.TaskTotal != 1 || undone.Current == nil || undone.Current.RecallCount != 2 {
+		t.Fatalf("undo restored the wrong recall progress: %+v / %+v (%v)", undone, undone.Current, err)
+	}
+	s.pinReview(undone)
+	now := time.Date(2026, 11, 6, 12, 0, 0, 0, time.UTC)
+	file, err := s.transferBytes(now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	copy, err := parseTransfer(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	migrated := &store{db: copy.Database}
+	migratedState := migrated.review(day)
+	if len(copy.Task.Pending) != 1 || !copy.Task.CurrentRecall || migratedState.Current == nil || migratedState.Current.RecallCount != 2 {
+		t.Fatalf("transfer lost recall progress: %+v / %+v", copy.Task, migratedState.Current)
+	}
+	s.io.Close()
+	reopened, err := openStore(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.io.Close()
+	if final := nextVote(t, reopened, day, true); !final.TaskCompleted || final.TaskDone != 1 {
+		t.Fatalf("reopening did not preserve the two prior correct answers: %+v", final)
+	}
+	importTest(t, reopened, day, "definite,advantage")
+	if got := reopened.review(day); got.TaskDone != 1 || got.TaskTotal != 3 || got.Due != 2 {
+		t.Fatalf("adding new words changed completed recall progress: %+v", got)
+	}
+	if card := reopened.db.Words["crucial"]; !card.Mastered || card.Streak != 6 {
+		t.Fatalf("recall changed mastery: %+v", card.progress)
+	}
+}
+
+func TestSharedRecallAndOrdinaryRetestGoals(t *testing.T) {
+	for _, goal := range []int{1, 3, 5} {
+		s, _ := newTestStore(t)
+		const first, day = "2026-11-01", "2026-11-06"
+		importTest(t, s, first, "crucial")
+		nextVote(t, s, first, false)
+		options := s.db.Settings
+		options.DailyGoal = goal
+		if _, err := s.changeSettings(day, options); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.refreshRecall(day); err != nil {
+			t.Fatal(err)
+		}
+		nextVote(t, s, day, false)
+		for i := 1; i <= max(goal, recallRetestGoal); i++ {
+			current := s.review(day).Current
+			if current == nil || current.Recall != (i > goal) || current.RecallPending != (i <= recallRetestGoal) {
+				t.Fatalf("goal %d, answer %d: wrong pending requirements %+v", goal, i, current)
+			}
+			got := nextVote(t, s, day, true)
+			done := i == max(goal, recallRetestGoal)
+			if got.TaskTotal != 1 || (got.TaskDone == 1) != done || got.TaskCompleted != done {
+				t.Fatalf("goal %d, answer %d: %+v", goal, i, got)
+			}
+		}
+		if s.db.Words["crucial"].Streak != 1 {
+			t.Fatal("shared answers must credit just one ordinary study day")
+		}
+		if err := s.refreshRecall("2026-11-07"); err != nil || s.review("2026-11-07").RecallDue != 1 {
+			t.Fatalf("shared first miss lost its carry: %v", err)
+		}
+	}
+}
+
+func TestDirectPassPreservesOngoingRecall(t *testing.T) {
+	s, _ := newTestStore(t)
+	const first, day = "2026-11-01", "2026-11-06"
+	importTest(t, s, first, "crucial")
+	nextVote(t, s, first, false)
+	if err := s.refreshRecall(day); err != nil {
+		t.Fatal(err)
+	}
+	nextVote(t, s, day, false)
+	nextVote(t, s, day, true)
+	current := s.review(day).Current
+	got, err := s.recordVote(day, current.Key, current.Reviews, current.Order, true, false, true)
+	if err != nil || !got.DayPassed || got.TaskDone != 0 || !got.Current.Recall || got.Current.RecallCount != 1 || got.Due != 1 {
+		t.Fatalf("direct pass changed recall progress: %+v / %+v (%v)", got, got.Current, err)
+	}
+	nextVote(t, s, day, true)
+	if last := nextVote(t, s, day, true); !last.TaskCompleted {
+		t.Fatalf("two real checks should finish the task: %+v", last)
+	}
+}
+
+func TestUpgradeLegacyRecallKeepsCurrentDayCompletion(t *testing.T) {
+	s, _ := newTestStore(t)
+	const first, day = "2026-11-01", "2026-11-06"
+	importTest(t, s, first, "apple")
+	nextVote(t, s, first, false)
+	card := s.db.Words["apple"]
+	card.Mastered, card.Streak, card.Reviews = true, 6, 8
+	s.db.RecallBatch = &recallBatch{Day: day, Rolling: true, Cards: []uint64{card.ID}}
+	if got := nextVote(t, s, day, false); got.Due != 0 {
+		t.Fatalf("legacy behavior should check a word only once: %+v", got)
+	}
+	if err := s.refreshRecall(day); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.review(day); got.TaskDone != 1 || got.TaskTotal != 1 || got.Due != 0 {
+		t.Fatalf("updating a live batch reopened an already handled word: %+v", got)
+	}
+	if err := s.refreshRecall("2026-11-07"); err != nil || s.review("2026-11-07").RecallDue != 1 {
+		t.Fatalf("legacy miss lost its carry: %v", err)
+	}
+}
+
+func TestRecallRetestUsesOrdinarySpacing(t *testing.T) {
+	s, _ := newTestStore(t)
+	const first, day = "2026-11-01", "2026-11-06"
+	importTest(t, s, first, "apple")
+	nextVote(t, s, first, false)
+	apple := s.db.Words["apple"]
+	apple.Mastered, apple.Streak, apple.Reviews = true, 6, 8
+	options := s.db.Settings
+	options.DailyGoal = 1
+	if _, err := s.changeSettings(day, options); err != nil {
+		t.Fatal(err)
+	}
+	newWords := importTest(t, s, day, "banana,lemon,pear,peach,mango,grape,plum,cherry,lime,melon,fig,kiwi,orange,papaya,pineapple,berry,apricot,tangerine,guava,pomegranate")
+	if err := s.refreshRecall(day); err != nil {
+		t.Fatal(err)
+	}
+	ranks := map[uint64]int{apple.ID: 1}
+	for i, key := range newWords.Keys {
+		ranks[s.db.Words[key].ID] = i + 2
+	}
+	s.display = reviewDisplay{day: day, ranks: ranks}
+	if state := s.review(day); state.Current.Key != apple.Key || state.TaskTotal != len(newWords.Keys)+1 {
+		t.Fatalf("unexpected starting queue: %+v", state)
+	}
+	nextVote(t, s, day, false)
+	for i := 0; i <= repeatGapDeadline; i++ {
+		if state := s.review(day); state.Current.Key == apple.Key {
+			if i < minTargetGap || i > maxTargetGap || state.Current.RecallCount != 0 || !state.Current.RecallRetesting {
+				t.Fatalf("wrong first retest after %d different cards: %+v", i, state.Current)
+			}
+			return
+		}
+		nextVote(t, s, day, true)
+	}
+	t.Fatal("recall retest did not return at the existing interval")
 }

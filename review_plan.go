@@ -12,6 +12,8 @@ type reviewState struct {
 	Settings    settings      `json:"settings"`
 	Due         int           `json:"due"`
 	RecallDue   int           `json:"recallDue,omitempty"`
+	TaskDone    int           `json:"taskDone"`
+	TaskTotal   int           `json:"taskTotal"`
 	OverflowNew int           `json:"overflowNew"`
 	Reviewed    int           `json:"reviewed"`
 	Remembered  int           `json:"remembered"`
@@ -24,14 +26,17 @@ type reviewState struct {
 }
 
 type cardFace struct {
-	Key         string `json:"key"`
-	Word        string `json:"word"`
-	Streak      int    `json:"streak"`
-	DailyCount  int    `json:"dailyCount"`
-	DailyTarget int    `json:"dailyTarget"`
-	Reviews     int    `json:"reviews"`
-	Order       uint64 `json:"order"`
-	Recall      bool   `json:"recall,omitempty"`
+	Key             string `json:"key"`
+	Word            string `json:"word"`
+	Streak          int    `json:"streak"`
+	DailyCount      int    `json:"dailyCount"`
+	DailyTarget     int    `json:"dailyTarget"`
+	Reviews         int    `json:"reviews"`
+	Order           uint64 `json:"order"`
+	Recall          bool   `json:"recall,omitempty"`
+	RecallPending   bool   `json:"recallPending,omitempty"`
+	RecallRetesting bool   `json:"recallRetesting,omitempty"`
+	RecallCount     int    `json:"recallCount,omitempty"`
 }
 
 const (
@@ -42,26 +47,33 @@ const (
 )
 
 type attendance struct {
-	lastShown map[uint64]int
-	reviewed  map[uint64]bool
-	recalled  map[uint64]bool
-	regular   map[uint64]bool
-	credited  map[uint64]bool
-	imports   map[uint64]bool
-	votes     int
-	recent    [repeatGapDeadline]uint64
+	lastShown      map[uint64]int
+	reviewed       map[uint64]bool
+	recalled       map[uint64]bool
+	recallProgress map[uint64]recallProgress
+	regular        map[uint64]bool
+	credited       map[uint64]bool
+	imports        map[uint64]bool
+	votes          int
+	recent         [repeatGapDeadline]uint64
 }
 
 func (s *store) attendance(day string) attendance {
-	return s.attendanceSince(day, "")
+	return s.attendanceSince(day, "", nil)
 }
 
-func (s *store) attendanceSince(day, recallFrom string) attendance {
+func (s *store) attendanceSince(day, recallFrom string, batch *recallBatch) attendance {
 	result := attendance{
 		lastShown: make(map[uint64]int), reviewed: make(map[uint64]bool),
 		regular: make(map[uint64]bool), credited: make(map[uint64]bool), imports: make(map[uint64]bool),
 	}
-	if recallFrom != "" {
+	if batch != nil {
+		result.recallProgress = make(map[uint64]recallProgress, len(batch.Cards))
+		for _, id := range batch.Cards {
+			result.recallProgress[id] = recallProgress{}
+		}
+	}
+	if recallFrom != "" && batch == nil {
 		result.recalled = make(map[uint64]bool)
 	}
 	for _, item := range s.db.Events {
@@ -69,7 +81,7 @@ func (s *store) attendanceSince(day, recallFrom string) attendance {
 			continue
 		}
 		answer := item.Kind == "yes" || item.Kind == "no"
-		if recallFrom != "" && answer && item.Day >= recallFrom && item.Day <= day {
+		if result.recalled != nil && answer && item.Day >= recallFrom && item.Day <= day {
 			result.recalled[item.Card] = true
 		}
 		if item.Day != day {
@@ -84,6 +96,13 @@ func (s *store) attendanceSince(day, recallFrom string) attendance {
 		result.recent[result.votes%len(result.recent)] = item.Card
 		result.votes++
 		result.reviewed[item.Card] = true
+		if progress, selected := result.recallProgress[item.Card]; selected {
+			if item.RecallAnswer {
+				result.recallProgress[item.Card] = progress.answer(item.Kind == "yes", result.votes)
+			} else if batch.RetestAfter > 0 && item.Tick <= batch.RetestAfter {
+				result.recallProgress[item.Card] = recallProgress{done: true}
+			}
+		}
 		if item.Recall {
 			continue
 		}
@@ -128,6 +147,7 @@ type reviewPlan struct {
 	repeats  []*wordCard
 	carry    []*wordCard
 	recall   []*wordCard
+	retests  []*wordCard
 	session  attendance
 	previous attendance
 }
@@ -145,10 +165,14 @@ func (s *store) planReview(day string) reviewPlan {
 
 func (s *store) planReviewRules(day string, legacy bool) reviewPlan {
 	recallFrom := ""
+	var batch *recallBatch
 	if !legacy && s.db.RecallBatch.available(day) {
 		recallFrom = s.db.RecallBatch.Day
+		if s.db.RecallBatch.Retest && recallFrom == day {
+			batch = s.db.RecallBatch
+		}
 	}
-	session := s.attendanceSince(day, recallFrom)
+	session := s.attendanceSince(day, recallFrom, batch)
 	plan := reviewPlan{
 		state:   reviewState{Date: day, Exam: countdown(day, s.db.Settings.ExamDate), Settings: s.db.Settings, Reviewed: len(session.reviewed)},
 		session: session,
@@ -253,9 +277,15 @@ func (s *store) planReviewRules(day string, legacy bool) reviewPlan {
 	plan.state.Due = len(plan.old) + len(plan.new) + len(plan.extras) + len(plan.repeats)
 	plan.state.OverflowNew = len(plan.overflow)
 	plan.state.Planned = plan.state.Remembered + plan.state.Due
-	if recallFrom != "" {
+	plan.state.TaskDone, plan.state.TaskTotal = plan.state.Remembered, plan.state.Planned
+	plan.retests = plan.repeats
+	if batch != nil {
+		plan.retests = slices.Clone(plan.repeats)
 		plan.addRecall(s.db)
-		plan.state.Due += plan.state.RecallDue
+	} else if recallFrom != "" {
+		plan.addLegacyRecall(s.db)
+		plan.state.Due += len(plan.recall)
+		plan.state.TaskTotal += len(plan.recall)
 	}
 	return plan
 }
@@ -301,7 +331,7 @@ func presentationOrder(plan reviewPlan, prior map[uint64]int) []*wordCard {
 	ordered = append(ordered, fresh...)
 	ordered = append(ordered, extras...)
 	ordered = append(ordered, old...)
-	for _, card := range plan.recall {
+	for _, card := range plan.freshRecall() {
 		ordered = slices.Insert(ordered, rand.IntN(len(ordered)+1), card)
 	}
 	return ordered
@@ -349,10 +379,27 @@ func targetRepeatGap(card *wordCard, last int) int {
 	return minTargetGap + int((3*(card.ID%width)+uint64(last)+uint64(card.RetryGap))%width)
 }
 
+func (p reviewPlan) lastRetest(card *wordCard) int {
+	return max(p.session.lastShown[card.ID], p.session.recallProgress[card.ID].last)
+}
+
+func (p reviewPlan) freshRecall() []*wordCard {
+	if p.session.recallProgress == nil {
+		return p.recall
+	}
+	var fresh []*wordCard
+	for _, card := range p.recall {
+		if p.session.recallProgress[card.ID].last == 0 {
+			fresh = append(fresh, card)
+		}
+	}
+	return fresh
+}
+
 func (p reviewPlan) readyRepeat() *wordCard {
 	wanted := min(distinctGapGoal, p.state.Due-1)
-	for _, card := range p.repeats {
-		last := p.session.lastShown[card.ID]
+	for _, card := range p.retests {
+		last := p.lastRetest(card)
 		gap := p.session.votes - last
 		// At most one card can have a given last position. Serving the oldest
 		// eligible card and capping the variety preference prevents starvation.
@@ -411,16 +458,19 @@ func (s *store) reviewState(plan reviewPlan) reviewState {
 			next = preferred(ranks, old)
 		case len(plan.carry) > 0:
 			next = plan.carry[0]
-		case len(plan.repeats) > 0:
-			// If no fresh or ready card remains, take the longest-waiting
-			// card. With multiple cards this cannot be the most recent one.
-			next = plan.repeats[0]
 		}
 		// Shuffle the extra checks into the queue without displacing ready
 		// repeats or changing the order of the normal groups.
-		if recall := preferred(ranks, plan.recall); recall != nil &&
+		if next == nil && plan.session.recallProgress == nil && len(plan.retests) > 0 {
+			next = plan.retests[0]
+		}
+		if recall := preferred(ranks, plan.freshRecall()); recall != nil &&
 			(next == nil || (ranks[recall.ID] > 0 && (ranks[next.ID] == 0 || ranks[recall.ID] < ranks[next.ID]))) {
 			next = recall
+		}
+		if next == nil && len(plan.retests) > 0 {
+			// With too few different cards, use the longest-waiting one.
+			next = plan.retests[0]
 		}
 	}
 	if s.display.day == state.Date && s.display.undoCard != 0 {
@@ -446,9 +496,11 @@ func (s *store) reviewState(plan reviewPlan) reviewState {
 	}
 	if next != nil {
 		daily := next.dailyState(state.Date, state.Settings.DailyGoal)
+		check, selected := plan.session.recallProgress[next.ID]
 		state.Current = &cardFace{
 			Key: next.Key, Word: next.Word, Streak: next.Streak, Recall: recall,
 			DailyCount: daily.count, DailyTarget: daily.target, Reviews: next.Reviews, Order: next.Order,
+			RecallPending: selected && !check.done, RecallRetesting: check.retesting && !check.done, RecallCount: check.count,
 		}
 	}
 	return state

@@ -21,7 +21,7 @@ import (
 
 const (
 	transferFormat  = "wordreview.learning-state"
-	transferVersion = 4
+	transferVersion = 5
 	maxTransfer     = 128 << 20
 	studyFileExt    = ".lexi"
 )
@@ -85,8 +85,12 @@ func (s *store) captureTaskRules(day string, legacy bool) transferTask {
 			task.Pending = append(task.Pending, card.ID)
 		}
 	}
+	slices.Sort(task.Pending)
 	for _, card := range s.db.Words {
-		if !card.Deleted && card.passedOn(day) {
+		_, pending := slices.BinarySearch(task.Pending, card.ID)
+		recall, hasRecall := plan.session.recallProgress[card.ID]
+		if !card.Deleted && (hasRecall || card.passedOn(day)) &&
+			(!hasRecall || recall.done) && !pending {
 			task.Passed = append(task.Passed, card.ID)
 		}
 	}
@@ -94,7 +98,6 @@ func (s *store) captureTaskRules(day string, legacy bool) transferTask {
 		task.Current = card.ID
 		task.CurrentRecall = s.presented.recall
 	}
-	slices.Sort(task.Pending)
 	slices.Sort(task.Passed)
 	if s.display.day == day {
 		for _, id := range task.Pending {

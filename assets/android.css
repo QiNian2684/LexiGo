@@ -1,24 +1,30 @@
+/* Native window fitting supplies the usable WebView bounds. */
+html { height: 100%; overflow: hidden; }
 body.platform-android {
   --control: 3rem;
   --phone-nav: 4.35rem;
-  --phone-actions: 4.15rem;
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-top: env(safe-area-inset-top, 0px);
-  display: block;
+  grid-template: minmax(0, 1fr) auto var(--phone-nav) / minmax(0, 1fr);
   min-width: 0;
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 .platform-android .shell {
+  grid-area: 1 / 1;
   width: min(100%, 45rem);
-  padding: calc(1.2rem + var(--safe-top)) 1rem calc(var(--phone-nav) + var(--safe-bottom) + 1.35rem);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding: 1.2rem 1rem 1.35rem;
 }
 .platform-android .sidebar {
-  position: fixed;
+  position: relative;
   z-index: 20;
-  inset: auto 0 0;
-  width: 100%; height: auto; min-height: 0;
-  padding: .37rem .38rem calc(.39rem + var(--safe-bottom));
+  grid-area: 3 / 1;
+  inset: auto;
+  height: 100%;
+  min-height: 0;
+  padding: .37rem .38rem .39rem;
   background: var(--surface);
   border: 0;
   border-top: 1px solid var(--line);
@@ -26,15 +32,23 @@ body.platform-android {
 :root[data-theme="dark"] .platform-android .sidebar { background: var(--rail); }
 .platform-android .brand { display: none; }
 .platform-android .nav {
+  --nav-gap: .27rem;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
   width: 100%;
-  gap: .27rem;
+  gap: var(--nav-gap);
   margin-inline: auto;
   max-width: 38rem;
 }
+.platform-android .nav-indicator {
+  width: calc((100% - 4 * var(--nav-gap)) / 5);
+  height: 100%;
+  transform: translateX(calc(var(--nav-index, 0) * (100% + var(--nav-gap))));
+}
 .platform-android .nav button {
-  min-height: 3.5rem;
+  min-height: 0;
   height: 100%;
   display: grid;
   align-content: center;
@@ -44,6 +58,10 @@ body.platform-android {
   font-size: .77rem;
   line-height: 1.3;
   text-align: center;
+}
+.platform-android .nav button[aria-current="page"] { font-weight: 520; }
+@media (prefers-reduced-motion: no-preference) {
+  .platform-android .nav button:not(:disabled):active { transform: none; }
 }
 .platform-android .nav button > span {
   position: static; width: auto; height: auto;
@@ -65,7 +83,6 @@ body.platform-android {
 .platform-android .review-heading h1.exam-countdown { font-size: clamp(1.1rem, 4.6vw, 1.4rem); }
 .platform-android .study-summary { min-width: 5.2rem; max-width: 8rem; align-self: flex-start; margin-top: .22rem; font-size: .78rem; }
 .platform-android #session-tools, .platform-android .card-actions kbd, .platform-android .desktop-data-copy { display: none; }
-.platform-android .review-card { overflow: visible; }
 .platform-android .card-front { min-height: 0; padding: 2rem .92rem 1.25rem; row-gap: .64rem; }
 .platform-android .english-word { font-size: clamp(2.3rem, 10.6vw, 3.9rem); }
 .platform-android .english-word.long-word { font-size: clamp(1.85rem, 8vw, 2.95rem); }
@@ -80,7 +97,8 @@ body.platform-android {
 .platform-android .memory-panel { border-inline-start: 0; border-top: 1px solid var(--line); padding: .95rem 0 0; }
 .platform-android .personal-note textarea { min-height: 6rem; max-height: none; overflow-y: hidden; resize: none; }
 .platform-android #card-metadata { margin-block: .8rem; }
-.platform-android[data-view="review"] { touch-action: pan-y pinch-zoom; }
+.platform-android[data-view="review"],
+.platform-android[data-view="review"] .shell { touch-action: pan-y pinch-zoom; }
 .platform-android .swipe-content { position: relative; }
 .platform-android .review-card { position: relative; overflow-x: clip; overflow-y: visible; }
 .platform-android .swipe-cue {
@@ -90,15 +108,15 @@ body.platform-android {
   font-size: .84rem; pointer-events: none;
 }
 .platform-android .card-actions {
-  position: fixed; z-index: 19;
-  inset: auto 0 calc(var(--phone-nav) + var(--safe-bottom));
+  grid-area: 2 / 1;
+  z-index: 19;
   padding: .53rem 1rem;
   background: var(--surface);
   box-shadow: var(--shadow);
 }
-.platform-android.has-vote[data-view="review"] .shell { padding-bottom: calc(var(--phone-nav) + var(--phone-actions) + var(--safe-bottom) + 1.35rem); }
+body.platform-android.editing-input { grid-template-rows: minmax(0, 1fr); }
 .platform-android.editing-input .sidebar,
-.platform-android.editing-input .card-actions { visibility: hidden; pointer-events: none; }
+.platform-android.editing-input .card-actions { display: none; }
 .platform-android.editing-input .shell { padding-bottom: .85rem; }
 .platform-android textarea:focus, .platform-android input:focus { scroll-margin-block-end: .8rem; }
 .platform-android .empty-state { min-height: 14.25rem; padding: 2.15rem .9rem; }
@@ -174,7 +192,6 @@ body.platform-android {
   max-height: min(33rem, 78vh);
   max-height: min(33rem, 78dvh);
   margin: 0 auto;
-  padding: 0 0 var(--safe-bottom);
   border-radius: var(--radius-dialog) var(--radius-dialog) 0 0;
   border-bottom: 0;
 }

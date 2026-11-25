@@ -81,6 +81,9 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
         root = new FrameLayout(this);
+        // Android fits this window to its system bars, including a side bar
+        // in landscape. The WebView uses the resulting content bounds.
+        if (Build.VERSION.SDK_INT >= 30) getWindow().setDecorFitsSystemWindows(true);
         applyAppearance(startupDark());
         setContentView(root);
         watchKeyboard();

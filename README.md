@@ -1,10 +1,10 @@
-# LexiGo 3.5.1
+# LexiGo 3.5.2
 
 个人使用的英语词库与复习软件。支持 Windows 10/11 x64 和 Android 9 及以上。两端共用词典、SQLite 表结构、数据交换格式和复习逻辑。
 
 ## 使用
 
-Windows 运行对应版本的安装程序，先选择程序位置，再选择数据文件夹和桌面快捷方式。默认程序位置为 `%LOCALAPPDATA%\Programs\LexiGo`，默认数据文件夹为程序目录下的 `Data`。直接运行 `LexiGo.exe` 也可以使用便携模式。Windows 使用 WebView2 Runtime，窗口配置保存在数据目录的 `WebView2` 子目录。Android 安装 `LexiGo-Android-3.5.1.apk` 后打开「LexiGo」。运行无需安装 Go、Python 或数据库服务器。
+Windows 运行对应版本的安装程序，先选择程序位置，再选择数据文件夹和桌面快捷方式。默认程序位置为 `%LOCALAPPDATA%\Programs\LexiGo`，默认数据文件夹为程序目录下的 `Data`。直接运行 `LexiGo.exe` 也可以使用便携模式。Windows 使用 WebView2 Runtime，窗口配置保存在数据目录的 `WebView2` 子目录。Android 安装 `LexiGo-Android-3.5.2.apk` 后打开「LexiGo」。运行无需安装 Go、Python 或数据库服务器。
 
 启动时显示可滚动的使用手册。手册配有操作截图，涵盖添加单词、每日记忆与长期掌握、词库、统计、设置和备份迁移，并显示本平台的快捷键或手势。勾选「以后不再提示」并点「确认」后，可以从「设置 → 使用说明」随时重开。
 
@@ -34,7 +34,7 @@ Windows 运行对应版本的安装程序，先选择程序位置，再选择数
 
 ## 易错词回顾
 
-每个学习日按恰好五个学习日前的答错次数，选出最多 10 个词。已掌握的词也可进入回顾。每个入选词每天检查一次，答对通过，答错顺延到下一学习日。同一个词当天也在常规复习队列时，首答同时作为回顾结果。撤销的作答和单独的易错词回顾作答不计入五天后的选词。
+每个学习日按恰好五个学习日前的答错次数，选出最多 10 个词。已掌握的词也可进入回顾。当天首答正确即完成回顾。首答错误时，按现有间隔重测，直到当天连续答对 3 次。期间再次答错会把连对次数归零。即使当天完成重测，也会在下一学习日继续回顾，直到某天首答正确为止。普通复习和回顾重叠时共用作答，满足两项要求才计为 1 个已完成词。「今日进度」涵盖全部普通和回顾任务。撤销的作答和单独的易错词回顾作答不计入五天后的选词。
 
 ## 当天重测顺序
 
@@ -118,7 +118,7 @@ Android 3.5.0 使用独立的包名和已保存的新发行签名，可与 3.3.1
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-脚本运行 Go 测试并生成便携版 `dist\LexiGo.exe` 和安装版 `dist\LexiGo-Setup-3.5.1.exe`。首次从源码构建需要取得 `go.mod` 和 `go.sum` 声明的依赖。已编入的词典、界面和应用图标无需重新下载。第三方依赖许可证见 `licenses/`，数据处理脚本在 `scripts/`。
+脚本运行 Go 测试并生成便携版 `dist\LexiGo.exe` 和安装版 `dist\LexiGo-Setup-3.5.2.exe`。首次从源码构建需要取得 `go.mod` 和 `go.sum` 声明的依赖。已编入的词典、界面和应用图标无需重新下载。第三方依赖许可证见 `licenses/`，数据处理脚本在 `scripts/`。
 
 也可用 `go test ./...` 单独测试核心规则。用 Python 3 运行 `python scripts/test_http.py 路径\LexiGo.exe` 可以在独立临时词库上测试离线工作流和中止进程后恢复。还可运行 `python scripts/test_portable.py .\dist\LexiGo.exe`，用独立临时目录验证 EXE 路径、移动后重新打开和隔离的旧库迁移。脚本经过 EXE 的 `--serve` 模式测试后端，WebView2 窗口的验证需在 Windows 上双击 EXE。
 
@@ -126,7 +126,7 @@ Android 的开发环境、签名方式和命令见 `android/README.md`。两端�
 
 ## GitHub 发行
 
-Android 与 Windows 各有独立的发布页。Android 使用 `v3.5.1-android`，Windows 使用 `v3.5.1-windows`。
+Android 与 Windows 各有独立的发布页。Android 使用 `v3.5.2-android`，Windows 使用 `v3.5.2-windows`。
 
 - Android 在 Actions 中手动运行「Android release」。流程使用 `LEXIGO_ANDROID_SIGNING`，在 Android 16 验证只用 APK 安装和覆盖升级，通过后才公开发布。
-- Windows 在 Actions 中手动运行「Windows build」，该工作流验证编译、安装和便携版行为。正式签名由 Windows 签名机执行。在 Windows 构建机按 `LEXIGO_WINDOWS_SIGNING_THUMBPRINT` 指定受信任的代码签名证书，执行 `.\build.ps1 -Release`。签名流程先签署便携版，再打包和签署 Setup。推送对应的 Windows 标签后，运行 `.\scripts\publish-release.ps1 -Tag v3.5.1-windows`。脚本校验两个 EXE 的签名和版本，并从 GitHub 回读核对上传的文件。
+- Windows 在 Actions 中手动运行「Windows build」，勾选发布选项后，工作流验证编译、安装和便携版行为，再发布沿用原发行策略的未签名安装版和便携版。如需生成 Authenticode 签名版本，使用 Windows 签名机。在 Windows 构建机按 `LEXIGO_WINDOWS_SIGNING_THUMBPRINT` 指定受信任的代码签名证书，执行 `.\build.ps1 -Release`。签名流程先签署便携版，再打包和签署 Setup。推送对应的 Windows 标签后，运行 `.\scripts\publish-release.ps1 -Tag v3.5.2-windows`。脚本校验两个 EXE 的签名和版本，并从 GitHub 回读核对上传的文件。

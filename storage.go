@@ -344,6 +344,9 @@ func validDatabase(db database) bool {
 		if item.Waiting && (item.Kind != "no" || item.Legacy || item.Practice || item.Undone || item.Before == nil) {
 			return false
 		}
+		if item.RecallAnswer && (item.Legacy || item.Practice || (item.Kind != "yes" && item.Kind != "no")) {
+			return false
+		}
 		if !ids[item.Card] || !validDate(item.Day) || item.Tick > db.NextOrder {
 			return false
 		}
@@ -361,7 +364,8 @@ func validDatabase(db database) bool {
 		}
 	}
 	if batch := db.RecallBatch; batch != nil {
-		if !db.CumulativePasses || !validDate(batch.Day) || (!batch.Rolling && len(batch.Cards) > recallBatchLimit) {
+		if !db.CumulativePasses || !validDate(batch.Day) || (!batch.Rolling && (batch.Retest || len(batch.Cards) > recallBatchLimit)) ||
+			(batch.RetestAfter > 0 && (!batch.Retest || batch.RetestAfter > db.NextOrder)) {
 			return false
 		}
 		seen := make(map[uint64]bool, len(batch.Cards))
