@@ -129,6 +129,7 @@ Android 的开发环境、签名方式和命令见 `android/README.md`。两端�
 
 Android 和 Windows 共用一个发行标签，当前版本为 `v3.5.5`。公开附件为 Android APK、Windows Setup 和 Windows 便携版。Android 用户可直接使用 APK 覆盖安装同包名签名版本。
 
-- 在主分支手动运行「LexiGo release」。两端并行构建。Android 使用 `LEXIGO_ANDROID_SIGNING` 并在 Android 16 验证全新安装及覆盖升级。Windows 在原生环境验证安装与便携数据。统一发布任务核对两个平台的版本和附件哈希，通过后公开发行。
+- 在主分支手动运行「LexiGo release」。两端并行构建。Android 使用 `LEXIGO_ANDROID_SIGNING` 并在 Android 16 验证全新安装及覆盖升级。Windows 在原生环境验证安装与便携数据。发布任务先验证草稿附件，公开后从下载地址匿名下载并核对三份附件的 SHA-256。发行说明列出 APK 的字节数及 SHA-256。
+- Android 构建产物保留 30 天。同版本 APK 下载异常时，运行「Repair Android release asset」，输入发行标签、该版本的发行运行编号和递增的附件修订号。任务使用同一标签提交的已验证 APK，上传到新的下载地址，重新下载校验后才撤下旧附件。
 - 「Android build」和「Windows build」可分别运行构建及验证。Android 的 `.idsig` 和校验文件留在 Actions 构建产物中。
 - Windows 公开发行沿用未做 Authenticode 签名的策略。具备 Windows 签名证书的构建机可以用 `LEXIGO_WINDOWS_SIGNING_THUMBPRINT` 指定证书并执行 `.\build.ps1 -Release`，生成已签名的安装版和便携版。
