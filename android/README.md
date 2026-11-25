@@ -17,7 +17,7 @@ bash android/build-android.sh dist/LexiGo.apk
 
 脚本会编译两个架构、打包资源、对齐 APK、签名并验证签名。首次运行会要求输入密码并生成本地签名库。也可通过 `WORDREVIEW_KEYSTORE` 和 `WORDREVIEW_KEY_ALIAS` 指向已有签名库。安装更新必须沿用同一包名和签名。自行签名的构建如果与已安装版本的签名不同，先通过应用导出数据，保管好文件后再卸载原版本、安装自签版本并导入。发行签名密钥由构建方保存，源码不含私钥。
 
-发布构建需要通过 `WORDREVIEW_KEYSTORE` 指定当前包名使用的发行密钥库，再运行 `bash android/build-android.sh --release dist/LexiGo-Android-3.5.5.apk`。脚本会校验内嵌签名、对应的 `.idsig` 和当前发行证书指纹。两份文件均通过校验后才会进入输出目录。
+发布构建需要通过 `WORDREVIEW_KEYSTORE` 指定当前包名使用的发行密钥库，再运行 `bash android/build-android.sh --release dist/LexiGo-Android-3.5.6.apk`。脚本会校验内嵌签名、对应的 `.idsig` 和当前发行证书指纹。两份文件均通过校验后才会进入输出目录。
 
 GitHub Actions 的「Android release」在运行时从仓库的加密 Secret `LEXIGO_ANDROID_SIGNING` 取得发行签名。公开源码保留证书指纹。
 
@@ -27,4 +27,4 @@ GitHub Actions 的「Android release」在运行时从仓库的加密 Secret `LE
 
 3.5.0 使用独立的包名和发行签名，可和 3.3.1 同时安装。用旧版的「导出数据」和新版的「导入数据」迁移 .lexi 文件。APK 内嵌 v1、v2 和 v3 签名，可直接通过系统安装器打开。从 3.5.5 起，公开发行页提供 APK，`.apk.idsig` 留在 Actions 构建产物中。
 
-Android 通过系统分享面板发送 `.lexi` 学习数据，内容为 UTF-8 JSON。系统只向接收应用授予临时读取权限。私有缓存中超过三天的共享文件会在下次启动或分享时清理。「导出数据 → 保存到手机」使用系统文件选择器，默认文件名为 `LexiGo-年-月-日-时-分-秒.lexi`。
+Android 通过系统分享面板发送 `.lexi` 学习数据，内容为 UTF-8 JSON。系统只向接收应用授予临时读取权限。私有缓存中超过三天的共享文件会在下次启动或分享时清理。「保存到手机」「备份数据」和「导出覆盖前备份」使用通用二进制 MIME 和明确的 `.lexi` 文件名。若系统文件提供方改写后缀，LexiGo 会尝试改回 `.lexi`，无法改名时会显示提示。历史 `.learning` 或 `.json` 文件可从相应入口按内容验证。

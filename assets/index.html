@@ -101,16 +101,68 @@
       <header class="page-heading"><h1 id="add-title">添加单词</h1></header>
       <form id="add-form" class="card section-card compose-card" data-validation="import-status">
         <label class="section-title" for="add-input">英文单词或短语</label>
-        <p class="help" id="import-help">用英文逗号隔开，或每行一个。再次录入已存在的词会重置它的学习进度，确认前可预览。</p>
+        <p class="help" id="import-help">用逗号隔开，或每行输入一个词。也可以粘贴带表头的 CSV，或选择 CSV、TXT、JSON 词表文件。</p>
         <textarea rows="7" id="add-input" aria-describedby="import-help" placeholder="crucial, abundance, sophisticated, forthright" required spellcheck="false"></textarea>
         <div class="import-actions">
-          <button class="button outline" type="button" id="pick-txt"><svg class="icon" aria-hidden="true"><use href="/icons.svg#file"/></svg>导入 TXT 文件</button>
-          <input id="txt-file" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" hidden>
+          <button class="button outline" type="button" id="pick-word-file"><svg class="icon" aria-hidden="true"><use href="/icons.svg#file"/></svg>导入 CSV 文件</button>
+          <input id="word-file" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" hidden>
           <button class="button primary" type="submit" id="add-submit">预览导入<svg class="icon" aria-hidden="true"><use href="/icons.svg#right"/></svg></button>
         </div>
+        <p class="form-status" id="word-file-status" role="status" hidden></p>
         <p class="form-status" id="import-status" role="status" hidden></p>
         <p class="form-status" id="import-lookup" role="status" hidden></p>
       </form>
+      <section class="card section-card compose-card csv-guide" aria-labelledby="csv-guide-title">
+        <h2 class="section-title" id="csv-guide-title">CSV 批量导入指南</h2>
+        <p>用 CSV 一次添加多个单词，并带上释义、例句和记忆技巧。每行写一个单词或短语，填好的资料会随新词一起保存。</p>
+        <ol>
+          <li><strong>制作词表。</strong>在 Excel 中打开模板，保留第一行表头，从第二行开始填写并另存为「CSV UTF-8」。也可以让 AI 按下方表头整理单词，把输出粘贴到这里，或用文本编辑器保存为 UTF-8 的 <code>.csv</code> 文件。</li>
+          <li><strong>预览并导入。</strong>选择文件或粘贴内容，点「预览导入」，核对新增、重复和无效项后，再点「确认导入」。</li>
+        </ol>
+        <div class="csv-example">
+          <h3>可直接使用的示例</h3>
+          <pre id="csv-example"><code data-csv-sample></code></pre>
+          <div class="csv-actions">
+            <button type="button" class="button outline small" id="copy-csv-example">复制 CSV 示例</button>
+            <a class="button outline small" data-csv-template="common" href="/api/csv-template/common" download>下载常用模板</a>
+            <a class="button outline small" data-csv-template="full" href="/api/csv-template/full" download>下载完整模板</a>
+          </div>
+          <p class="form-status" role="status" id="csv-template-status" hidden></p>
+        </div>
+        <details>
+          <summary>查看全部字段和中文表头</summary>
+          <div class="csv-field-table">
+            <table aria-label="CSV 导入字段">
+              <thead><tr><th scope="col">字段</th><th scope="col">用途和可用中文表头</th></tr></thead>
+              <tbody>
+                <tr><th scope="row"><code>word</code></th><td>英文单词或短语（必填，第一列）。<span>单词</span></td></tr>
+                <tr><th scope="row"><code>meaning</code></th><td>中文释义。<span>中文释义、释义</span></td></tr>
+                <tr><th scope="row"><code>pos</code></th><td>词性，如 adj.、v.、n.。<span>词性</span></td></tr>
+                <tr><th scope="row"><code>examples</code></th><td>英文例句。<span>例句、英文例句</span></td></tr>
+                <tr><th scope="row"><code>exampleTranslation</code></th><td>例句的中文翻译。<span>例句翻译、例句中文翻译</span></td></tr>
+                <tr><th scope="row"><code>ipa</code></th><td>通用音标。<span>音标</span></td></tr>
+                <tr><th scope="row"><code>ipaUK</code></th><td>英式音标。<span>英式音标</span></td></tr>
+                <tr><th scope="row"><code>ipaUS</code></th><td>美式音标。<span>美式音标</span></td></tr>
+                <tr><th scope="row"><code>etymology</code></th><td>确有依据的词根词缀、构词或词源。<span>词根词缀、词根和词缀、词源</span></td></tr>
+                <tr><th scope="row"><code>note</code></th><td>帮助记忆的场景、熟词或谐音联想。<span>记忆提示、记忆技巧、记忆联想</span></td></tr>
+                <tr><th scope="row"><code>collocations</code></th><td>常见搭配。<span>搭配、常见搭配</span></td></tr>
+                <tr><th scope="row"><code>personalNote</code></th><td>个人笔记，复习时可单独编辑。<span>备注、个人备注、我的备注</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>展开复习卡片可在「记忆联想」看到 <code>etymology</code> 和 <code>note</code>。<code>personalNote</code> 会显示在「我的备注」。</p>
+        </details>
+        <details>
+          <summary>格式、空白字段与重复词</summary>
+          <ul>
+            <li>第一列写 <code>word</code> 或「单词」，使用英文半角逗号。每批最多 1,000 项，单个文件最多 4 MiB。</li>
+            <li>字段中有英文逗号或换行时，用英文双引号包住整字段。字段内部的一个双引号写成两个。例如 <code>"However, she said ""yes""."</code></li>
+            <li>选填列可删除，暂时没有的资料也可以留空。新词优先使用你填写的资料，缺项由内置词典和已开启的联网补充处理。</li>
+            <li>同一批重复的单词保留第一条有效记录。已经在词库中的词会重置学习进度并重新排入复习，原资料、个人备注和历史保留。</li>
+          </ul>
+          <p><strong>可给 AI 的指令。</strong>请按上方示例表头输出 LexiGo CSV，提供常用释义、词性、英文例句和对应翻译。词根词缀填在 etymology，记忆技巧填在 note；没有可靠资料的字段留空。</p>
+        </details>
+      </section>
     </section>
 
     <section id="library-view" aria-labelledby="library-title" hidden>
@@ -298,6 +350,7 @@
               </button>
               <p class="data-guide" id="transfer-guide">在原设备导出 .lexi 文件，再到另一台设备导入。</p>
               <p class="data-guide">导入将替换本机的词库、备注及学习记录。</p>
+              <input id="transfer-file" type="file" hidden>
               <h3>本地备份</h3>
               <a class="settings-operation" id="download-backup" href="/api/backup" download>
                 <svg class="icon" aria-hidden="true"><use href="/icons.svg#backup"/></svg><span>备份数据</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
@@ -305,8 +358,8 @@
               <button class="settings-operation" id="pick-restore" type="button">
                 <svg class="icon" aria-hidden="true"><use href="/icons.svg#history"/></svg><span>恢复备份</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
               </button>
-              <p class="data-guide">备份包含词库、备注、进度和历史。恢复时会替换本机学习数据。</p>
-              <input id="restore-file" type="file" accept=".lexi,.json,application/json" hidden>
+              <p class="data-guide">用「恢复备份」打开本地备份。可读取此前保存的 .learning 或 .json 文件，实际内容须通过校验。</p>
+              <input id="restore-file" type="file" hidden>
             </div>
             <p id="settings-status" class="inline-status" role="status" hidden></p>
           </section>
@@ -332,13 +385,13 @@
           <h3 id="guide-start"><svg class="icon" aria-hidden="true"><use href="/icons.svg#add"/></svg>添加单词并开始复习</h3>
           <div class="guide-layout">
             <ol class="guide-list">
-              <li><strong>输入词表。</strong> 在「添加单词」粘贴英文单词或短语，每行一项，也可以用逗号分隔。已有词表时，可以通过「导入 TXT 文件」读取 TXT、CSV 或 JSON 词表。</li>
+              <li><strong>输入词表。</strong> 在「添加单词」粘贴英文单词或短语，每行一项，也可以用逗号分隔。可用「导入 CSV 文件」读取 CSV、TXT 或 JSON。页面下方提供 CSV 示例和模板，填入词根词缀或记忆技巧后，复习时可直接查看。</li>
               <li><strong>核对后导入。</strong> 点击「预览导入」，确认新增和重置的数量。再次添加已有单词会让它重新进入学习计划，原有资料、备注和答题历史会保留。</li>
               <li><strong>开始今天的任务。</strong> 回到「复习」，点击「开始复习」。中途离开也可以，下次打开时可以继续当天的任务。</li>
             </ol>
             <figure class="guide-figure">
-              <img class="guide-light" src="/guide/add.webp" width="754" height="670" alt="添加单词界面，输入框中以 Abandon 为例，下方是导入文件和预览导入按钮" loading="lazy">
-              <img class="guide-dark" src="/guide/add-dark.webp" width="754" height="670" alt="添加单词界面，输入框中以 Abandon 为例，下方是导入文件和预览导入按钮" loading="lazy">
+              <img class="guide-light" src="/guide/add.webp" width="754" height="796" alt="添加单词界面，输入框中以 Abandon 为例，下方是导入文件和预览导入按钮" loading="lazy">
+              <img class="guide-dark" src="/guide/add-dark.webp" width="754" height="796" alt="添加单词界面，输入框中以 Abandon 为例，下方是导入文件和预览导入按钮" loading="lazy">
               <figcaption>把词表填入输入框，再用右下角的「预览导入」核对。</figcaption>
             </figure>
           </div>
@@ -432,8 +485,8 @@
           <div class="guide-layout">
             <div>
               <p><strong>从原设备导出。</strong> 打开「设置 → 导出数据」。<span id="guide-export-tip">在 Windows 选择保存位置。</span>将生成的 <code>.lexi</code> 文件传到新设备。</p>
-              <p><strong>在新设备导入。</strong> 选择「导入数据」，打开刚传过去的文件。确认前可以预览词条和学习进度。确认后会覆盖当前设备的数据，原数据会保存在覆盖前备份中。</p>
-              <p><strong>在同一设备备份。</strong> 使用「备份数据」保存词库、备注和学习记录。需要恢复时，选择「恢复备份」。只想分享词表时，可从词库导出 CSV。</p>
+              <p><strong>在新设备导入。</strong> 选择「导入数据」，打开刚传过去的文件。此前的 .learning 或 .json 文件也可按内容校验。确认前可以预览词条和进度，覆盖前会自动备份。</p>
+              <p><strong>在同一设备备份。</strong> 使用「备份数据」保存 .lexi 文件，需要时选择「恢复备份」。只想分享词表时，可从词库导出 CSV。</p>
             </div>
             <figure class="guide-figure">
               <img class="guide-light" src="/guide/data.webp" width="754" height="576" alt="数据管理分为跨设备迁移和本地备份两组操作" loading="lazy">
@@ -482,7 +535,7 @@
         <label for="edit-exampleTranslation">例句翻译</label><textarea rows="2" id="edit-exampleTranslation"></textarea>
         <label for="edit-etymology">词根和词源</label><textarea rows="2" id="edit-etymology"></textarea>
         <label for="edit-collocations">搭配</label><textarea rows="2" id="edit-collocations"></textarea>
-        <label for="edit-note">记忆提示</label><textarea rows="2" id="edit-note"></textarea>
+        <label for="edit-note">记忆技巧</label><textarea rows="2" id="edit-note"></textarea>
         <label for="edit-personalNote">我的备注</label><textarea rows="2" id="edit-personalNote" maxlength="12000"></textarea>
       </div>
       <div class="dialog-footer">

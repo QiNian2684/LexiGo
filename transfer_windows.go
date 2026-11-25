@@ -43,19 +43,21 @@ func chooseDataFile(save bool, suggested, extension string) (string, error) {
 	dialog := syscall.NewLazyDLL("comdlg32.dll")
 	procedure, title := "GetOpenFileNameW", "导入完整学习数据"
 	description := "LexiGo 学习数据"
+	filterText := description + " (*" + extension + ")\x00*" + extension + "\x00\x00"
 	flags := uint32(0x00080000 | 0x00000800 | 0x00000008) // Explorer, existing path, unchanged working directory.
 	file := make([]uint16, 32768)
 	if save {
 		procedure, title = "GetSaveFileNameW", "导出完整学习数据"
 		if extension == ".csv" {
-			title, description = "导出词库 CSV", "CSV 词库"
+			title, filterText = "保存 CSV 文件", "CSV 文件 (*.csv)\x00*.csv\x00\x00"
 		}
 		flags |= 0x00000002 // Confirm overwriting.
 		copy(file, utf16.Encode([]rune(suggested)))
 	} else {
 		flags |= 0x00001000 // Existing file.
+		filterText = "LexiGo 学习数据 (*.lexi;*.learning;*.json)\x00*.lexi;*.learning;*.json\x00所有文件 (*.*)\x00*.*\x00\x00"
 	}
-	filter := utf16.Encode([]rune(description + " (*" + extension + ")\x00*" + extension + "\x00\x00"))
+	filter := utf16.Encode([]rune(filterText))
 	name, _ := syscall.UTF16PtrFromString(title)
 	var ext *uint16
 	if save {
@@ -79,7 +81,7 @@ func chooseDataFile(save bool, suggested, extension string) (string, error) {
 		return "", nil
 	}
 	path := syscall.UTF16ToString(file)
-	if !strings.EqualFold(filepath.Ext(path), extension) {
+	if save && !strings.EqualFold(filepath.Ext(path), extension) {
 		return "", fmt.Errorf("请选择扩展名为 %s 的文件。", extension)
 	}
 	return path, nil

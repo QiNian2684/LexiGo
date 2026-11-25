@@ -321,12 +321,12 @@ body:not(.platform-android) .swipe-cue { display: none; }
 .streak { color: var(--muted); font-size: .91rem; text-align: center; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .review-controls { display: flex; align-items: center; gap: .45rem; margin-block-start: .16rem; }
 .sound { border-color: var(--line); }
-#reveal .icon { transition: transform var(--motion-answer) var(--motion-ease); }
+#reveal { min-inline-size: calc(6em + 2.55rem); }
 .select-control > button .icon:last-child { transition: transform var(--motion-panel) var(--motion-ease); }
 #reveal[aria-expanded="true"] .icon { transform: rotate(180deg); }
 .select-control > button[aria-expanded="true"] .icon:last-child { transform: rotate(180deg); }
 
-.answer-panel { overflow: clip; }
+.answer-panel { display: flow-root; overflow: clip; overflow-anchor: none; }
 .answer {
   display: grid;
   grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr);
@@ -348,6 +348,9 @@ body:not(.platform-android) .swipe-cue { display: none; }
 .detail-group p { color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; }
 .detail-group .meaning { font-size: 1.28rem; font-weight: 575; }
 .detail-group .construction { margin-block-start: .35rem; color: var(--muted); font-size: .84rem; }
+.memory-association .construction { color: var(--secondary); }
+.memory-association strong { color: var(--ink); font-weight: 600; }
+.memory-association .construction-details { margin-top: .45rem; }
 .review-heading h1.exam-countdown { color: var(--secondary); font-size: clamp(1.16rem, 3.6vw, 1.5rem); font-weight: 600; letter-spacing: normal; }
 .detail-group .example { font-family: var(--font-word); font-size: 1.02rem; }
 .detail-group .translation, .detail-group .placeholder { color: var(--muted); font-size: .93rem; }
@@ -480,6 +483,45 @@ input[type=checkbox]:disabled { opacity: .55; cursor: default; }
   display: flex; align-items: center; justify-content: flex-end; gap: .65rem;
 }
 .import-actions { justify-content: space-between; margin-top: 1.05rem; }
+.csv-guide {
+  display: grid;
+  gap: .82rem;
+  margin-top: 1rem;
+  color: var(--secondary);
+  line-height: 1.65;
+}
+.csv-guide h2, .csv-guide h3, .csv-guide summary, .csv-guide strong { color: var(--ink); }
+.csv-guide h3 { font-size: .91rem; margin-bottom: .5rem; }
+.csv-guide ol, .csv-guide ul { margin: 0; padding-inline-start: 1.35rem; }
+.csv-guide li + li { margin-top: .45rem; }
+.csv-guide pre {
+  margin: 0;
+  padding: .75rem .85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--inset);
+  color: var(--ink);
+  font-size: .83rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.csv-actions { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .66rem; }
+.csv-guide > details { padding-top: .7rem; border-top: 1px solid var(--line); min-width: 0; }
+.csv-guide summary { cursor: pointer; font-weight: 600; }
+.csv-guide details > :nth-child(2), .csv-guide details > p { margin-top: .55rem; }
+.csv-field-table table { width: 100%; table-layout: fixed; border-collapse: collapse; text-align: start; font-size: .85rem; }
+.csv-field-table :is(th, td) {
+  min-width: 0;
+  padding: .44rem .42rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.csv-field-table th { color: var(--ink); }
+.csv-field-table tbody th { width: 32%; font-weight: 500; }
+.csv-field-table td span { display: block; color: var(--muted); }
 .notice, .inline-status, .form-status {
   white-space: pre-wrap; overflow-wrap: anywhere;
   color: var(--accent); background: var(--accent-soft);

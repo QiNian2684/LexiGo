@@ -25,6 +25,7 @@ const (
 	transferVersionWithoutFirstTry = 5
 	maxTransfer                    = 128 << 20
 	studyFileExt                   = ".lexi"
+	studyFileMIME                  = "application/octet-stream"
 )
 
 type transferEnvelope struct {
@@ -153,7 +154,7 @@ func parseTransfer(file []byte) (transferPayload, error) {
 	var envelope transferEnvelope
 	if len(file) == 0 || len(file) > maxTransfer || !utf8.Valid(file) || decodeExact(file, &envelope) != nil ||
 		envelope.Format != transferFormat {
-		return p, errors.New("请选择由「导出数据」「分享数据」或「保存到本机」生成的学习数据文件。文件可能已经损坏或超过 128 MB。")
+		return p, errors.New("请选择「导出数据」生成的学习数据文件。若文件由「备份数据」生成，请选择「恢复备份」。学习数据文件损坏或超过 128 MB 时无法导入。")
 	}
 	if envelope.Version < 1 || envelope.Version > transferVersion {
 		return p, errors.New("此文件的数据交换版本不兼容。请使用支持该版本的LexiGo。")
@@ -372,6 +373,23 @@ func (a *application) transferRoutes(mux *http.ServeMux) {
 		}
 		respond(w, 200, map[string]bool{"available": file != ""})
 	})
+	mux.HandleFunc("GET /api/transfer/recovery/download", func(w http.ResponseWriter, _ *http.Request) {
+		file, err := a.latestTransferBackup()
+		if err != nil {
+			saveError(w, err)
+			return
+		}
+		if file == "" {
+			problem(w, 404, "没有可导出的覆盖前备份。")
+			return
+		}
+		data, err := os.ReadFile(file)
+		if err != nil {
+			saveError(w, err)
+			return
+		}
+		download(w, studyFileMIME, transferFilename(time.Now()), data)
+	})
 	mux.HandleFunc("POST /api/transfer/windows/recovery", func(w http.ResponseWriter, _ *http.Request) {
 		_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 		file, err := a.latestTransferBackup()
@@ -408,7 +426,7 @@ func (a *application) transferRoutes(mux *http.ServeMux) {
 			problem(w, 500, err.Error())
 			return
 		}
-		download(w, "application/json", transferFilename(time.Now()), data)
+		download(w, studyFileMIME, transferFilename(time.Now()), data)
 	})
 	mux.HandleFunc("POST /api/transfer/preview", func(w http.ResponseWriter, r *http.Request) {
 		data, err := readTransfer(r.Body)

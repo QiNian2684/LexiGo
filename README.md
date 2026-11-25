@@ -1,14 +1,14 @@
-# LexiGo 3.5.5
+# LexiGo 3.5.6
 
 个人使用的英语词库与复习软件。支持 Windows 10/11 x64 和 Android 9 及以上。两端共用词典、SQLite 表结构、数据交换格式和复习逻辑。
 
 ## 使用
 
-Windows 运行对应版本的安装程序，先选择程序位置，再选择数据文件夹和桌面快捷方式。默认程序位置为 `%LOCALAPPDATA%\Programs\LexiGo`，默认数据文件夹为程序目录下的 `Data`。直接运行 `LexiGo.exe` 也可以使用便携模式。Windows 使用 WebView2 Runtime，窗口配置保存在数据目录的 `WebView2` 子目录。Android 安装 `LexiGo-Android-3.5.5.apk` 后打开「LexiGo」。运行无需安装 Go、Python 或数据库服务器。
+Windows 运行对应版本的安装程序，先选择程序位置，再选择数据文件夹和桌面快捷方式。默认程序位置为 `%LOCALAPPDATA%\Programs\LexiGo`，默认数据文件夹为程序目录下的 `Data`。直接运行 `LexiGo.exe` 也可以使用便携模式。Windows 使用 WebView2 Runtime，窗口配置保存在数据目录的 `WebView2` 子目录。Android 安装 `LexiGo-Android-3.5.6.apk` 后打开「LexiGo」。运行无需安装 Go、Python 或数据库服务器。
 
 启动时显示可滚动的使用手册。手册配有操作截图，涵盖添加单词、每日记忆与长期掌握、词库、统计、设置和备份迁移，并显示本平台的快捷键或手势。勾选「以后不再提示」并点「确认」后，可以从「设置 → 使用说明」随时重开。
 
-1. 在「添加单词」粘贴英文或通过「导入 TXT 文件」打开词表，点击「预览导入」，核对新增及重置数量，再确认。
+1. 在「添加单词」粘贴英文或通过「导入 CSV 文件」打开词表，点击「预览导入」，核对新增及重置数量，再确认。
 2. 在「复习」点击「开始复习」。Windows 的 Enter 展开释义，1 没记住，2 记住了。点「没记住」先保存一次遗忘并留在原卡片，同时禁用「直接完成今日记忆」。点「下一单词」或再按 1 只翻页。两颗作答按钮固定在底部。点卡片右上角的「直接完成今日记忆」可立即完成该词当天目标，展开或收起释义时都能使用。Android 在卡片正面向下滑可展开释义。展开后左滑可记住，记录遗忘后左滑只翻页。在复习页从左向右滑动可撤销上一次作答，回到上一词并展开释义，可以重新选择。手势可从卡片外开始。Windows 可点击「撤销上一次」或按 `Ctrl+Z`。通过导航离开复习时会保存已有进度。
 3. 展开卡片即可写多行个人备注。在「编辑卡片资料」可修改释义、例句等内容，停笔约 0.6 秒、失去焦点或完成编辑时自动保存。普通设置会在选择或填完有效数字后自动提交。
 4. 「词库管理」可搜索、排序、筛选、修改英文拼写和资料。Windows 把鼠标停在词条上、Android 长按词条，均可打开详情预览，也可从更多菜单选「预览词条」。删除会移入回收站。选择「提前复习」可查看已掌握卡片，选择「重新学习」会重置当天和长期进度。可选中多条或全选筛选结果，再批量处理。
@@ -49,13 +49,13 @@ Windows 运行对应版本的安装程序，先选择程序位置，再选择数
 
 ## 文件导入
 
-每批最多 1,000 项。纯英文可用英文逗号、中文逗号或换行分隔。内部空格允许出现在短语中，大小写和首尾空格在查重时忽略。TXT、CSV、JSON 用 UTF-8。导入新词时，文件中的完整资料优先于词典内容。再次导入已有词的作用是重新学习，原资料保留，更新内容可用编辑入口。
+「添加单词」页面下方可查看字段说明、复制示例、下载常用或完整模板。每批最多 1,000 项，文件最多 4 MiB。纯英文可用英文逗号、中文逗号或换行分隔。TXT、CSV、JSON 用 UTF-8。同批重复词保留第一条有效记录。导入新词时，已填写的资料优先于词典内容。再次导入已有词会重新学习，原资料、备注和历史保留。更新资料可用编辑入口。
 
-有表头的 CSV 可以使用以下格式。只有 `word` 是必填列，其他列可按需要提供。
+CSV 第一列为 `word` 或「单词」，其他列可省略或留空。含英文逗号的字段用英文双引号包裹。以下示例可直接粘贴到添加页面。
 
 ```csv
-word,meaning,pos,ipa,ipaUK,ipaUS,examples,exampleTranslation,etymology,collocations,note,personalNote
-crucial,至关重要的,形容词,,,,This is a crucial decision.,这是一个至关重要的决定。,,,,重点记住关键的
+word,meaning,pos,examples,exampleTranslation,etymology,note
+rewrite,重写；改写,v.,"After reading the feedback, she decided to rewrite the report.",看过反馈之后，她决定重写这份报告。,re-（再次）+ write（写）,想象收到反馈后把写错的句子重新写一遍。
 ```
 
 JSON 词表是对象数组，也可以用相同的字段名。
@@ -65,6 +65,8 @@ JSON 词表是对象数组，也可以用相同的字段名。
   {"word":"fiscal","meaning":"财政的","pos":"形容词","personalNote":"财政政策"}
 ]
 ```
+
+卡片展开后，「记忆联想」优先显示 `etymology`（词根词缀或词源）和 `note`（记忆技巧）。自动联想可在「更多联想」中查看，无自填资料时直接显示自动联想。`personalNote` 单独显示在「我的备注」。
 
 ## 查词策略与来源
 
@@ -96,12 +98,12 @@ JSON 词表是对象数组，也可以用相同的字段名。
 
 在「设置」点击「备份数据」可保存包括词条、备注、历史、回收站和设置的完整备份。「恢复备份」先要求确认覆盖范围，然后事务恢复。恢复前的快照写入 `Data\backups\before-restore.json`。旧版留有恢复前快照时，迁移也会尝试复制为 `Data\backups\legacy-before-restore.json`。
 
-日常词表交换可用「词库管理」里的 CSV 导出。本地备份以 `.lexi` 为后缀，内容仍是 JSON，请通过「恢复备份」加载。
+日常词表交换可用「词库管理」里的 CSV 导出。本地备份以 `.lexi` 为后缀，请通过「恢复备份」加载。旧版备份即使被保存为 `.learning` 或 `.json`，也可以按内容校验。
 
 ### 在 Windows 和 Android 间迁移
 
 1. 在当前设备打开「设置」。Windows 选择「导出数据」，Android 点击「导出数据」后选择「分享数据」或「保存到手机」。文件名使用本机时间，默认类似 `LexiGo-2026-11-20-09-07-03.lexi`。
-2. 自行把文件传到另一台设备。打开「设置 → 导入数据」，并选择 `.lexi` 文件。
+2. 自行把文件传到另一台设备。打开「设置 → 导入数据」，并选择 `.lexi` 文件。此前被系统改成 `.learning`、`.lexi.learning` 或 `.json` 的有效迁移文件也可导入。
 3. 检查生成时间、词条和今日任务摘要。选择「确认覆盖」后，程序自动备份接收端，再用文件中的完整状态替换接收端。想回到覆盖前的状态，可用同一入口导入这份自动快照。
 4. 换回原设备时，在正在使用的设备上重新导出最新文件，再在原设备导入。
 
@@ -119,7 +121,7 @@ Android 3.5.0 使用独立的包名和已保存的新发行签名，可与 3.3.1
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-脚本运行 Go 测试并生成便携版 `dist\LexiGo.exe` 和安装版 `dist\LexiGo-Setup-3.5.5.exe`。首次从源码构建需要取得 `go.mod` 和 `go.sum` 声明的依赖。已编入的词典、界面和应用图标无需重新下载。第三方依赖许可证见 `licenses/`，数据处理脚本在 `scripts/`。
+脚本运行 Go 测试并生成便携版 `dist\LexiGo.exe` 和安装版 `dist\LexiGo-Setup-3.5.6.exe`。首次从源码构建需要取得 `go.mod` 和 `go.sum` 声明的依赖。已编入的词典、界面和应用图标无需重新下载。第三方依赖许可证见 `licenses/`，数据处理脚本在 `scripts/`。
 
 也可用 `go test ./...` 单独测试核心规则。用 Python 3 运行 `python scripts/test_http.py 路径\LexiGo.exe` 可以在独立临时词库上测试离线工作流和中止进程后恢复。还可运行 `python scripts/test_portable.py .\dist\LexiGo.exe`，用独立临时目录验证 EXE 路径、移动后重新打开和隔离的旧库迁移。脚本经过 EXE 的 `--serve` 模式测试后端，WebView2 窗口的验证需在 Windows 上双击 EXE。
 
@@ -127,7 +129,7 @@ Android 的开发环境、签名方式和命令见 `android/README.md`。两端�
 
 ## GitHub 发行
 
-Android 和 Windows 共用一个发行标签，当前版本为 `v3.5.5`。公开附件为 Android APK、Windows Setup 和 Windows 便携版。Android 用户可直接使用 APK 覆盖安装同包名签名版本。
+Android 和 Windows 共用一个发行标签，当前版本为 `v3.5.6`。公开附件为 Android APK、Windows Setup 和 Windows 便携版。Android 用户可直接使用 APK 覆盖安装同包名签名版本。
 
 - 在主分支手动运行「LexiGo release」。两端并行构建。Android 使用 `LEXIGO_ANDROID_SIGNING` 并在 Android 16 验证全新安装及覆盖升级。Windows 在原生环境验证安装与便携数据。发布任务先验证草稿附件，公开后从下载地址匿名下载并核对三份附件的 SHA-256。发行说明列出 APK 的字节数及 SHA-256。
 - Android 构建产物保留 30 天。同版本 APK 下载异常时，运行「Repair Android release asset」，输入发行标签、该版本的发行运行编号和递增的附件修订号。任务使用同一标签提交的已验证 APK，上传到新的下载地址，重新下载校验后才撤下旧附件。

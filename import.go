@@ -41,76 +41,30 @@ type importInput struct {
 }
 
 func parseImport(input importInput) ([]importedWord, error) {
+	if len(input.Text) > 4<<20 {
+		return nil, errors.New("词表超过 4 MiB，请拆成多批。")
+	}
 	text := strings.TrimPrefix(input.Text, "\ufeff")
+	if (input.Format == "" || input.Format == "words") && strings.HasPrefix(strings.TrimSpace(text), "[") {
+		input.Format = "json"
+	}
 	var words []importedWord
 	switch input.Format {
 	case "json":
 		if err := json.Unmarshal([]byte(text), &words); err != nil || words == nil {
 			return nil, errors.New("词表 JSON 应为词条数组，如 [{\"word\":\"crucial\",\"meaning\":\"关键的\"}]。完整备份请在设置中恢复。")
 		}
-	case "csv":
-		reader := csv.NewReader(strings.NewReader(text))
-		reader.FieldsPerRecord = -1
-		first, err := reader.Read()
+	case "", "words", "csv":
+		parsed, err := parseWordCSV(text, input.Format == "csv")
 		if err != nil {
-			return nil, errors.New("CSV 为空或格式无效。")
+			return nil, err
 		}
-		if len(first) == 0 {
-			return nil, errors.New("CSV 中没有词条。")
-		}
-		if !strings.EqualFold(strings.TrimSpace(first[0]), "word") && strings.TrimSpace(first[0]) != "单词" {
-			input.Format = "words"
-			return parseImport(input)
-		}
-		headers := make([]string, len(first))
-		for i, header := range first {
-			headers[i] = normalizeHeader(header)
-		}
-		for {
-			row, err := reader.Read()
-			if err == io.EOF {
-				break
+		if parsed != nil {
+			words = parsed
+		} else {
+			for _, word := range splitWords(text) {
+				words = append(words, importedWord{Word: word})
 			}
-			if err != nil {
-				return nil, errors.New("CSV 有无法读取的行，请检查逗号和双引号。")
-			}
-			var item importedWord
-			for i, value := range row {
-				if i >= len(headers) {
-					break
-				}
-				switch headers[i] {
-				case "word":
-					item.Word = value
-				case "meaning":
-					item.Meaning = value
-				case "pos":
-					item.POS = value
-				case "ipa":
-					item.IPA = value
-				case "ipaUK":
-					item.IPAUK = value
-				case "ipaUS":
-					item.IPAUS = value
-				case "examples":
-					item.Examples = value
-				case "exampleTranslation":
-					item.ExampleTranslation = value
-				case "etymology":
-					item.Etymology = value
-				case "collocations":
-					item.Collocations = value
-				case "note":
-					item.Note = value
-				case "personalNote":
-					item.PersonalNote = value
-				}
-			}
-			words = append(words, item)
-		}
-	case "", "words":
-		for _, word := range splitWords(text) {
-			words = append(words, importedWord{Word: word})
 		}
 	default:
 		return nil, errors.New("请使用 TXT、CSV 或 JSON 词表。")
@@ -121,21 +75,155 @@ func parseImport(input importInput) ([]importedWord, error) {
 	return words, nil
 }
 
+func parseWordCSV(text string, declared bool) ([]importedWord, error) {
+	text = strings.TrimSpace(text)
+	line, _, multiline := strings.Cut(text, "\n")
+	if !multiline && !declared && !strings.ContainsAny(line, ",，;；\t") {
+		return nil, nil
+	}
+	// A recognizable spreadsheet header with the wrong separator is not a word list.
+	for _, separator := range []string{"，", ";", "；", "\t"} {
+		first, rest, found := strings.Cut(line, separator)
+		if found && normalizeHeader(first) == "word" &&
+			(declared || normalizeHeader(strings.SplitN(rest, separator, 2)[0]) != "") {
+			return nil, errors.New("CSV 表头请用英文半角逗号分隔，如 word,meaning。")
+		}
+	}
+
+	reader := csv.NewReader(strings.NewReader(text))
+	reader.FieldsPerRecord = -1
+	first, err := reader.Read()
+	if err == io.EOF {
+		if declared {
+			return nil, errors.New("CSV 中没有词条。")
+		}
+		return nil, nil
+	}
+	if err != nil {
+		if declared || normalizeHeader(strings.Trim(strings.SplitN(line, ",", 2)[0], "\" ")) == "word" {
+			return nil, errors.New("无法读取 CSV 表头，请检查英文逗号和双引号。")
+		}
+		return nil, nil
+	}
+	headers := make([]string, len(first))
+	for i, name := range first {
+		headers[i] = normalizeHeader(name)
+	}
+	hasDetails, misplacedWord := false, false
+	for _, column := range headers[1:] {
+		hasDetails = hasDetails || column != ""
+		misplacedWord = misplacedWord || column == "word"
+	}
+	if headers[0] != "word" {
+		// A CSV can also be a headerless word list. Leave unambiguous lists on
+		// the original path, without interpreting table cells as word entries.
+		wrongFirst := strings.ToLower(strings.TrimSpace(first[0]))
+		switch wrongFirst {
+		case "term", "headword", "vocabulary", "english", "words":
+			wrongFirst = "word"
+		}
+		if len(first) > 1 && (declared && (hasDetails || !plainWordList(text)) ||
+			multiline && hasDetails && (misplacedWord || headers[0] != "" || wrongFirst == "word" || !plainWordList(text))) {
+			return nil, errors.New("CSV 第一列的表头应为 word 或「单词」，其余列填写释义、词性等资料。")
+		}
+		return nil, nil
+	}
+	if !declared && !multiline && !hasDetails {
+		return nil, nil
+	}
+	seen := make(map[string]bool)
+	for _, column := range headers {
+		if column == "" {
+			continue
+		}
+		if seen[column] {
+			return nil, fmt.Errorf("CSV 表头中 %s 重复，每个字段只能有一列。", column)
+		}
+		seen[column] = true
+	}
+
+	var words []importedWord
+	for {
+		row, err := reader.Read()
+		if err == io.EOF {
+			if len(words) == 0 {
+				return nil, errors.New("CSV 只有表头，请从第二行填写词条。")
+			}
+			return words, nil
+		}
+		if err != nil {
+			var parseErr *csv.ParseError
+			if errors.As(err, &parseErr) {
+				return nil, fmt.Errorf("CSV 第 %d 行无法读取，请检查逗号和双引号。", parseErr.Line)
+			}
+			return nil, err
+		}
+		if len(row) > len(headers) {
+			line, _ := reader.FieldPos(0)
+			return nil, fmt.Errorf("CSV 第 %d 行的列数多于表头，字段内的英文逗号请用双引号包裹。", line)
+		}
+		if len(words) == 1000 {
+			return nil, errors.New("每批最多 1,000 项，请分批导入。")
+		}
+		var item importedWord
+		for i, value := range row {
+			if strings.TrimSpace(value) == "" {
+				continue
+			}
+			switch headers[i] {
+			case "word":
+				item.Word = value
+			case "meaning":
+				item.Meaning = value
+			case "pos":
+				item.POS = value
+			case "ipa":
+				item.IPA = value
+			case "ipaUK":
+				item.IPAUK = value
+			case "ipaUS":
+				item.IPAUS = value
+			case "examples":
+				item.Examples = value
+			case "exampleTranslation":
+				item.ExampleTranslation = value
+			case "etymology":
+				item.Etymology = value
+			case "collocations":
+				item.Collocations = value
+			case "note":
+				item.Note = value
+			case "personalNote":
+				item.PersonalNote = value
+			}
+		}
+		words = append(words, item)
+	}
+}
+
+func plainWordList(text string) bool {
+	for _, word := range splitWords(text) {
+		if _, _, valid := normalize(word); !valid {
+			return false
+		}
+	}
+	return true
+}
+
+var importColumns = map[string]string{
+	"word": "word", "单词": "word", "meaning": "meaning", "中文释义": "meaning", "释义": "meaning",
+	"pos": "pos", "词性": "pos", "ipa": "ipa", "音标": "ipa",
+	"ipauk": "ipaUK", "英式音标": "ipaUK", "ipaus": "ipaUS", "美式音标": "ipaUS",
+	"examples": "examples", "例句": "examples", "英文例句": "examples",
+	"exampletranslation": "exampleTranslation", "例句翻译": "exampleTranslation", "例句中文翻译": "exampleTranslation",
+	"etymology": "etymology", "词根词缀": "etymology", "词根和词缀": "etymology", "词源": "etymology",
+	"collocations": "collocations", "搭配": "collocations", "常见搭配": "collocations",
+	"note": "note", "记忆提示": "note", "记忆技巧": "note", "记忆联想": "note",
+	"personalnote": "personalNote", "备注": "personalNote", "个人备注": "personalNote", "我的备注": "personalNote",
+}
+
 func normalizeHeader(header string) string {
-	header = strings.TrimSpace(header)
-	aliases := map[string]string{
-		"单词": "word", "中文释义": "meaning", "词性": "pos", "音标": "ipa", "英式音标": "ipaUK",
-		"美式音标": "ipaUS", "例句": "examples", "例句翻译": "exampleTranslation",
-		"词根词缀": "etymology", "词源": "etymology", "搭配": "collocations", "记忆提示": "note",
-		"备注": "personalNote", "个人备注": "personalNote",
-	}
-	if result := aliases[header]; result != "" {
-		return result
-	}
-	if strings.EqualFold(header, "word") {
-		return "word"
-	}
-	return header
+	return importColumns[strings.ToLower(strings.TrimSpace(header))]
 }
 
 type importPreview struct {

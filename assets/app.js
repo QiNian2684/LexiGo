@@ -12,6 +12,8 @@ const swipeContent = el("swipe-content");
 const cardFront = swipeContent.querySelector(".card-front");
 const swipeCue = el("swipe-cue");
 const answerPanel = el("answer");
+const answerContent = answerPanel.firstElementChild;
+const revealIcon = el("reveal").querySelector(".icon");
 const voteDock = el("vote-dock");
 const voteActions = el("vote-actions");
 const barRaised = {transform: "translateY(0%)", opacity: 1};
@@ -49,7 +51,8 @@ let settingsDraft, settingsJob, settingsSaved;
 let savedNote = "";
 let noteClock = 0;
 let noteTimer;
-let fileFormat = "words";
+let wordFileRequest = 0;
+let wordFileFormat = "";
 let imported = [];
 let importPending = false;
 let listPage = 0;
@@ -266,28 +269,14 @@ function cardDetailSections(card, showIPA) {
     if (!sound.length && card.ipa) sound.push(ipa(card.ipa));
   }
   const meaning = group("中文释义", card.meaning, missing, "meaning");
-  if (card.memoryHint) {
-    const hint = document.createElement("p");
-    hint.className = "construction";
-    hint.textContent = "记忆联想：" + card.memoryHint;
-    meaning.append(hint);
-    if (card.moreMemory) {
-      const more = document.createElement("details");
-      more.className = "construction construction-details";
-      const title = document.createElement("summary");
-      title.textContent = "更多联想";
-      const content = document.createElement("p");
-      content.textContent = card.moreMemory;
-      more.append(title, content);
-      meaning.append(more);
-    }
-  }
+  const association = memorySection(card);
   const exampleSource = card.exampleBy || "";
   const machine = card.exampleTranslation && (card.exampleTranslationBy === "mymemory" ||
     card.exampleTranslationBy !== "manual" &&
       /^(simple-mt$|tatoeba-mt\||wiktionary-data\||simple-wikipedia\|)/.test(exampleSource));
   const fields = [
     meaning,
+    ...(association ? [association] : []),
     group("英文例句", card.examples, missing, "example"),
     group(machine ? "例句翻译（机译）" : "例句翻译", card.exampleTranslation,
       card.translationPending && state?.settings.online ? "等待联网补译。" : "暂无对应译文。", "translation"),
@@ -328,6 +317,55 @@ function cardDetailSections(card, showIPA) {
   return {fields, sound, sources};
 }
 
+function memorySection(card) {
+  const seen = new Set();
+  const unique = value => {
+    const text = value?.trim();
+    if (!text) return "";
+    const key = text.normalize("NFKC").replace(/\s+/g, " ");
+    if (seen.has(key)) return "";
+    seen.add(key);
+    return text;
+  };
+  const root = unique(card.etymology);
+  const note = unique(card.note);
+  const hint = unique(card.memoryHint);
+  const extra = unique(card.moreMemory);
+  const hasDetails = root || note;
+  const main = hasDetails ? "" : hint || extra;
+  if (!hasDetails && !main) return;
+  const association = document.createElement("div");
+  association.className = "detail-group memory-association";
+  const heading = document.createElement("h3");
+  heading.textContent = "记忆联想";
+  association.append(heading);
+  for (const [label, text] of [["词根词缀", root], ["记忆技巧", note], ["", main]]) {
+    if (!text) continue;
+    const line = document.createElement("p");
+    line.className = "construction";
+    if (label) {
+      const name = document.createElement("strong");
+      name.textContent = label + " · ";
+      line.append(name);
+    }
+    line.append(text);
+    association.append(line);
+  }
+  const supplement = hasDetails ? [hint, extra].filter(Boolean).join("\n") : hint && extra;
+  if (supplement) {
+    const more = document.createElement("details");
+    more.className = "construction-details";
+    const title = document.createElement("summary");
+    title.textContent = "更多联想";
+    const content = document.createElement("p");
+    content.className = "construction";
+    content.textContent = supplement;
+    more.append(title, content);
+    association.append(more);
+  }
+  return association;
+}
+
 function renderDetails(card) {
   const {fields, sound, sources} = cardDetailSections(card, state?.settings.showIPA);
   sources.append(button("编辑卡片资料", async () => {
@@ -344,8 +382,7 @@ async function refreshRevealedDetails() {
   const before = revealed;
   if (!before) return;
   const result = await api("/api/card/" + keyPath(before.key));
-  if (revealed === before && (result.lookup !== before.lookup ||
-      result.exampleTranslation !== before.exampleTranslation || result.translationPending !== before.translationPending)) {
+  if (revealed === before && ["lookup", "translationPending", ...editFields].some(key => result[key] !== before[key])) {
     revealed = result;
     renderDetails(result);
   }
@@ -407,30 +444,40 @@ function syncVoteBar(timing) {
   }).catch(() => {});
 }
 
+function settleAnswerMotion(expanded) {
+  answerPanel.hidden = !expanded;
+  for (const animation of answerAnimation || []) animation.cancel();
+  answerAnimation = undefined;
+}
+
 function setAnswerExpanded(expanded, animate = true) {
   const changed = answerExpanded() !== expanded;
-  const timing = changed && animate ? reviewTiming(expanded ? "--motion-answer" : "--motion") : undefined;
+  if (!changed && animate) return;
+  const timing = changed && animate ? reviewTiming("--motion-answer") : undefined;
   const visible = {opacity: 1, transform: "translateY(0)"};
   const concealed = {opacity: 0, transform: "translateY(-5px)"};
-  const from = timing && answerAnimation ? currentMotionFrame(answerPanel) : expanded ? concealed : visible;
+  const from = timing && answerAnimation ? currentMotionFrame(answerContent) : expanded ? concealed : visible;
+  const height = timing && !answerPanel.hidden ? answerPanel.getBoundingClientRect().height : 0;
+  const rotation = timing && getComputedStyle(revealIcon).transform;
 
-  answerAnimation?.cancel();
-  answerAnimation = undefined;
+  settleAnswerMotion(expanded || !!timing);
   answerPanel.setAttribute("aria-hidden", String(!expanded));
   answerPanel.inert = !expanded;
   el("reveal").setAttribute("aria-expanded", String(expanded));
   el("reveal-label").textContent = expanded ? "收起释义" : "查看中文释义";
+  if (expanded) fitNote();
   if (timing) {
-    answerPanel.hidden = false;
-    const motion = playReviewMotion(answerPanel, [from, expanded ? visible : concealed], timing);
-    answerAnimation = motion;
-    motion.finished.then(() => {
-      if (answerAnimation !== motion) return;
-      answerPanel.hidden = !expanded;
-      motion.cancel();
-      answerAnimation = undefined;
+    const target = expanded ? answerPanel.getBoundingClientRect().height : 0;
+    const motions = [
+      playReviewMotion(answerPanel, [{height: height + "px"}, {height: target + "px"}], timing),
+      playReviewMotion(answerContent, [from, expanded ? visible : concealed], timing),
+      playReviewMotion(revealIcon, [{transform: rotation}, {transform: expanded ? "rotate(180deg)" : "rotate(0deg)"}], timing),
+    ];
+    answerAnimation = motions;
+    motions[0].finished.then(() => {
+      if (answerAnimation === motions) settleAnswerMotion(expanded);
     }).catch(() => {});
-  } else answerPanel.hidden = !expanded;
+  }
   syncVoteBar(timing);
 }
 
@@ -462,7 +509,6 @@ async function toggleReveal({animate = true, duringSlide = false} = {}) {
       renderDetails(card);
     }
     setAnswerExpanded(true, animate);
-    fitNote();
     renderReview();
   } catch (error) {
     if (intent === viewRequest && request === revealRequest) showError(error);
@@ -615,12 +661,14 @@ async function slideReview({offset = 0, reversing = false, passToday = false} = 
   const exitTiming = reviewTiming("--motion-card-out", "--motion-card-ease");
   const distance = exitTiming && !flashcard.hidden ? swipeContent.clientWidth : 0;
   const barWasVisible = mobile && !voteDock.hidden;
+  const interruptedAnswer = answerAnimation;
   const emptyPanel = el("review-empty");
   let outgoing, outgoingBar, completed;
   swiping = true;
   updateReviewControls();
   try {
     if (distance) {
+      for (const animation of interruptedAnswer || []) animation.pause();
       const exit = direction * Math.max(distance, Math.abs(offset) + 24);
       outgoing = playReviewMotion(swipeContent, [
         {transform: `translateX(${offset}px)`, opacity: 1},
@@ -663,6 +711,9 @@ async function slideReview({offset = 0, reversing = false, passToday = false} = 
     outgoing?.cancel();
     resetReviewSlide();
     swiping = false;
+    if (interruptedAnswer === answerAnimation) {
+      for (const animation of interruptedAnswer || []) animation.play();
+    }
     settleVoteBar(wantsVoteBar());
     updateReviewControls();
   }
@@ -708,7 +759,10 @@ async function displayView(next, {intent, top = 0, prepare, focus} = {}) {
     if (previous !== next && shell.contains(document.activeElement)) document.activeElement.blur();
     view = next;
     document.body.dataset.view = next;
-    if (next !== "review") settleVoteBar(false);
+    if (next !== "review") {
+      settleAnswerMotion(answerExpanded());
+      settleVoteBar(false);
+    }
     for (const id of views) el(id + "-view").hidden = id !== next;
     prepare?.();
     for (const item of navigationButtons) {
@@ -1295,10 +1349,12 @@ async function retryOne() {
 async function submitWords(event) {
   event.preventDefault();
   const input = el("add-input");
-  const payload = {text: input.value, format: fileFormat};
+  const intent = wordFileRequest;
+  const payload = {text: input.value, format: wordFileFormat};
   el("add-submit").disabled = true;
   try {
     const plan = await api("/api/import-preview", payload);
+    if (intent !== wordFileRequest || payload.text !== input.value) return;
     const numbers = `解析 ${plan.total} 项 · 新增 ${plan.new} · 重置 ${plan.reset} · 批内重复 ${plan.duplicates} · 无效 ${plan.invalid.length}`;
     if (!plan.new && !plan.reset) {
       message("import-status", numbers + (plan.invalid.length ? "\n请检查：" + plan.invalid.slice(0, 8).join("、") : ""));
@@ -1309,17 +1365,20 @@ async function submitWords(event) {
       "复习进度清零，资料、备注和历史保留。");
     if (plan.invalid.length) parts.push("将跳过无效项：" + plan.invalid.slice(0, 8).join("、"));
     ask("确认批量导入", parts.join("\n"), "确认导入", async () => {
+      if (intent !== wordFileRequest || payload.text !== input.value) throw new Error("词表已变化，请重新预览。");
       const result = await api("/api/import", {...payload, token: plan.token});
       imported = result.keys;
-      if (input.value === payload.text) {
+      if (intent === wordFileRequest && input.value === payload.text) {
         input.value = "";
-        fileFormat = "words";
+        clearWordFile();
       }
       message("import-status");
       await updateImportStatus();
       await refreshState();
     });
-  } catch (error) { message("import-status", error.message); }
+  } catch (error) {
+    if (intent === wordFileRequest) message("import-status", error.message);
+  }
   finally { el("add-submit").disabled = false; }
 }
 
@@ -1343,17 +1402,48 @@ async function readWordFile(event) {
   const file = event.target.files[0];
   event.target.value = "";
   if (!file) return;
+  const intent = ++wordFileRequest;
   if (file.size > 4 << 20) {
     message("import-status", "词表文件过大，请拆成多批。");
     return;
   }
   try {
     const value = new TextDecoder("utf-8", {fatal: true}).decode(await file.arrayBuffer());
+    if (intent !== wordFileRequest) return;
     const extension = file.name.toLowerCase().split(".").pop();
-    fileFormat = ["csv", "json"].includes(extension) ? extension : "words";
+    wordFileFormat = ["csv", "json"].includes(extension) ? extension : "";
     el("add-input").value = value;
     message("import-status");
-  } catch { message("import-status", "请将词表另存为 UTF-8 编码，再重新读取。"); }
+    message("word-file-status", `已读取 ${file.name}`);
+  } catch {
+    if (intent === wordFileRequest) message("import-status", "请将词表另存为 UTF-8 编码，再重新读取。");
+  }
+}
+
+function clearWordFile() {
+  wordFileRequest++;
+  wordFileFormat = "";
+  message("word-file-status");
+  message("import-status");
+}
+
+async function copyCSVExample() {
+  const sample = el("csv-example");
+  try {
+    await navigator.clipboard.writeText(sample.textContent);
+  } catch {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(sample);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    if (!document.execCommand("copy")) {
+      message("csv-template-status", "已选中示例，可用系统复制操作。");
+      return;
+    }
+    selection.removeAllRanges();
+  }
+  message("csv-template-status", "已复制 CSV 示例。");
 }
 
 async function refreshStats() {
@@ -1585,6 +1675,11 @@ async function pickTransfer(kind) {
     window.WordReviewFiles.pickFile(kind, "");
     return;
   }
+  if (!windowsReview) {
+    if (opening) el("transfer-file").click();
+    else window.location.assign(kind === "recovery" ? "/api/transfer/recovery/download" : "/api/transfer/export");
+    return;
+  }
   const trigger = el("transfer-" + kind);
   trigger.disabled = true;
   try {
@@ -1621,7 +1716,7 @@ if (mobile) {
     return false;
   };
   window.wordReviewFileResult = (kind, data, error) => {
-    const target = kind === "csv" ? "error" : "settings-status";
+    const target = kind === "template" ? "csv-template-status" : kind === "csv" ? "error" : "settings-status";
     if (error) {
       message(target, error);
       return;
@@ -1634,9 +1729,25 @@ if (mobile) {
         changeView("settings").then(() => {
           if (view === "settings") showTransferPreview(result);
         });
+      } else if (result.warning || result.filename) {
+        message(target, result.warning || `已保存 ${result.filename}。`);
+      } else if (kind === "template") {
+        message(target, "已保存 CSV 模板。");
       }
     } catch (e) { message(target, e.message); }
   };
+}
+
+async function readTransferFile(event) {
+  const file = event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  try {
+    const data = await api("/api/transfer/preview", undefined, {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: file,
+    });
+    if (view === "settings") showTransferPreview(data);
+  } catch (error) { message("settings-status", error.message); }
 }
 
 async function restoreFile(event) {
@@ -1646,6 +1757,9 @@ async function restoreFile(event) {
   try {
     if (file.size > 124 << 20) throw new Error("备份文件过大。");
     const backup = JSON.parse(await file.text());
+    if (backup?.format === "wordreview.learning-state") {
+      throw new Error("这是跨设备学习数据，请使用「导入数据」。");
+    }
     ask("覆盖当前词库？", "恢复会替换现有词条、备注、学习历史和设置。程序会先在本地自动保存一份恢复前备份。", "确认覆盖", async () => {
       await api("/api/restore", backup);
       await showRestored();
@@ -2006,6 +2120,7 @@ if (mobile && window.WordReviewFiles) {
   exportData.onclick = () => pickTransfer("export");
 }
 el("transfer-import").onclick = () => pickTransfer("import");
+el("transfer-file").onchange = readTransferFile;
 el("transfer-recovery").onclick = () => pickTransfer("recovery");
 el("download-backup").onclick = event => {
   if (window.WordReviewFiles) {
@@ -2060,9 +2175,22 @@ el("edit-form").addEventListener("focusout", event => {
 el("retry-one").onclick = retryOne;
 el("action-form").onsubmit = confirmAction;
 el("add-form").onsubmit = submitWords;
-el("pick-txt").onclick = () => el("txt-file").click();
-el("txt-file").onchange = readWordFile;
-el("add-input").oninput = () => { if (!el("add-input").value.trim()) fileFormat = "words"; };
+el("pick-word-file").onclick = () => el("word-file").click();
+el("word-file").onchange = readWordFile;
+el("add-input").oninput = clearWordFile;
+el("copy-csv-example").onclick = () => copyCSVExample();
+for (const template of all("[data-csv-template]")) {
+  template.onclick = event => {
+    message("csv-template-status");
+    if (window.WordReviewFiles) {
+      event.preventDefault();
+      window.WordReviewFiles.pickFile("template", template.dataset.csvTemplate);
+    } else if (windowsReview) {
+      event.preventDefault();
+      api(template.getAttribute("href") + "/windows", {}).catch(error => message("csv-template-status", error.message));
+    }
+  };
+}
 document.addEventListener("keydown", keyboard);
 function flushOnHide() {
   commitFocusedSetting();

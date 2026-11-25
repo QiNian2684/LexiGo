@@ -49,9 +49,10 @@ def start(directory):
         process.kill()
         process.wait()
         raise
-    def call(path, body=None, raw=False, expect=200):
+    def call(path, body=None, raw=False, expect=200, attachment=None):
         headers = {'Origin': host, 'Content-Type': 'application/json'} if body is not None else {}
-        req = urllib.request.Request(host+path, data=None if body is None else json.dumps(body).encode(), headers=headers)
+        payload = body if isinstance(body, bytes) else None if body is None else json.dumps(body).encode()
+        req = urllib.request.Request(host+path, data=payload, headers=headers)
         try:
             result = agent.open(req,timeout=20)
         except urllib.error.HTTPError as failure:
@@ -59,6 +60,10 @@ def start(directory):
         with result:
             content=result.read()
             assert result.status == expect, (path, result.status, content)
+            if attachment:
+                mime, filename = attachment
+                assert result.headers.get_content_type() == mime, result.headers
+                assert result.headers.get_filename().endswith(filename), result.headers
             return content if raw else json.loads(content)
     def load(text, fmt='words'):
         payload={'text':text,'format':fmt}
@@ -131,3 +136,46 @@ with tempfile.TemporaryDirectory() as temp:
         process.kill()
         process.wait()
 print('HTTP end-to-end PASS: offline settings, import preview, reimport, notes, answer/retry/undo, statistics, rename, history, CSV, trash, full backup/restore, killed-process recovery and SQLite integrity.')
+
+with tempfile.TemporaryDirectory() as temp:
+    process, call, load, _ = start(Path(temp))
+    try:
+        call('/api/settings', {'goal': 4, 'dailyGoal': 3, 'limit': 30, 'online': False, 'rollover': '00:00'})
+        common = call('/api/csv-template/common', raw=True, attachment=('text/csv', 'LexiGo-template-common.csv'))
+        full = call('/api/csv-template/full', raw=True, attachment=('text/csv', 'LexiGo-template-full.csv'))
+        assert common.startswith(b'\xef\xbb\xbf') and full.startswith(b'\xef\xbb\xbf')
+        entries = list(csv.DictReader(io.StringIO(full.decode('utf-8-sig'))))
+        assert len(entries) == 1 and entries[0]['word'] == 'rewrite' and len(entries[0]) == 12
+        assert load(full.decode('utf-8-sig'), '')['new'] == 1
+        saved = call('/api/card/rewrite')
+        for field, value in entries[0].items():
+            assert saved[field] == value, (field, saved[field], value)
+        duplicate = load(common.decode('utf-8-sig'), 'csv')
+        assert (duplicate['new'], duplicate['reset']) == (2, 1)
+        edited = call('/api/card/rewrite', {'note': '写错一句，整句重写。', 'etymology': 're- 再次 + write 写'})
+        assert edited['note'] == '写错一句，整句重写。'
+        assert edited['personalNote'] == saved['personalNote']
+        csv_data = call('/api/export', {'all': True}, raw=True)
+        exported = list(csv.DictReader(io.StringIO(csv_data.decode('utf-8-sig'))))
+        assert next(row['note'] for row in exported if row['word'] == 'rewrite') == edited['note']
+
+        study_mime = ('application/octet-stream', '.lexi')
+        transfer = call('/api/transfer/export', raw=True, attachment=study_mime)
+        backup = call('/api/backup', raw=True, attachment=study_mime)
+        assert '恢复备份' in call('/api/transfer/preview', backup, expect=400)['error']
+        assert '完整性校验失败' in call('/api/transfer/preview', transfer.replace(b'rewrite', b'rewrite again', 1), expect=400)['error']
+        assert '导入数据' in call('/api/restore', transfer, expect=400)['error']
+        call('/api/card/rewrite', {'note': '本机的新记法'})
+        overview = call('/api/transfer/preview', transfer)
+        assert overview['words'] == 3
+        call('/api/transfer/commit', {'token': overview['token']})
+        assert call('/api/card/rewrite')['note'] == edited['note']
+        assert call('/api/transfer/recovery')['available']
+        recovery = call('/api/transfer/recovery/download', raw=True, attachment=study_mime)
+        assert call('/api/transfer/preview', recovery)['words'] == 3
+        call('/api/restore', backup)
+        assert call('/api/card/rewrite')['personalNote'] == saved['personalNote']
+    finally:
+        process.kill()
+        process.wait()
+print('HTTP CSV and study data PASS: UTF-8 templates, full fields, duplicate preservation, edit, CSV export, transfer integrity, recovery, and backup.')

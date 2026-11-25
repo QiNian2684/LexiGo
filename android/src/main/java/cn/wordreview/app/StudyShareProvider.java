@@ -15,7 +15,7 @@ import java.util.List;
 
 /** Read-only provider scoped to generated share files in the private cache. */
 public final class StudyShareProvider extends ContentProvider {
-    private static final String JSON = "application/json";
+    static final String FILE_MIME = "application/octet-stream";
     static final String FILE_EXTENSION = ".lexi";
     static final long KEEP_MILLIS = 3L * 24 * 60 * 60 * 1000;
 
@@ -45,7 +45,7 @@ public final class StudyShareProvider extends ContentProvider {
         return file.isFile() ? file : null;
     }
 
-    @Override public String getType(Uri uri) { return JSON; }
+    @Override public String getType(Uri uri) { return FILE_MIME; }
 
     @Override public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
         File file = resolve(uri);

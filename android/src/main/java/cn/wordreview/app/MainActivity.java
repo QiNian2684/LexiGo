@@ -11,6 +11,7 @@ import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.Voice;
@@ -35,7 +36,6 @@ import org.json.JSONException;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -375,12 +375,34 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
         return "LexiGo-" + time + StudyShareProvider.FILE_EXTENSION;
     }
 
-    private boolean isStudyDocument(Uri uri) {
-        String name = uri.getLastPathSegment();
+    private String documentName(Uri uri) {
         try (Cursor cursor = getContentResolver().query(uri, new String[] {OpenableColumns.DISPLAY_NAME}, null, null, null)) {
-            if (cursor != null && cursor.moveToFirst() && !cursor.isNull(0)) name = cursor.getString(0);
+            if (cursor != null && cursor.moveToFirst() && !cursor.isNull(0)) return cursor.getString(0);
+        } catch (RuntimeException ignored) {}
+        return null;
+    }
+
+    private static boolean hasStudySuffix(String name) {
+        return name != null && name.toLowerCase(java.util.Locale.ROOT).endsWith(StudyShareProvider.FILE_EXTENSION) &&
+            !name.matches("(?i).+\\.(?:lexi|learning|json)\\.lexi$");
+    }
+
+    private String savedStudyDocument(Uri uri) {
+        String name = documentName(uri);
+        if (name != null && !hasStudySuffix(name) && DocumentsContract.isDocumentUri(this, uri)) {
+            String stem = name.replaceFirst("(?i)(?:\\.(?:lexi|learning|json|bin|octet-stream))+$", "");
+            String corrected = stem.trim().isEmpty() ? studyFilename() : stem + StudyShareProvider.FILE_EXTENSION;
+            try {
+                Uri renamed = DocumentsContract.renameDocument(getContentResolver(), uri, corrected);
+                if (renamed != null) name = documentName(renamed);
+            } catch (IOException | RuntimeException ignored) {
+                // Some providers let apps create and write documents, but do not allow renaming.
+            }
         }
-        return name != null && name.toLowerCase(java.util.Locale.ROOT).endsWith(StudyShareProvider.FILE_EXTENSION);
+        if (hasStudySuffix(name)) return "{\"ok\":true,\"filename\":" + JSONObject.quote(name) + "}";
+        String warning = name == null ? "文件已保存，请在文件管理器中核对名称是否以 .lexi 结尾。"
+            : "已保存为 " + name + "。此保存位置未保留 .lexi 后缀，LexiGo 仍可按文件内容读取。";
+        return "{\"ok\":true,\"warning\":" + JSONObject.quote(warning) + "}";
     }
 
     private void pruneShares() {
@@ -417,7 +439,7 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
                 runOnUiThread(() -> {
                     preparingShare = false;
                     if (isDestroyed() || !visible) return;
-                    Intent send = new Intent(Intent.ACTION_SEND).setType("application/json")
+                    Intent send = new Intent(Intent.ACTION_SEND).setType(StudyShareProvider.FILE_MIME)
                         .putExtra(Intent.EXTRA_STREAM, uri)
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                     send.setClipData(ClipData.newUri(getContentResolver(), "LexiGo学习数据", uri));
@@ -444,14 +466,6 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
             shareStudyData();
             return;
         }
-        if ("recovery".equals(kind)) {
-            File latest = latestRecovery();
-            if (latest == null) {
-                sendResult(kind, null, "还没有覆盖前自动备份。");
-                return;
-            }
-            body = latest.getName();
-        }
         String csvFilename = null;
         if ("csv".equals(kind)) {
             try {
@@ -466,17 +480,20 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
                 sendResult(kind, null, "CSV 导出范围无效。");
                 return;
             }
+        } else if ("template".equals(kind)) {
+            if (!"common".equals(body) && !"full".equals(body)) return;
+            csvFilename = "LexiGo-template-" + body + ".csv";
         }
         operation = new Operation(kind, body);
         Intent selector;
         if ("import".equals(kind)) {
             selector = document(Intent.ACTION_OPEN_DOCUMENT, "*/*");
-        } else if ("csv".equals(kind)) {
+        } else if (csvFilename != null) {
             selector = document(Intent.ACTION_CREATE_DOCUMENT, "text/csv");
             selector.putExtra(Intent.EXTRA_TITLE, csvFilename);
         } else {
-            // An explicit JSON MIME type may make document providers append .json to the title.
-            selector = document(Intent.ACTION_CREATE_DOCUMENT, "application/vnd.lexigo.learning");
+            // Use a neutral MIME type so document providers can keep the requested suffix.
+            selector = document(Intent.ACTION_CREATE_DOCUMENT, StudyShareProvider.FILE_MIME);
             selector.putExtra(Intent.EXTRA_TITLE, studyFilename());
         }
         try {
@@ -541,23 +558,17 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
     }
 
     private String processDocument(Operation op, Uri uri, Uri base, String cookie, OutputStream privateOutput) throws IOException {
-        if ("import".equals(op.kind) && !isStudyDocument(uri)) {
-            throw new IOException("请选择扩展名为 .lexi 的 LexiGo 学习数据文件。");
-        }
-        if ("recovery".equals(op.kind)) {
-            if (!op.body.matches("before-transfer-[0-9TZ.]+\\.json")) throw new IOException("备份文件名无效。");
-            File file = new File(recoveryDirectory(), op.body);
-            try (InputStream response = new FileInputStream(file)) {
-                writeDocument(uri, response);
-            }
-            return "{\"ok\":true}";
-        }
         String endpoint;
         switch (op.kind) {
         case "import": endpoint = "/api/transfer/preview"; break;
         case "export": endpoint = "/api/transfer/export"; break;
         case "backup": endpoint = "/api/backup"; break;
+        case "recovery": endpoint = "/api/transfer/recovery/download"; break;
         case "csv": endpoint = "/api/export"; break;
+        case "template":
+            if (!"common".equals(op.body) && !"full".equals(op.body)) throw new IOException("CSV 模板无效。");
+            endpoint = "/api/csv-template/" + op.body;
+            break;
         default: throw new IOException("文件操作不受支持。");
         }
         String origin = "http://127.0.0.1:" + base.getPort();
@@ -599,26 +610,12 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
                 if ("import".equals(op.kind)) return text(response);
                 if (privateOutput == null) writeDocument(uri, response);
                 else copy(response, privateOutput, MAX_FILE);
-                return "{\"ok\":true}";
             }
+            boolean studyDocument = "export".equals(op.kind) || "backup".equals(op.kind) || "recovery".equals(op.kind);
+            return privateOutput == null && studyDocument ? savedStudyDocument(uri) : "{\"ok\":true}";
         } finally {
             connection.disconnect();
         }
-    }
-
-    private File recoveryDirectory() {
-        return new File(getFilesDir(), "StudyData/backups");
-    }
-
-    private File latestRecovery() {
-        File[] files = recoveryDirectory().listFiles((dir, name) -> name.matches("before-transfer-[0-9TZ.]+\\.json"));
-        File latest = null;
-        if (files != null) {
-            for (File file : files) {
-                if (file.isFile() && (latest == null || file.getName().compareTo(latest.getName()) > 0)) latest = file;
-            }
-        }
-        return latest;
     }
 
     private void writeDocument(Uri uri, InputStream response) throws IOException {
@@ -670,7 +667,7 @@ public final class MainActivity extends Activity implements LocalEngine.Listener
 
         @JavascriptInterface public void pickFile(String kind, String body) {
             if (!"import".equals(kind) && !"export".equals(kind) && !"backup".equals(kind) &&
-                    !"csv".equals(kind) && !"recovery".equals(kind) && !"share".equals(kind)) return;
+                    !"csv".equals(kind) && !"template".equals(kind) && !"recovery".equals(kind) && !"share".equals(kind)) return;
             if (body == null || body.length() > 1000000) return;
             runOnUiThread(() -> pick(kind, body));
         }

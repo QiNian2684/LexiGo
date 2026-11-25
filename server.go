@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"net/http"
@@ -61,6 +62,12 @@ var favicon []byte
 
 //go:embed assets/guide/*.webp
 var guideImages embed.FS
+
+//go:embed assets/templates/LexiGo-template-common.csv
+var commonCSVTemplate []byte
+
+//go:embed assets/templates/LexiGo-template-full.csv
+var fullCSVTemplate []byte
 
 //go:embed licenses/*.txt
 var licenseFiles embed.FS
@@ -345,7 +352,9 @@ func (a *application) handler() http.Handler {
 			_, _ = w.Write(data)
 		}
 	}
-	page := indexHTML
+	sample := strings.TrimRight(strings.TrimPrefix(string(commonCSVTemplate), "\ufeff"), "\r\n")
+	page := bytes.Replace(indexHTML, []byte("<code data-csv-sample></code>"),
+		[]byte("<code>"+html.EscapeString(sample)+"</code>"), 1)
 	if a.mobile {
 		page = bytes.Replace(page, []byte("</head>"), []byte("<link rel=\"stylesheet\" href=\"/android.css\"></head>"), 1)
 		page = bytes.Replace(page, []byte("<body "), []byte("<body class=\"platform-android\" "), 1)
@@ -759,13 +768,22 @@ func (a *application) handler() http.Handler {
 			saveWindowsFile(w, a.csvFilename(), ".csv", func() ([]byte, error) { return a.exportCSV(req) })
 		}
 	})
+	for kind, data := range map[string][]byte{"common": commonCSVTemplate, "full": fullCSVTemplate} {
+		name := "LexiGo-template-" + kind + ".csv"
+		mux.HandleFunc("GET /api/csv-template/"+kind, func(w http.ResponseWriter, _ *http.Request) {
+			download(w, "text/csv; charset=utf-8", name, data)
+		})
+		mux.HandleFunc("POST /api/csv-template/"+kind+"/windows", func(w http.ResponseWriter, _ *http.Request) {
+			saveWindowsFile(w, name, ".csv", func() ([]byte, error) { return data, nil })
+		})
+	}
 	mux.HandleFunc("GET /api/backup", func(w http.ResponseWriter, _ *http.Request) {
 		data, err := a.backupBytes()
 		if err != nil {
 			saveError(w, err)
 			return
 		}
-		download(w, "application/json", transferFilename(time.Now()), data)
+		download(w, studyFileMIME, transferFilename(time.Now()), data)
 	})
 	mux.HandleFunc("POST /api/backup/windows", func(w http.ResponseWriter, _ *http.Request) {
 		saveWindowsFile(w, transferFilename(time.Now()), studyFileExt, a.backupBytes)
