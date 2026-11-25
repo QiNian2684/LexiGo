@@ -1,4 +1,5 @@
 """Exercise a built program in a temporary portable folder, without touching user data."""
+from contextlib import closing
 import datetime
 import http.cookiejar
 import json
@@ -21,7 +22,7 @@ exe = Path(sys.argv[1]).resolve(strict=True)
 def legacy_fixture(path, word):
     path.parent.mkdir(parents=True, exist_ok=True)
     day = str((datetime.datetime.now() - datetime.timedelta(hours=5)).date())
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db, db:
         db.executescript("""
           CREATE TABLE IF NOT EXISTS meta (id INTEGER PRIMARY KEY, body BLOB NOT NULL);
           CREATE TABLE IF NOT EXISTS cards (key TEXT PRIMARY KEY, body BLOB NOT NULL);
@@ -126,7 +127,7 @@ with tempfile.TemporaryDirectory(prefix="wordreview-portable-") as temp:
         if sys.platform == "win32":
             assert "两处文件都已保留" in api("/api/storage")["notice"]
             assert api("/api/card/migration")["personalNote"] == "迁移备注"
-            with sqlite3.connect(old_db) as untouched:
+            with closing(sqlite3.connect(old_db)) as untouched:
                 assert untouched.execute("SELECT key FROM cards").fetchone()[0] == "different"
         exit_program(process, api)
     finally:

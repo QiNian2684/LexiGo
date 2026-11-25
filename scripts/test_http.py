@@ -1,3 +1,4 @@
+from contextlib import closing
 import csv
 import http.cookiejar
 import io
@@ -124,7 +125,7 @@ with tempfile.TemporaryDirectory() as temp:
         assert call('/api/state')['due']==1
         assert call('/api/card/solar%20flare')['personalNote']=='天文'
         assert call('/api/card/crucial')['personalNote']=='备注\n本地持久化'
-        with sqlite3.connect(directory/'vocabulary.db') as db:
+        with closing(sqlite3.connect(directory / 'vocabulary.db')) as db:
             assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
     finally:
         process.kill()
