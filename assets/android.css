@@ -86,6 +86,7 @@ body.platform-android {
 .platform-android .study-summary { min-width: 5.2rem; max-width: 8rem; align-self: flex-start; margin-top: .22rem; font-size: .78rem; }
 .platform-android #session-tools, .platform-android .card-actions kbd, .platform-android .desktop-data-copy { display: none; }
 .platform-android .card-front { min-height: 0; padding: 2rem .92rem 1.25rem; row-gap: .64rem; }
+.platform-android .answer-panel { min-height: .625rem; }
 .platform-android .english-word { font-size: clamp(2.3rem, 10.6vw, 3.9rem); }
 .platform-android .english-word.long-word { font-size: clamp(1.85rem, 8vw, 2.95rem); }
 .platform-android .streak { font-size: .81rem; }
@@ -101,11 +102,8 @@ body.platform-android {
 .platform-android #card-metadata { margin-block: .8rem; }
 .platform-android[data-view="review"],
 .platform-android[data-view="review"] .shell { touch-action: pan-y pinch-zoom; }
-/* On the closed front, reserve a downward drag while leaving upward scroll and pinch to WebView. */
-.platform-android .card-front[data-swipe-reveal] {
-  touch-action: pinch-zoom;
-  touch-action: pan-down pinch-zoom;
-}
+/* Reserve a downward drag across the scroller, including its empty space. */
+.platform-android[data-view="review"] .shell[data-swipe-reveal] { touch-action: pan-down pinch-zoom; }
 .platform-android .swipe-content { position: relative; }
 .platform-android .review-card { position: relative; overflow-x: clip; overflow-y: visible; }
 .platform-android .swipe-cue {

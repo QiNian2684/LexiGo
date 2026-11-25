@@ -328,7 +328,7 @@ body:not(.platform-android) .swipe-cue { display: none; }
 #reveal[aria-expanded="true"] .icon { transform: rotate(180deg); }
 .select-control > button[aria-expanded="true"] .icon:last-child { transform: rotate(180deg); }
 
-.answer-panel { display: flow-root; overflow: clip; overflow-anchor: none; }
+.answer-panel { display: flow-root; min-height: 0; overflow: clip; overflow-anchor: none; }
 .answer {
   display: grid;
   grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr);

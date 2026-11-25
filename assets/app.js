@@ -15,12 +15,12 @@ const cardFront = swipeContent.querySelector(".card-front");
 const swipeCue = el("swipe-cue");
 const answerPanel = el("answer");
 const answerContent = answerPanel.firstElementChild;
-const revealIcon = el("reveal").querySelector(".icon");
+const revealButton = el("reveal");
+const revealIcon = revealButton.querySelector(".icon");
 const voteDock = el("vote-dock");
 const voteActions = el("vote-actions");
 const barRaised = {transform: "translateY(0%)", opacity: 1};
 const barLowered = {transform: "translateY(100%)", opacity: 0};
-const barLeaving = {transform: "translateY(62%)", opacity: .25};
 const navigation = document.querySelector(".nav");
 const navigationButtons = [...navigation.querySelectorAll("button[data-view]")];
 const navigationIndicator = navigation.querySelector(".nav-indicator");
@@ -173,7 +173,6 @@ function renderReview() {
   el("pass-today").hidden = !studying || !!practice || !next.current || !!next.current.recall;
   const current = practice || (studying && next.current);
   flashcard.hidden = !current;
-  if (mobile) cardFront.toggleAttribute("data-swipe-reveal", !!current && !answerExpanded());
   el("review-start").hidden = !!practice || !!studying || !next.current;
   emptyPanel.hidden = !!practice || !!next.current;
   reviewFrame.hidden = flashcard.hidden && emptyPanel.hidden;
@@ -208,9 +207,21 @@ function updateReviewControls() {
   const waiting = !practice && state?.waitingForNext;
   const concealed = !answerExpanded();
   el("undo").disabled = !state?.canUndo || blocked;
-  el("pass").disabled = blocked || concealed || !!waiting;
-  el("forgot").disabled = blocked || concealed;
+  // The mobile dock stays visually unchanged during a flip. Inert locks it
+  // even when both cards have their answers open.
+  if (!mobile || !swiping) {
+    el("pass").disabled = blocked || concealed || !!waiting;
+    el("forgot").disabled = blocked || concealed;
+  }
   el("pass-today").disabled = blocked || !!waiting;
+  syncRevealGesture();
+}
+
+function syncRevealGesture() {
+  if (!mobile) return;
+  shell.toggleAttribute("data-swipe-reveal", view === "review" &&
+    !!(practice || studying && state?.current) && !answerExpanded() &&
+    !busy && !swiping && !revealButton.disabled);
 }
 
 function masteryProgress(days, goal, mastered = false) {
@@ -232,7 +243,7 @@ function empty(title, text, action, complete = false) {
 
 function clearAnswer() {
   revealRequest++;
-  el("reveal").disabled = false;
+  revealButton.disabled = false;
   clearTimeout(noteTimer);
   revealed = undefined;
   savedNote = "";
@@ -402,9 +413,10 @@ function reviewTiming(token, easing) {
   return {options: motionOptions(token, easing), animations: []};
 }
 
-function playReviewMotion(element, frames, timing, fill = "both") {
-  const animation = element.animate(frames, {...timing.options, fill});
-  if (!timing.animations.length) {
+function playReviewMotion(element, frames, timing, options = {}) {
+  const animation = element.animate(frames, {...timing.options, fill: "both", ...options});
+  if (timing.start != null) animation.startTime = timing.start;
+  else if (!timing.animations.length) {
     // The frame clock starts after preparation, including any synchronous
     // measurement for the card and the dock. Pending effects hold frame zero.
     requestAnimationFrame(start => {
@@ -430,15 +442,15 @@ function wantsVoteBar() {
 function settleVoteBar(visible) {
   voteBarVisible = visible;
   voteDock.hidden = !visible;
-  voteActions.inert = !visible;
+  voteActions.inert = !visible || (mobile && swiping);
   voteBarAnimation?.cancel();
   voteBarAnimation = undefined;
 }
 
-function moveVoteBar(from, to, timing) {
+function moveVoteBar(from, to, timing, options) {
   voteBarAnimation?.cancel();
   voteDock.hidden = false;
-  voteBarAnimation = playReviewMotion(voteActions, [from, to], timing);
+  voteBarAnimation = playReviewMotion(voteActions, [from, to], timing, options);
   return voteBarAnimation;
 }
 
@@ -461,9 +473,13 @@ function syncVoteBar(timing) {
 }
 
 function settleAnswerMotion(expanded) {
-  answerPanel.hidden = !expanded;
+  answerContent.hidden = !expanded;
   for (const animation of answerAnimation || []) animation.cancel();
   answerAnimation = undefined;
+}
+
+function closedAnswerHeight() {
+  return parseFloat(getComputedStyle(answerPanel).minHeight);
 }
 
 function setAnswerExpanded(expanded, animate = true) {
@@ -473,16 +489,15 @@ function setAnswerExpanded(expanded, animate = true) {
   const visible = {opacity: 1, transform: "translateY(0)"};
   const concealed = {opacity: 0, transform: "translateY(-5px)"};
   const from = timing && answerAnimation ? currentMotionFrame(answerContent) : expanded ? concealed : visible;
-  const height = timing && !answerPanel.hidden ? answerPanel.getBoundingClientRect().height : 0;
+  const height = timing && answerPanel.getBoundingClientRect().height;
   const rotation = timing && getComputedStyle(revealIcon).transform;
 
   if (timing) answerPanel.style.height = height + "px";
   settleAnswerMotion(expanded || !!timing);
   answerPanel.setAttribute("aria-hidden", String(!expanded));
   answerPanel.inert = !expanded;
-  el("reveal").setAttribute("aria-expanded", String(expanded));
+  revealButton.setAttribute("aria-expanded", String(expanded));
   el("reveal-label").textContent = expanded ? "收起释义" : "查看中文释义";
-  if (mobile) cardFront.toggleAttribute("data-swipe-reveal", !flashcard.hidden && !expanded);
   updateReviewControls();
   syncVoteBar(timing);
   if (expanded) fitNote();
@@ -490,7 +505,7 @@ function setAnswerExpanded(expanded, animate = true) {
     const style = expanded && getComputedStyle(answerContent);
     const target = expanded
       ? answerContent.getBoundingClientRect().height + parseFloat(style.marginTop) + parseFloat(style.marginBottom)
-      : 0;
+      : closedAnswerHeight();
     const motions = [
       playReviewMotion(answerPanel, [{height: height + "px"}, {height: target + "px"}], timing),
       playReviewMotion(answerContent, [from, expanded ? visible : concealed], timing),
@@ -504,23 +519,23 @@ function setAnswerExpanded(expanded, animate = true) {
   }
 }
 
-async function toggleReveal({animate = true, duringSlide = false} = {}) {
+async function toggleReveal({animate = true, duringSlide = false, cardRequest} = {}) {
   const current = practice || state?.current;
-  const trigger = el("reveal");
   if (!current || (!studying && !practice) || busy || (swiping && !duringSlide) ||
-      view !== "review" || trigger.disabled) return;
+      view !== "review" || revealButton.disabled) return;
   if (answerExpanded()) {
     if (!practice && state?.waitingForNext) return;
-    if (answerPanel.contains(document.activeElement)) trigger.focus({preventScroll: true});
+    if (answerPanel.contains(document.activeElement)) revealButton.focus({preventScroll: true});
     setAnswerExpanded(false, animate);
     return;
   }
   const intent = viewRequest;
   const request = ++revealRequest;
-  trigger.disabled = true;
+  revealButton.disabled = true;
+  syncRevealGesture();
   try {
     if (!revealed) {
-      const card = await api("/api/card/" + keyPath(current.key));
+      const card = await (cardRequest || api("/api/card/" + keyPath(current.key)));
       if (view !== "review" || intent !== viewRequest || request !== revealRequest ||
           !sameCard(practice || state?.current, current) || (!studying && !practice) ||
           (swiping && !duringSlide)) return;
@@ -534,7 +549,10 @@ async function toggleReveal({animate = true, duringSlide = false} = {}) {
   } catch (error) {
     if (intent === viewRequest && request === revealRequest) showError(error);
   } finally {
-    if (request === revealRequest) trigger.disabled = false;
+    if (request === revealRequest) {
+      revealButton.disabled = false;
+      syncRevealGesture();
+    }
   }
 }
 
@@ -641,17 +659,23 @@ async function undo(beforeSwap) {
   if (view !== "review" || !state?.canUndo || busy || (swiping && !beforeSwap) || practice) return;
   busy = true;
   let revealAfterUndo = false;
+  let cardRequest;
   try {
     await flushNote();
     const wasWaiting = state.waitingForNext;
     const result = await api("/api/undo", {});
+    if (result.current && (studying || result.waitingForNext) &&
+        !(wasWaiting && revealed?.key === result.current.key && result.date === state.date && answerExpanded())) {
+      cardRequest = api("/api/card/" + keyPath(result.current.key));
+      cardRequest.catch(() => {}); // toggleReveal reports an error when the card is shown.
+    }
     if (beforeSwap) await beforeSwap;
     if (beforeSwap && result.current && studying) revealAfterUndo = !result.waitingForNext;
     applyState(result, !wasWaiting);
     if (beforeSwap) pageScroller().scrollTo({top: 0});
   } catch (error) { showError(error); }
   finally { busy = false; updateReviewControls(); }
-  const revealOptions = {animate: false, duringSlide: true};
+  const revealOptions = {animate: false, duringSlide: true, cardRequest};
   if (state?.waitingForNext) await resumeWaiting(revealOptions);
   else if (revealAfterUndo && !answerExpanded()) await toggleReveal(revealOptions);
 }
@@ -676,8 +700,41 @@ function reviewFrameHeight(content) {
   return content.getBoundingClientRect().height + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
 }
 
-function moveReviewFrame(from, to, timing) {
-  return playReviewMotion(reviewFrame, [{height: from + "px"}, {height: to + "px"}], timing);
+function frameEase(initialSlope) {
+  // Equally spaced x controls make the slope 3 times the first y control.
+  return `cubic-bezier(.333333,${initialSlope / 3},.666667,1)`;
+}
+
+function startReviewResize(from, forecast, duration, timing) {
+  const animation = playReviewMotion(reviewFrame, [
+    {height: from + "px", easing: frameEase(2)},
+    {height: forecast + "px"},
+  ], timing, {duration, easing: "linear"});
+  return {animation, from, forecast, duration};
+}
+
+function retargetReviewResize(resize, from, target, timing) {
+  const motion = resize?.animation;
+  if (motion?.startTime == null || timing.start == null) {
+    motion?.cancel();
+    return playReviewMotion(reviewFrame, [{height: from + "px"}, {height: target + "px"}], timing);
+  }
+  // Keep the running clock and anchor the new target to the rendered height.
+  // The forecast is a quadratic ease-out, so its current velocity is known.
+  const elapsed = Math.max(0, timing.start - motion.startTime);
+  const remaining = timing.options.duration;
+  const velocity = 2 * (resize.forecast - resize.from) / resize.duration *
+    Math.max(0, 1 - elapsed / resize.duration);
+  const distance = target - from;
+  const slope = distance ? Math.max(0, Math.min(3, velocity * remaining / distance)) : 0;
+  const duration = elapsed + remaining;
+  motion.effect.updateTiming({duration});
+  motion.effect.setKeyframes([
+    {height: from + "px", offset: elapsed / duration, easing: frameEase(slope)},
+    {height: target + "px", offset: 1},
+  ]);
+  motion.startTime = timing.start - elapsed;
+  return motion;
 }
 
 async function slideReview({offset = 0, reversing = false, passToday = false} = {}) {
@@ -689,18 +746,22 @@ async function slideReview({offset = 0, reversing = false, passToday = false} = 
   const waiting = Boolean(waitingForNext);
   const direction = reversing ? 1 : -1;
   const exitTiming = reviewTiming("--motion-card-out", "--motion-card-ease");
+  const entryTiming = reviewTiming("--motion-card-in", "--motion-card-ease");
   const oldContent = flashcard.hidden ? emptyPanel : swipeContent;
   const distance = exitTiming && !reviewFrame.hidden ? oldContent.clientWidth : 0;
-  const barWasVisible = mobile && !voteDock.hidden;
   const interruptedAnswer = answerAnimation;
-  let outgoing, outgoingBar, incoming, frameMotion, completed;
+  let barTarget = mobile && voteBarVisible;
+  let outgoing, incoming, resize, frameMotion, barMotion, completed;
   swiping = true;
+  if (mobile) voteActions.inert = true;
   updateReviewControls();
   try {
     if (distance) {
       const from = reviewFrame.getBoundingClientRect().height;
-      const front = flashcard.hidden ? from : reviewFrameHeight(cardFront);
-      const bridge = front + Math.min(96, Math.max(0, from - front) * .28);
+      const forecast = reversing || flashcard.hidden
+        ? from
+        : Math.min(from, reviewFrameHeight(cardFront) + closedAnswerHeight());
+      const duration = exitTiming.options.duration + entryTiming.options.duration;
       for (const animation of interruptedAnswer || []) animation.pause();
       reviewFrame.setAttribute("data-flipping", "");
       const exit = direction * Math.max(distance, Math.abs(offset) + 24);
@@ -708,44 +769,42 @@ async function slideReview({offset = 0, reversing = false, passToday = false} = 
         {transform: `translateX(${offset}px)`, opacity: 1},
         {transform: `translateX(${exit}px)`, opacity: 0},
       ], exitTiming);
-      // Keep this frame fixed while the response swaps or fetches card contents.
-      frameMotion = moveReviewFrame(from, Math.min(from, bridge), exitTiming);
-      if (barWasVisible) {
-        voteActions.inert = true;
-        const from = voteBarAnimation ? currentMotionFrame(voteActions) : barRaised;
-        // Keep part of the downward travel for the incoming card's phase.
-        outgoingBar = moveVoteBar(from, barLeaving, exitTiming);
+      // The outside edge keeps moving while the new content is swapped in.
+      resize = startReviewResize(from, forecast, duration, exitTiming);
+      frameMotion = resize.animation;
+      if (!reversing && barTarget) {
+        barTarget = false;
+        const position = voteBarAnimation ? currentMotionFrame(voteActions) : barRaised;
+        barMotion = moveVoteBar(position, barLowered, exitTiming, {duration, easing: frameEase(2)});
       }
     }
-    const beforeSwap = Promise.allSettled([outgoing?.finished, outgoingBar?.finished, frameMotion?.finished]);
-    // Run the local request and card exit together. Keep the outgoing frames
-    // in place until both finish, even when the request takes longer.
+    // The response and old content's exit run together. The frame and dock
+    // span the whole flip and don't have to stop at the content handoff.
+    const beforeSwap = outgoing?.finished.catch(() => {}) || Promise.resolve();
     if (reversing) await undo(beforeSwap);
     else if (waiting) await nextCard(beforeSwap);
     else completed = await vote(true, {beforeSwap, passToday});
 
     const changed = !sameReview({card, date, waiting});
     const barVisible = wantsVoteBar();
-    const incomingTarget = !flashcard.hidden ? swipeContent : changed && !emptyPanel.hidden ? emptyPanel : null;
-    const entryTiming = incomingTarget && reviewTiming("--motion-card-in", "--motion-card-ease");
-    if (entryTiming) {
+    const incomingTarget = !flashcard.hidden ? swipeContent : !emptyPanel.hidden ? emptyPanel : null;
+    if (incomingTarget && entryTiming && !reducedMotion.matches) {
       const start = !changed ? currentMotionFrame(incomingTarget) : {
         transform: incomingTarget === emptyPanel ? "translateY(6px)" : `translateX(${-direction * 24}px)`,
         opacity: .55,
       };
       const from = reviewFrame.getBoundingClientRect().height;
       const goal = reviewFrameHeight(incomingTarget === emptyPanel ? emptyPanel : flashcard);
+      entryTiming.start = document.timeline.currentTime;
       outgoing?.cancel();
-      frameMotion?.cancel();
       resetReviewSlide();
       incoming = playReviewMotion(incomingTarget, [start, {transform: "none", opacity: 1}], entryTiming);
-      frameMotion = moveReviewFrame(from, goal, entryTiming);
-      let incomingBar;
-      if (mobile && (barWasVisible || barVisible)) {
-        const from = voteDock.hidden ? barLowered : currentMotionFrame(voteActions);
-        incomingBar = moveVoteBar(from, barVisible ? barRaised : barLowered, entryTiming);
+      frameMotion = retargetReviewResize(resize, from, goal, entryTiming);
+      if (mobile && barTarget !== barVisible) {
+        const position = voteDock.hidden ? barLowered : currentMotionFrame(voteActions);
+        barMotion = moveVoteBar(position, barVisible ? barRaised : barLowered, entryTiming);
       }
-      await Promise.allSettled([incoming.finished, incomingBar?.finished, frameMotion.finished]);
+      await Promise.allSettled([incoming.finished, frameMotion.finished, barMotion?.finished]);
     }
   } finally {
     outgoing?.cancel();
@@ -815,7 +874,11 @@ async function displayView(next, {intent, top = 0, prepare, focus} = {}) {
     positionNavigationIndicator();
     pageScroller().scrollTo({top});
     focus?.focus({preventScroll: true});
-    if (next === "review") fitNote();
+    syncRevealGesture();
+    if (next === "review") {
+      syncVoteBar();
+      fitNote();
+    }
   };
   if (previous === next) {
     update();
@@ -1938,10 +2001,11 @@ if (mobile) {
   let frame;
   let suppressClickUntil = 0;
   const editingTarget = "input,textarea,select,[contenteditable]";
-  const canSwipe = () => view === "review" && state && !busy && !swiping &&
+  const independentControl = editingTarget + ",button:not(#reveal),a,summary,[role=button]";
+  const canSwipe = () => view === "review" && state && !busy && !swiping && !pendingNavigation &&
     !document.activeElement?.matches(editingTarget) &&
     !document.querySelector("dialog[open]") && !controls.isOpen() && !window.getSelection()?.toString();
-  const canRevealBySwipe = () => cardFront.hasAttribute("data-swipe-reveal") && !el("reveal").disabled;
+  const canRevealBySwipe = () => shell.hasAttribute("data-swipe-reveal");
   const stillOnCard = () => drag.intent === viewRequest && sameReview(drag);
   const offsetFor = (action, dx, dy) => action === "reveal" ? Math.max(0, dy)
     : action === "undo" ? Math.max(0, dx) : Math.min(0, dx);
@@ -1956,12 +2020,13 @@ if (mobile) {
       const timing = reviewTiming("--motion-card-in", "--motion-card-ease");
       if (timing) playReviewMotion(swipeContent, [
         {transform: `translateX(${x}px)`}, {transform: "none"},
-      ], timing, "none");
+      ], timing, {fill: "none"});
     }
   }
 
   document.addEventListener("click", event => {
-    if (event.detail && performance.now() < suppressClickUntil) {
+    const fromTouch = event.pointerType === "touch" || event.sourceCapabilities?.firesTouchEvents;
+    if (fromTouch && event.detail && performance.now() < suppressClickUntil) {
       event.preventDefault();
       event.stopImmediatePropagation();
     }
@@ -1970,9 +2035,8 @@ if (mobile) {
     if (event.pointerType !== "touch") return;
     if (!event.isPrimary) { cancelDrag(); return; }
     suppressClickUntil = 0;
-    if (drag || !canSwipe() || !shell.contains(event.target) || event.target.closest(editingTarget)) return;
-    const reveal = canRevealBySwipe() && cardFront.contains(event.target) &&
-      !event.target.closest("button:not(#reveal), a");
+    if (drag || !canSwipe() || !shell.contains(event.target) || event.target.closest(independentControl)) return;
+    const reveal = canRevealBySwipe();
     const forward = !practice && swipeContent.contains(event.target) && event.clientX >= 24 &&
       innerWidth - event.clientX >= 24 && canAdvanceReview();
     const undo = !practice && state.canUndo;

@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="cn.wordreview.app.lexigo.android" android:versionCode="357" android:versionName="3.5.7">
+    package="cn.wordreview.app.lexigo.android" android:versionCode="358" android:versionName="3.5.8">
     <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="34" />
     <uses-permission android:name="android.permission.INTERNET" />
     <queries><intent><action android:name="android.intent.action.TTS_SERVICE" /></intent></queries>
