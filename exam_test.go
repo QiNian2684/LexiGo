@@ -37,7 +37,7 @@ func TestExamPersistsAndTransfersWithoutChangingReview(t *testing.T) {
 	source, path := newTestStore(t)
 	dest, _ := newTestStore(t)
 	now := time.Now()
-	day := now.Format(time.DateOnly)
+	day := source.db.studyDay(now)
 	importTest(t, source, day, "transport, crucial")
 	first := source.shuffleReview(day).Current
 	held, err := source.recordVote(day, first.Key, first.Reviews, first.Order, false, true, false)

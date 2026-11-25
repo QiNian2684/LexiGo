@@ -20,7 +20,7 @@ exe = Path(sys.argv[1]).resolve(strict=True)
 
 def legacy_fixture(path, word):
     path.parent.mkdir(parents=True, exist_ok=True)
-    day = str(datetime.date.today())
+    day = str((datetime.datetime.now() - datetime.timedelta(hours=5)).date())
     with sqlite3.connect(path) as db:
         db.executescript("""
           CREATE TABLE IF NOT EXISTS meta (id INTEGER PRIMARY KEY, body BLOB NOT NULL);
