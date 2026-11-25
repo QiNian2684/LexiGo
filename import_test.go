@@ -70,7 +70,7 @@ func TestBundledCSVTemplates(t *testing.T) {
 		fields, rows int
 	}{
 		{commonCSVTemplate, 7, 3},
-		{fullCSVTemplate, 12, 1},
+		{fullCSVTemplate, 13, 1},
 	} {
 		text := string(template.data)
 		if !strings.HasPrefix(text, "\ufeff") {
@@ -84,7 +84,7 @@ func TestBundledCSVTemplates(t *testing.T) {
 		if err != nil || len(words) != template.rows || words[0].Etymology == "" || words[0].Note == "" {
 			t.Fatalf("template did not import: %+v, %v", words, err)
 		}
-		if template.fields == 12 && (words[0].IPA == "" || words[0].IPAUK == "" || words[0].IPAUS == "" ||
+		if template.fields == 13 && (words[0].IPA == "" || words[0].IPAUK == "" || words[0].IPAUS == "" ||
 			words[0].PersonalNote == "" || words[0].Collocations == "") {
 			t.Fatalf("full template is missing fields: %+v", words[0])
 		}

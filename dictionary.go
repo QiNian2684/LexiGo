@@ -40,9 +40,11 @@ type cardDetails struct {
 	IPAUS              string `json:"ipaUS"`
 	Examples           string `json:"examples"`
 	ExampleTranslation string `json:"exampleTranslation"`
-	Etymology          string `json:"etymology"`
-	Collocations       string `json:"collocations"`
-	Note               string `json:"note"`
+	// Shared with dictionary and input codecs. On saved cards these two fields
+	// are legacy, with user and reference data stored on wordCard.
+	Etymology    string `json:"etymology"`
+	Collocations string `json:"collocations"`
+	Note         string `json:"note"`
 }
 
 func (c cardDetails) size() int {
@@ -105,6 +107,12 @@ var expandedExamples = sync.OnceValues(func() (map[string]sourcedExample, error)
 	return readExamples(exampleExpansionBytes)
 })
 
+var bundledLearningNotes = sync.OnceValues(func() (map[string]cardDetails, error) {
+	var notes map[string]cardDetails
+	err := json.Unmarshal(learningJSON, &notes)
+	return notes, err
+})
+
 func readExamples(packed []byte) (map[string]sourcedExample, error) {
 	data, err := expand(packed)
 	if err != nil {
@@ -139,7 +147,7 @@ func (d *dictionary) load() {
 			}
 			position += end + 1
 		}
-		if d.err = json.Unmarshal(learningJSON, &d.notes); d.err != nil {
+		if d.notes, d.err = bundledLearningNotes(); d.err != nil {
 			return
 		}
 		d.examples, d.err = bundledExamples()
@@ -194,8 +202,12 @@ func (d *dictionary) lookup(word string) (offlineEntry, error) {
 	return result, nil
 }
 
-func (c cardDetails) needsOnline() bool {
-	return c.Meaning == "" || c.POS == "" || c.Examples == "" || c.ExampleTranslation == "" || c.Etymology == ""
+func (c *wordCard) detailSize() int {
+	return c.cardDetails.size() + utf8.RuneCountInString(c.Construction+c.MemoryTip+c.RawEtymology)
+}
+
+func (c *wordCard) needsOnline() bool {
+	return c.Meaning == "" || c.POS == "" || c.Examples == "" || c.ExampleTranslation == "" || c.RawEtymology == ""
 }
 
 func (c *cardDetails) fill(from cardDetails) (used bool) {
@@ -211,13 +223,21 @@ func (c *cardDetails) fill(from cardDetails) (used bool) {
 	}
 	for _, pair := range [][2]*string{
 		{&c.Meaning, &from.Meaning}, {&c.POS, &from.POS}, {&c.IPA, &from.IPA},
-		{&c.IPAUK, &from.IPAUK}, {&c.IPAUS, &from.IPAUS}, {&c.Etymology, &from.Etymology},
-		{&c.Collocations, &from.Collocations}, {&c.Note, &from.Note},
+		{&c.IPAUK, &from.IPAUK}, {&c.IPAUS, &from.IPAUS}, {&c.Collocations, &from.Collocations},
 	} {
 		if *pair[0] == "" && *pair[1] != "" {
 			*pair[0] = *pair[1]
 			used = true
 		}
+	}
+	return used
+}
+
+func (c *wordCard) fillFromDictionary(from cardDetails) bool {
+	used := c.cardDetails.fill(from)
+	if c.RawEtymology == "" && from.Etymology != "" {
+		c.RawEtymology = from.Etymology
+		used = true
 	}
 	return used
 }

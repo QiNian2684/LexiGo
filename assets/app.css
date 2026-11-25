@@ -283,7 +283,9 @@ body:not(.platform-android) .swipe-cue { display: none; }
   width: 100%; height: 100%;
   pointer-events: none;
 }
-.review-card { overflow: clip; box-shadow: var(--shadow); }
+.review-frame { overflow: clip; overflow-anchor: none; }
+.review-frame:has(.review-card:not([hidden])) { box-shadow: var(--shadow); }
+.review-frame[data-flipping] :is(.swipe-content, #review-empty) { opacity: 0; }
 .card-front {
   position: relative;
   display: grid;
@@ -348,8 +350,7 @@ body:not(.platform-android) .swipe-cue { display: none; }
 .detail-group p { color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; }
 .detail-group .meaning { font-size: 1.28rem; font-weight: 575; }
 .detail-group .construction { margin-block-start: .35rem; color: var(--muted); font-size: .84rem; }
-.memory-association .construction { color: var(--secondary); }
-.memory-association strong { color: var(--ink); font-weight: 600; }
+.memory-association .construction { color: var(--secondary); font-size: .9rem; }
 .memory-association .construction-details { margin-top: .45rem; }
 .review-heading h1.exam-countdown { color: var(--secondary); font-size: clamp(1.16rem, 3.6vw, 1.5rem); font-weight: 600; letter-spacing: normal; }
 .detail-group .example { font-family: var(--font-word); font-size: 1.02rem; }
@@ -910,6 +911,9 @@ dialog::backdrop { background: var(--overlay); }
 .data-guide strong { color: var(--ink); font-weight: 600; }
 .construction-details { margin-top: .15rem; color: var(--muted); font-size: .82rem; }
 .construction-details summary { width: fit-content; cursor: pointer; }
+.construction-details > p { margin-top: .33rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.editor-fields .construction-details { margin-top: .7rem; }
+.editor-fields .construction-details .button { margin-top: .4rem; }
 
 @media (prefers-reduced-motion: no-preference) {
   @keyframes panel-appear {

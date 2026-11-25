@@ -57,9 +57,14 @@ func openStore(file string) (*store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("无法读取内置例句：%w", err)
 	}
+	memoryKeys, err := upgradeSavedAssociations(s.db.Words)
+	if err != nil {
+		return nil, fmt.Errorf("无法整理旧版记忆联想：%w", err)
+	}
+	keys = append(keys, memoryKeys...)
 	if len(keys) > 0 {
 		if err := s.save(keys, len(s.db.Events)); err != nil {
-			return nil, fmt.Errorf("无法保存补齐的例句翻译：%w", err)
+			return nil, fmt.Errorf("无法保存更新的词条资料：%w", err)
 		}
 	}
 	ok = true
@@ -263,6 +268,9 @@ func (s *store) replaceLocked(incoming database, backupName string, backup []byt
 		upgradePassCounts(&incoming)
 	}
 	if _, err := updateSavedExamples(incoming.Words); err != nil {
+		return err
+	}
+	if _, err := upgradeSavedAssociations(incoming.Words); err != nil {
 		return err
 	}
 	keys := make([]string, 0, len(incoming.Words))

@@ -123,7 +123,7 @@ func TestConstructionIsPresentationOnly(t *testing.T) {
 	card := wordCard{Key: "transport"}
 	card.Meaning = "手动释义"
 	card.PersonalNote = "我的备注"
-	card.Etymology = "我的旧资料"
+	card.RawEtymology = "我的旧资料"
 	public, _ := json.Marshal(presentCard(card))
 	saved, _ := json.Marshal(card)
 	for _, value := range []string{"手动释义", "我的备注", "我的旧资料"} {

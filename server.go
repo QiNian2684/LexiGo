@@ -264,7 +264,7 @@ func (a *application) enrich(ctx context.Context) {
 					current.ExampleBy = candidate.By
 				}
 				wikiExampleBefore := current.Examples
-				if current.cardDetails.fill(entry.cardDetails) {
+				if current.fillFromDictionary(entry.cardDetails) {
 					if current.WikiSource == "" || wikiExampleBefore != current.Examples {
 						current.WikiSource = wikiSource(entry.Revision)
 					}
@@ -709,8 +709,8 @@ func (a *application) handler() http.Handler {
 			oldExample, oldTranslation := c.Examples, c.ExampleTranslation
 			fields := map[string]*string{
 				"meaning": &c.Meaning, "pos": &c.POS, "ipa": &c.IPA, "ipaUK": &c.IPAUK, "ipaUS": &c.IPAUS,
-				"examples": &c.Examples, "exampleTranslation": &c.ExampleTranslation, "etymology": &c.Etymology,
-				"collocations": &c.Collocations, "note": &c.Note,
+				"examples": &c.Examples, "exampleTranslation": &c.ExampleTranslation, "etymology": &c.Construction,
+				"collocations": &c.Collocations, "note": &c.MemoryTip,
 			}
 			for field, value := range req {
 				switch {
@@ -727,7 +727,7 @@ func (a *application) handler() http.Handler {
 					*fields[field] = strings.TrimSpace(value)
 				}
 			}
-			if c.cardDetails.size() > 12000 || utf8.RuneCountInString(c.PersonalNote) > 12000 {
+			if c.detailSize() > 12000 || utf8.RuneCountInString(c.PersonalNote) > 12000 {
 				return errors.New("卡片资料及备注各最多 12,000 字。")
 			}
 			if c.ExampleTranslation != oldTranslation {

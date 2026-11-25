@@ -49,7 +49,8 @@
         <p id="start-summary"></p>
         <button class="button primary" type="button" id="start-review">开始复习<svg class="icon" aria-hidden="true"><use href="/icons.svg#right"/></svg></button>
       </section>
-      <article class="card review-card" id="flashcard" hidden>
+      <div class="card review-frame" id="review-frame">
+      <article class="review-card" id="flashcard" hidden>
         <div class="swipe-content" id="swipe-content"><div class="card-front">
           <button class="icon-button pass-today" type="button" id="pass-today" title="直接完成今日记忆" aria-label="直接完成今日记忆" hidden><svg class="icon" aria-hidden="true"><use href="/icons.svg#check"/></svg></button>
           <h2 class="english-word" id="word" lang="en"></h2>
@@ -85,12 +86,13 @@
           </div>
         </div>
       </article>
-      <article class="card empty-state" id="review-empty" aria-busy="true">
+      <article class="empty-state" id="review-empty" aria-busy="true">
         <div class="state-symbol"><svg class="icon" aria-hidden="true"><use href="/icons.svg#review"/></svg></div>
         <h2 id="empty-title">正在加载…</h2>
         <p id="empty-text" hidden></p>
         <button class="button primary" type="button" id="empty-action" hidden></button>
       </article>
+      </div>
       <div class="session-tools" id="session-tools" hidden>
         <span id="session-hint">Enter 查看释义 · 1 没记住 · 2 记住了</span>
         <button class="quiet" type="button" id="undo">撤销上一次</button>
@@ -143,14 +145,15 @@
                 <tr><th scope="row"><code>ipa</code></th><td>通用音标。<span>音标</span></td></tr>
                 <tr><th scope="row"><code>ipaUK</code></th><td>英式音标。<span>英式音标</span></td></tr>
                 <tr><th scope="row"><code>ipaUS</code></th><td>美式音标。<span>美式音标</span></td></tr>
-                <tr><th scope="row"><code>etymology</code></th><td>确有依据的词根词缀、构词或词源。<span>词根词缀、词根和词缀、词源</span></td></tr>
+                <tr><th scope="row"><code>etymology</code></th><td>简洁的自定义构词分析，留空时使用自动构词联想。<span>词根词缀、词根和词缀、词源</span></td></tr>
                 <tr><th scope="row"><code>note</code></th><td>帮助记忆的场景、熟词或谐音联想。<span>记忆提示、记忆技巧、记忆联想</span></td></tr>
+                <tr><th scope="row"><code>rawEtymology</code></th><td>原始词典词源，放在折叠的参考资料中。<span>原始词源、原始词源资料</span></td></tr>
                 <tr><th scope="row"><code>collocations</code></th><td>常见搭配。<span>搭配、常见搭配</span></td></tr>
                 <tr><th scope="row"><code>personalNote</code></th><td>个人笔记，复习时可单独编辑。<span>备注、个人备注、我的备注</span></td></tr>
               </tbody>
             </table>
           </div>
-          <p>展开复习卡片可在「记忆联想」看到 <code>etymology</code> 和 <code>note</code>。<code>personalNote</code> 会显示在「我的备注」。</p>
+          <p>「记忆联想」先显示自填或自动生成的构词分析，再显示 <code>note</code> 中的记忆技巧。<code>personalNote</code> 显示在「我的备注」。</p>
         </details>
         <details>
           <summary>格式、空白字段与重复词</summary>
@@ -160,7 +163,7 @@
             <li>选填列可删除，暂时没有的资料也可以留空。新词优先使用你填写的资料，缺项由内置词典和已开启的联网补充处理。</li>
             <li>同一批重复的单词保留第一条有效记录。已经在词库中的词会重置学习进度并重新排入复习，原资料、个人备注和历史保留。</li>
           </ul>
-          <p><strong>可给 AI 的指令。</strong>请按上方示例表头输出 LexiGo CSV，提供常用释义、词性、英文例句和对应翻译。词根词缀填在 etymology，记忆技巧填在 note；没有可靠资料的字段留空。</p>
+          <p><strong>可给 AI 的指令。</strong>请按上方示例表头输出 LexiGo CSV，提供常用释义、词性、英文例句和对应翻译。etymology 填简短、可靠的词根词缀拆解，note 填好记的场景或熟词联想。无法确认的字段留空。</p>
         </details>
       </section>
     </section>
@@ -533,9 +536,15 @@
         </div>
         <label for="edit-examples">例句</label><textarea rows="2" id="edit-examples"></textarea>
         <label for="edit-exampleTranslation">例句翻译</label><textarea rows="2" id="edit-exampleTranslation"></textarea>
-        <label for="edit-etymology">词根和词源</label><textarea rows="2" id="edit-etymology"></textarea>
+        <label for="edit-etymology">自定义构词联想</label><textarea rows="2" id="edit-etymology" aria-describedby="edit-etymology-help"></textarea>
+        <p class="help" id="edit-etymology-help">留空时使用自动构词联想。</p>
         <label for="edit-collocations">搭配</label><textarea rows="2" id="edit-collocations"></textarea>
         <label for="edit-note">记忆技巧</label><textarea rows="2" id="edit-note"></textarea>
+        <details id="edit-raw-etymology" class="construction-details" hidden>
+          <summary>原始词源资料</summary>
+          <p id="edit-raw-etymology-text"></p>
+          <button class="button outline small" type="button" id="use-raw-etymology">用作自定义构词联想</button>
+        </details>
         <label for="edit-personalNote">我的备注</label><textarea rows="2" id="edit-personalNote" maxlength="12000"></textarea>
       </div>
       <div class="dialog-footer">

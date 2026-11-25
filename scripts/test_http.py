@@ -145,16 +145,24 @@ with tempfile.TemporaryDirectory() as temp:
         full = call('/api/csv-template/full', raw=True, attachment=('text/csv', 'LexiGo-template-full.csv'))
         assert common.startswith(b'\xef\xbb\xbf') and full.startswith(b'\xef\xbb\xbf')
         entries = list(csv.DictReader(io.StringIO(full.decode('utf-8-sig'))))
-        assert len(entries) == 1 and entries[0]['word'] == 'rewrite' and len(entries[0]) == 12
+        assert len(entries) == 1 and entries[0]['word'] == 'rewrite' and len(entries[0]) == 13
         assert load(full.decode('utf-8-sig'), '')['new'] == 1
         saved = call('/api/card/rewrite')
         for field, value in entries[0].items():
-            assert saved[field] == value, (field, saved[field], value)
+            assert saved.get(field, '') == value, (field, saved.get(field, ''), value)
         duplicate = load(common.decode('utf-8-sig'), 'csv')
         assert (duplicate['new'], duplicate['reset']) == (2, 1)
         edited = call('/api/card/rewrite', {'note': '写错一句，整句重写。', 'etymology': 're- 再次 + write 写'})
         assert edited['note'] == '写错一句，整句重写。'
         assert edited['personalNote'] == saved['personalNote']
+        assert edited['etymology'] == 're- 再次 + write 写' and not edited.get('memoryHint')
+        restored_auto = call('/api/card/rewrite', {'etymology': ''})
+        assert restored_auto['note'] == edited['note'] and restored_auto['memoryHint']
+        call('/api/card/rewrite', {'etymology': edited['etymology']})
+        assert load('[{"word":"unfold","note":"想象展开纸张","rawEtymology":"Source dictionary text."}]', 'json')['new'] == 1
+        association = call('/api/card/unfold')
+        assert association['note'] == '想象展开纸张' and association['rawEtymology'] == 'Source dictionary text.'
+        assert association['etymology'] == '' and association['memoryHint']
         csv_data = call('/api/export', {'all': True}, raw=True)
         exported = list(csv.DictReader(io.StringIO(csv_data.decode('utf-8-sig'))))
         assert next(row['note'] for row in exported if row['word'] == 'rewrite') == edited['note']
@@ -167,12 +175,12 @@ with tempfile.TemporaryDirectory() as temp:
         assert '导入数据' in call('/api/restore', transfer, expect=400)['error']
         call('/api/card/rewrite', {'note': '本机的新记法'})
         overview = call('/api/transfer/preview', transfer)
-        assert overview['words'] == 3
+        assert overview['words'] == 4
         call('/api/transfer/commit', {'token': overview['token']})
         assert call('/api/card/rewrite')['note'] == edited['note']
         assert call('/api/transfer/recovery')['available']
         recovery = call('/api/transfer/recovery/download', raw=True, attachment=study_mime)
-        assert call('/api/transfer/preview', recovery)['words'] == 3
+        assert call('/api/transfer/preview', recovery)['words'] == 4
         call('/api/restore', backup)
         assert call('/api/card/rewrite')['personalNote'] == saved['personalNote']
     finally:

@@ -58,6 +58,9 @@ type wordCard struct {
 	Word string `json:"word"`
 	cardDetails
 	progress
+	Construction         string `json:"construction,omitempty"`
+	MemoryTip            string `json:"memoryTip,omitempty"`
+	RawEtymology         string `json:"rawEtymology,omitempty"`
 	PersonalNote         string `json:"personalNote"`
 	NoteClock            int64  `json:"noteClock,omitempty"`
 	ECDICT               bool   `json:"ecdict,omitempty"`

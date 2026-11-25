@@ -34,7 +34,7 @@ func myMemoryTranslation(ctx context.Context, client *http.Client, endpoint, sen
 		return "", err
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "LexiGo/3.5.6 (+https://github.com/QiNian2684/LexiGo)")
+	req.Header.Set("User-Agent", "LexiGo/3.5.7 (+https://github.com/QiNian2684/LexiGo)")
 	reply, err := client.Do(req)
 	if err != nil {
 		return "", err
@@ -277,7 +277,7 @@ func (a *application) saveTranslationLocked(card *wordCard, text string, err err
 		task := q.pending[card.Key]
 		task.retryAt = time.Now().Add(time.Minute)
 		q.pending[card.Key] = task
-	case text == "" || card.cardDetails.size()+utf8.RuneCountInString(text) > 12000:
+	case text == "" || card.detailSize()+utf8.RuneCountInString(text) > 12000:
 		if q.skipped == nil {
 			q.skipped = make(map[uint64]string)
 		}

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -31,6 +32,7 @@ func splitWords(value string) []string {
 type importedWord struct {
 	Word string `json:"word"`
 	cardDetails
+	RawEtymology string `json:"rawEtymology,omitempty"`
 	PersonalNote string `json:"personalNote"`
 }
 
@@ -142,6 +144,8 @@ func parseWordCSV(text string, declared bool) ([]importedWord, error) {
 		seen[column] = true
 	}
 
+	exported := slices.Equal(first, libraryCSVColumns)
+	legacyExport := slices.Equal(first, libraryCSVColumns[:len(libraryCSVColumns)-1])
 	var words []importedWord
 	for {
 		row, err := reader.Read()
@@ -167,6 +171,10 @@ func parseWordCSV(text string, declared bool) ([]importedWord, error) {
 		}
 		var item importedWord
 		for i, value := range row {
+			if exported {
+				// Undo the spreadsheet protection applied by this export format.
+				value = strings.TrimPrefix(value, "'")
+			}
 			if strings.TrimSpace(value) == "" {
 				continue
 			}
@@ -188,7 +196,13 @@ func parseWordCSV(text string, declared bool) ([]importedWord, error) {
 			case "exampleTranslation":
 				item.ExampleTranslation = value
 			case "etymology":
-				item.Etymology = value
+				if legacyExport {
+					item.RawEtymology = value
+				} else {
+					item.Etymology = value
+				}
+			case "rawEtymology":
+				item.RawEtymology = value
 			case "collocations":
 				item.Collocations = value
 			case "note":
@@ -217,6 +231,7 @@ var importColumns = map[string]string{
 	"examples": "examples", "例句": "examples", "英文例句": "examples",
 	"exampletranslation": "exampleTranslation", "例句翻译": "exampleTranslation", "例句中文翻译": "exampleTranslation",
 	"etymology": "etymology", "词根词缀": "etymology", "词根和词缀": "etymology", "词源": "etymology",
+	"rawetymology": "rawEtymology", "原始词源": "rawEtymology", "原始词源资料": "rawEtymology",
 	"collocations": "collocations", "搭配": "collocations", "常见搭配": "collocations",
 	"note": "note", "记忆提示": "note", "记忆技巧": "note", "记忆联想": "note",
 	"personalnote": "personalNote", "备注": "personalNote", "个人备注": "personalNote", "我的备注": "personalNote",
@@ -243,7 +258,8 @@ func (s *store) preview(items []importedWord) (importPreview, []importedWord) {
 	digest := sha256.New()
 	for _, item := range items {
 		word, key, valid := normalize(item.Word)
-		if !valid || utf8.RuneCountInString(item.PersonalNote) > 12000 || item.cardDetails.size() > 12000 {
+		if !valid || utf8.RuneCountInString(item.PersonalNote) > 12000 ||
+			item.cardDetails.size()+utf8.RuneCountInString(item.RawEtymology) > 12000 {
 			runes := []rune(word)
 			plan.Invalid = append(plan.Invalid, string(runes[:min(96, len(runes))]))
 			continue
@@ -302,15 +318,15 @@ func (s *store) add(day string, items []importedWord, token string, dict *dictio
 		if err != nil {
 			return importResult{}, err
 		}
-		details := item.cardDetails
-		exampleBy := ""
-		details.fill(offline.cardDetails)
-		if details.Examples != item.Examples || details.ExampleTranslation != item.ExampleTranslation {
-			exampleBy = offline.ExampleBy
-		}
-		card := &wordCard{Key: key, Word: item.Word, cardDetails: details,
-			ECDICT: offline.ECDICT, ExampleBy: exampleBy, PersonalNote: item.PersonalNote,
+		card := &wordCard{Key: key, Word: item.Word, cardDetails: item.cardDetails,
+			Construction: strings.TrimSpace(item.Etymology), MemoryTip: strings.TrimSpace(item.Note),
+			RawEtymology: strings.TrimSpace(item.RawEtymology), ECDICT: offline.ECDICT, PersonalNote: item.PersonalNote,
 			AddedDay: day, Lookup: "done"}
+		card.Etymology, card.Note = "", ""
+		card.fillFromDictionary(offline.cardDetails)
+		if card.Examples != item.Examples || card.ExampleTranslation != item.ExampleTranslation {
+			card.ExampleBy = offline.ExampleBy
+		}
 		if card.needsOnline() {
 			card.Lookup = "pending"
 		}
@@ -346,13 +362,15 @@ func (s *store) add(day string, items []importedWord, token string, dict *dictio
 	return result, nil
 }
 
+var libraryCSVColumns = []string{"word", "meaning", "pos", "ipa", "ipaUK", "ipaUS", "examples",
+	"exampleTranslation", "etymology", "collocations", "note", "personalNote", "status", "streak", "lastReview", "rawEtymology"}
+
 func asCSV(cards []*wordCard) ([]byte, error) {
 	var buffer bytes.Buffer
 	buffer.WriteString("\ufeff")
 	writer := csv.NewWriter(&buffer)
 	writer.UseCRLF = true
-	if err := writer.Write([]string{"word", "meaning", "pos", "ipa", "ipaUK", "ipaUS", "examples",
-		"exampleTranslation", "etymology", "collocations", "note", "personalNote", "status", "streak", "lastReview"}); err != nil {
+	if err := writer.Write(libraryCSVColumns); err != nil {
 		return nil, err
 	}
 	for _, c := range cards {
@@ -364,9 +382,11 @@ func asCSV(cards []*wordCard) ([]byte, error) {
 			status = "回收站"
 		}
 		values := []string{c.Word, c.Meaning, c.POS, c.IPA, c.IPAUK, c.IPAUS, c.Examples,
-			c.ExampleTranslation, c.Etymology, c.Collocations, c.Note, c.PersonalNote, status, strconv.Itoa(c.Streak), c.LastTry}
+			c.ExampleTranslation, c.Construction, c.Collocations, c.MemoryTip, c.PersonalNote, status, strconv.Itoa(c.Streak), c.LastTry,
+			c.RawEtymology}
 		for i, value := range values {
-			if trimmed := strings.TrimLeft(value, " \r\n\t"); trimmed != "" && strings.ContainsRune("=+-@", rune(trimmed[0])) {
+			if trimmed := strings.TrimLeft(value, " \r\n\t"); strings.HasPrefix(value, "'") ||
+				trimmed != "" && strings.ContainsRune("=+-@", rune(trimmed[0])) {
 				values[i] = "'" + value
 			}
 		}

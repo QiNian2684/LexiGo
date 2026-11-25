@@ -7,7 +7,7 @@ ManifestDPIAware true
 !include "FileFunc.nsh"
 !include "x64.nsh"
 
-!define VERSION "3.5.6"
+!define VERSION "3.5.7"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\LexiGo"
 !define DATA_CONFIG "LexiGo.data-dir"
 

@@ -47,7 +47,7 @@ try {
     & go build -buildvcs=false -trimpath '-ldflags=-s -w -H=windowsgui' -o $target .
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     if ($Release) { Protect-ReleaseExecutable $target }
-    $setup = Join-Path $staging 'LexiGo-Setup-3.5.6.exe'
+    $setup = Join-Path $staging 'LexiGo-Setup-3.5.7.exe'
     & $MakeNSIS "/DPACKAGE_EXE=$target" "/DPACKAGE_SETUP=$setup" .\installer\LexiGo.nsi
     if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
     if ($Release) { Protect-ReleaseExecutable $setup }

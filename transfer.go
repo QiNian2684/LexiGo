@@ -21,7 +21,8 @@ import (
 
 const (
 	transferFormat                 = "wordreview.learning-state"
-	transferVersion                = 6
+	transferVersion                = 7
+	transferVersionWithFirstTry    = 6
 	transferVersionWithoutFirstTry = 5
 	maxTransfer                    = 128 << 20
 	studyFileExt                   = ".lexi"
@@ -128,7 +129,13 @@ func (s *store) transferBytes(now time.Time) ([]byte, error) {
 	version := transferVersionWithoutFirstTry
 	if payload.Database.Settings.FirstTryMastery ||
 		slices.ContainsFunc(payload.Database.Events, func(item event) bool { return item.FirstTryMastered }) {
-		version = transferVersion
+		version = transferVersionWithFirstTry
+	}
+	for _, card := range payload.Database.Words {
+		if card.Construction != "" || card.MemoryTip != "" || card.RawEtymology != "" {
+			version = transferVersion
+			break
+		}
 	}
 	file, err := json.Marshal(transferEnvelope{transferFormat, version, hex.EncodeToString(digest[:]), raw})
 	if len(file) > maxTransfer {

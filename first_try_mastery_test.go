@@ -209,7 +209,7 @@ func TestFirstTryMasteryUndoRestartAndTransfer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := json.Unmarshal(file, &envelope); err != nil || envelope.Version != transferVersion {
+	if err := json.Unmarshal(file, &envelope); err != nil || envelope.Version != transferVersionWithFirstTry {
 		t.Fatalf("new transfer features require their format version: %d (%v)", envelope.Version, err)
 	}
 	snapshot, err := parseTransfer(file)

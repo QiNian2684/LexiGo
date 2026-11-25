@@ -1,10 +1,10 @@
-# LexiGo 3.5.6
+# LexiGo 3.5.7
 
 个人使用的英语词库与复习软件。支持 Windows 10/11 x64 和 Android 9 及以上。两端共用词典、SQLite 表结构、数据交换格式和复习逻辑。
 
 ## 使用
 
-Windows 运行对应版本的安装程序，先选择程序位置，再选择数据文件夹和桌面快捷方式。默认程序位置为 `%LOCALAPPDATA%\Programs\LexiGo`，默认数据文件夹为程序目录下的 `Data`。直接运行 `LexiGo.exe` 也可以使用便携模式。Windows 使用 WebView2 Runtime，窗口配置保存在数据目录的 `WebView2` 子目录。Android 安装 `LexiGo-Android-3.5.6.apk` 后打开「LexiGo」。运行无需安装 Go、Python 或数据库服务器。
+Windows 运行对应版本的安装程序，先选择程序位置，再选择数据文件夹和桌面快捷方式。默认程序位置为 `%LOCALAPPDATA%\Programs\LexiGo`，默认数据文件夹为程序目录下的 `Data`。直接运行 `LexiGo.exe` 也可以使用便携模式。Windows 使用 WebView2 Runtime，窗口配置保存在数据目录的 `WebView2` 子目录。Android 安装 `LexiGo-Android-3.5.7.apk` 后打开「LexiGo」。运行无需安装 Go、Python 或数据库服务器。
 
 启动时显示可滚动的使用手册。手册配有操作截图，涵盖添加单词、每日记忆与长期掌握、词库、统计、设置和备份迁移，并显示本平台的快捷键或手势。勾选「以后不再提示」并点「确认」后，可以从「设置 → 使用说明」随时重开。
 
@@ -66,7 +66,9 @@ JSON 词表是对象数组，也可以用相同的字段名。
 ]
 ```
 
-卡片展开后，「记忆联想」优先显示 `etymology`（词根词缀或词源）和 `note`（记忆技巧）。自动联想可在「更多联想」中查看，无自填资料时直接显示自动联想。`personalNote` 单独显示在「我的备注」。
+卡片展开后，「记忆联想」先显示 `etymology` 中的自定义构词。该字段留空时使用本地自动构词。填写 `note` 时，记忆技巧自然接在构词后面。`personalNote` 单独显示在「我的备注」。
+
+`rawEtymology` 是可选的原始词源列，词库导出也会使用这一列。原始词源显示在折叠区。旧版词库导出的混合词源也会保留在该区，可在词条编辑中主动用作自定义构词。
 
 ## 查词策略与来源
 
@@ -107,7 +109,7 @@ JSON 词表是对象数组，也可以用相同的字段名。
 3. 检查生成时间、词条和今日任务摘要。选择「确认覆盖」后，程序自动备份接收端，再用文件中的完整状态替换接收端。想回到覆盖前的状态，可用同一入口导入这份自动快照。
 4. 换回原设备时，在正在使用的设备上重新导出最新文件，再在原设备导入。
 
-完整学习数据会保存当天任务及调度所需的已提交作答历史。两端仍处于同一个学习日时，可以继续已有任务。导入已结束学习日的快照时，按原跨日规则开始本机当前学习日。跨时区导致两端日期不一致且导出端学习日尚未结束时，等该学习日结束后再导入。自动快照位于应用数据目录的 `backups/before-transfer-*.json`。
+完整学习数据会保存当天任务及调度所需的已提交作答历史。两端仍处于同一个学习日时，可以继续已有任务。导入已结束学习日的快照时，按原跨日规则开始本机当前学习日。跨时区导致两端日期不一致且导出端学习日尚未结束时，等该学习日结束后再导入。含独立构词、记忆技巧或原始词源字段的快照需使用 3.5.7 或更新版本。自动快照位于应用数据目录的 `backups/before-transfer-*.json`。
 
 Android 数据保存在应用私有目录 `files/StudyData`。卸载应用或清除应用数据之前，请用「导出数据」把快照保存到应用外。导入后可通过「导出覆盖前备份」将最近一次自动快照取出，再用「导入数据」恢复。完整数据含个人备注，请自行保管。
 
@@ -121,7 +123,7 @@ Android 3.5.0 使用独立的包名和已保存的新发行签名，可与 3.3.1
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-脚本运行 Go 测试并生成便携版 `dist\LexiGo.exe` 和安装版 `dist\LexiGo-Setup-3.5.6.exe`。首次从源码构建需要取得 `go.mod` 和 `go.sum` 声明的依赖。已编入的词典、界面和应用图标无需重新下载。第三方依赖许可证见 `licenses/`，数据处理脚本在 `scripts/`。
+脚本运行 Go 测试并生成便携版 `dist\LexiGo.exe` 和安装版 `dist\LexiGo-Setup-3.5.7.exe`。首次从源码构建需要取得 `go.mod` 和 `go.sum` 声明的依赖。已编入的词典、界面和应用图标无需重新下载。第三方依赖许可证见 `licenses/`，数据处理脚本在 `scripts/`。
 
 也可用 `go test ./...` 单独测试核心规则。用 Python 3 运行 `python scripts/test_http.py 路径\LexiGo.exe` 可以在独立临时词库上测试离线工作流和中止进程后恢复。还可运行 `python scripts/test_portable.py .\dist\LexiGo.exe`，用独立临时目录验证 EXE 路径、移动后重新打开和隔离的旧库迁移。脚本经过 EXE 的 `--serve` 模式测试后端，WebView2 窗口的验证需在 Windows 上双击 EXE。
 
@@ -129,7 +131,7 @@ Android 的开发环境、签名方式和命令见 `android/README.md`。两端�
 
 ## GitHub 发行
 
-Android 和 Windows 共用一个发行标签，当前版本为 `v3.5.6`。公开附件为 Android APK、Windows Setup 和 Windows 便携版。Android 用户可直接使用 APK 覆盖安装同包名签名版本。
+Android 和 Windows 共用一个发行标签，当前版本为 `v3.5.7`。公开附件为 Android APK、Windows Setup 和 Windows 便携版。Android 用户可直接使用 APK 覆盖安装同包名签名版本。
 
 - 在主分支手动运行「LexiGo release」。两端并行构建。Android 使用 `LEXIGO_ANDROID_SIGNING` 并在 Android 16 验证全新安装及覆盖升级。Windows 在原生环境验证安装与便携数据。发布任务先验证草稿附件，公开后从下载地址匿名下载并核对三份附件的 SHA-256。发行说明列出 APK 的字节数及 SHA-256。
 - Android 构建产物保留 30 天。同版本 APK 下载异常时，运行「Repair Android release asset」，输入发行标签、该版本的发行运行编号和递增的附件修订号。任务使用同一标签提交的已验证 APK，上传到新的下载地址，重新下载校验后才撤下旧附件。

@@ -91,9 +91,9 @@ verify_install() {
 install "$apk"
 verify_install
 
-prior_sha=800a04c61fa58164bf0a731e016be4299be3590ef45e5b62b685ae7c699eb32a
+prior_sha=42e7d526409b1adc838a6e0dc7c3196a680e7eb71151ad7ed5c7c0dcc6f8a883
 curl --fail --silent --show-error --location --retry 3 \
-  https://github.com/QiNian2684/LexiGo/releases/download/v3.5.5/LexiGo-Android-3.5.5-r1.apk \
+  https://github.com/QiNian2684/LexiGo/releases/download/v3.5.6/LexiGo-Android-3.5.6.apk \
   -o "$work/previous.apk"
 printf '%s  %s\n' "$prior_sha" "$work/previous.apk" | sha256sum --check
 adb uninstall "$package"

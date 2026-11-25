@@ -7,7 +7,9 @@ const windowsReview = document.documentElement.dataset.reviewShortcuts === "wind
 const shell = document.querySelector(".shell");
 const controls = window.WordReviewControls;
 const wordPreview = el("word-preview");
+const reviewFrame = el("review-frame");
 const flashcard = el("flashcard");
+const emptyPanel = el("review-empty");
 const swipeContent = el("swipe-content");
 const cardFront = swipeContent.querySelector(".card-front");
 const swipeCue = el("swipe-cue");
@@ -173,7 +175,8 @@ function renderReview() {
   flashcard.hidden = !current;
   if (mobile) cardFront.toggleAttribute("data-swipe-reveal", !!current && !answerExpanded());
   el("review-start").hidden = !!practice || !!studying || !next.current;
-  el("review-empty").hidden = !!practice || !!next.current;
+  emptyPanel.hidden = !!practice || !!next.current;
+  reviewFrame.hidden = flashcard.hidden && emptyPanel.hidden;
   const regularDue = next.planned - next.remembered;
   const recallDue = next.due - regularDue;
   el("start-summary").textContent = regularDue
@@ -318,52 +321,52 @@ function cardDetailSections(card, showIPA) {
 }
 
 function memorySection(card) {
-  const seen = new Set();
-  const unique = value => {
-    const text = value?.trim();
-    if (!text) return "";
-    const key = text.normalize("NFKC").replace(/\s+/g, " ");
-    if (seen.has(key)) return "";
-    seen.add(key);
-    return text;
-  };
-  const root = unique(card.etymology);
-  const note = unique(card.note);
-  const hint = unique(card.memoryHint);
-  const extra = unique(card.moreMemory);
-  const hasDetails = root || note;
-  const main = hasDetails ? "" : hint || extra;
-  if (!hasDetails && !main) return;
+  const custom = card.etymology?.trim();
+  const primary = custom || card.memoryHint?.trim() || card.moreMemory?.trim();
+  const tip = card.note?.trim();
+  if (!primary && !tip) return;
   const association = document.createElement("div");
   association.className = "detail-group memory-association";
   const heading = document.createElement("h3");
   heading.textContent = "记忆联想";
   association.append(heading);
-  for (const [label, text] of [["词根词缀", root], ["记忆技巧", note], ["", main]]) {
-    if (!text) continue;
+  const seen = new Set();
+  const isNew = text => {
+    if (!text) return false;
+    const key = text.normalize("NFKC").trim().replace(/\s+/g, " ");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  };
+  for (const text of [primary, tip]) {
+    if (!isNew(text)) continue;
     const line = document.createElement("p");
     line.className = "construction";
-    if (label) {
-      const name = document.createElement("strong");
-      name.textContent = label + " · ";
-      line.append(name);
-    }
-    line.append(text);
+    line.textContent = text;
     association.append(line);
   }
-  const supplement = hasDetails ? [hint, extra].filter(Boolean).join("\n") : hint && extra;
-  if (supplement) {
-    const more = document.createElement("details");
-    more.className = "construction-details";
-    const title = document.createElement("summary");
-    title.textContent = "更多联想";
-    const content = document.createElement("p");
-    content.className = "construction";
-    content.textContent = supplement;
-    more.append(title, content);
-    association.append(more);
-  }
+  if (!custom && isNew(card.moreMemory?.trim())) association.append(referenceDisclosure("更多联想", card.moreMemory));
   return association;
+}
+
+function referenceDisclosure(label, value) {
+  const reference = document.createElement("details");
+  reference.className = "construction-details";
+  const title = document.createElement("summary");
+  title.textContent = label;
+  const text = document.createElement("p");
+  text.textContent = value;
+  reference.append(title, text);
+  return reference;
+}
+
+function appendReferenceData(card, destination) {
+  if (card.rawEtymology && card.rawEtymology !== card.etymology) {
+    destination.append(referenceDisclosure("原始词源资料", card.rawEtymology));
+  }
+  if (card.referenceTip && card.referenceTip !== card.note) {
+    destination.append(referenceDisclosure("旧版参考提示", card.referenceTip));
+  }
 }
 
 function renderDetails(card) {
@@ -375,14 +378,18 @@ function renderDetails(card) {
     } catch (error) { showError(error); }
   }));
   el("details").replaceChildren(...fields);
-  el("card-metadata").replaceChildren(...(sound.length ? [group("音标", sound.join(" · "))] : []), sources);
+  const metadata = el("card-metadata");
+  metadata.replaceChildren(...(sound.length ? [group("音标", sound.join(" · "))] : []));
+  appendReferenceData(card, metadata);
+  metadata.append(sources);
 }
 
 async function refreshRevealedDetails() {
   const before = revealed;
   if (!before) return;
   const result = await api("/api/card/" + keyPath(before.key));
-  if (revealed === before && ["lookup", "translationPending", ...editFields].some(key => result[key] !== before[key])) {
+  if (revealed === before &&
+      ["lookup", "translationPending", "rawEtymology", "wikiSource", ...editFields].some(key => result[key] !== before[key])) {
     revealed = result;
     renderDetails(result);
   }
@@ -392,12 +399,21 @@ function answerExpanded() { return answerPanel.getAttribute("aria-hidden") === "
 
 function reviewTiming(token, easing) {
   if (reducedMotion.matches || !swipeContent.animate) return;
-  return {options: motionOptions(token, easing), start: document.timeline.currentTime};
+  return {options: motionOptions(token, easing), animations: []};
 }
 
 function playReviewMotion(element, frames, timing, fill = "both") {
   const animation = element.animate(frames, {...timing.options, fill});
-  if (timing.start != null) animation.startTime = timing.start;
+  if (!timing.animations.length) {
+    // The frame clock starts after preparation, including any synchronous
+    // measurement for the card and the dock. Pending effects hold frame zero.
+    requestAnimationFrame(start => {
+      for (const motion of timing.animations) {
+        if (motion.playState === "running") motion.startTime = start;
+      }
+    });
+  }
+  timing.animations.push(animation);
   return animation;
 }
 
@@ -460,25 +476,32 @@ function setAnswerExpanded(expanded, animate = true) {
   const height = timing && !answerPanel.hidden ? answerPanel.getBoundingClientRect().height : 0;
   const rotation = timing && getComputedStyle(revealIcon).transform;
 
+  if (timing) answerPanel.style.height = height + "px";
   settleAnswerMotion(expanded || !!timing);
   answerPanel.setAttribute("aria-hidden", String(!expanded));
   answerPanel.inert = !expanded;
   el("reveal").setAttribute("aria-expanded", String(expanded));
   el("reveal-label").textContent = expanded ? "收起释义" : "查看中文释义";
+  if (mobile) cardFront.toggleAttribute("data-swipe-reveal", !flashcard.hidden && !expanded);
+  updateReviewControls();
+  syncVoteBar(timing);
   if (expanded) fitNote();
   if (timing) {
-    const target = expanded ? answerPanel.getBoundingClientRect().height : 0;
+    const style = expanded && getComputedStyle(answerContent);
+    const target = expanded
+      ? answerContent.getBoundingClientRect().height + parseFloat(style.marginTop) + parseFloat(style.marginBottom)
+      : 0;
     const motions = [
       playReviewMotion(answerPanel, [{height: height + "px"}, {height: target + "px"}], timing),
       playReviewMotion(answerContent, [from, expanded ? visible : concealed], timing),
       playReviewMotion(revealIcon, [{transform: rotation}, {transform: expanded ? "rotate(180deg)" : "rotate(0deg)"}], timing),
     ];
+    answerPanel.style.height = "";
     answerAnimation = motions;
     motions[0].finished.then(() => {
       if (answerAnimation === motions) settleAnswerMotion(expanded);
     }).catch(() => {});
   }
-  syncVoteBar(timing);
 }
 
 async function toggleReveal({animate = true, duringSlide = false} = {}) {
@@ -490,7 +513,6 @@ async function toggleReveal({animate = true, duringSlide = false} = {}) {
     if (!practice && state?.waitingForNext) return;
     if (answerPanel.contains(document.activeElement)) trigger.focus({preventScroll: true});
     setAnswerExpanded(false, animate);
-    renderReview();
     return;
   }
   const intent = viewRequest;
@@ -509,7 +531,6 @@ async function toggleReveal({animate = true, duringSlide = false} = {}) {
       renderDetails(card);
     }
     setAnswerExpanded(true, animate);
-    renderReview();
   } catch (error) {
     if (intent === viewRequest && request === revealRequest) showError(error);
   } finally {
@@ -650,6 +671,15 @@ function resetReviewSlide() {
   swipeCue.style.opacity = "";
 }
 
+function reviewFrameHeight(content) {
+  const style = getComputedStyle(reviewFrame);
+  return content.getBoundingClientRect().height + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+}
+
+function moveReviewFrame(from, to, timing) {
+  return playReviewMotion(reviewFrame, [{height: from + "px"}, {height: to + "px"}], timing);
+}
+
 async function slideReview({offset = 0, reversing = false, passToday = false} = {}) {
   if (view !== "review" || !state || practice || busy || swiping ||
       (reversing ? !state.canUndo : passToday
@@ -659,21 +689,27 @@ async function slideReview({offset = 0, reversing = false, passToday = false} = 
   const waiting = Boolean(waitingForNext);
   const direction = reversing ? 1 : -1;
   const exitTiming = reviewTiming("--motion-card-out", "--motion-card-ease");
-  const distance = exitTiming && !flashcard.hidden ? swipeContent.clientWidth : 0;
+  const oldContent = flashcard.hidden ? emptyPanel : swipeContent;
+  const distance = exitTiming && !reviewFrame.hidden ? oldContent.clientWidth : 0;
   const barWasVisible = mobile && !voteDock.hidden;
   const interruptedAnswer = answerAnimation;
-  const emptyPanel = el("review-empty");
-  let outgoing, outgoingBar, completed;
+  let outgoing, outgoingBar, incoming, frameMotion, completed;
   swiping = true;
   updateReviewControls();
   try {
     if (distance) {
+      const from = reviewFrame.getBoundingClientRect().height;
+      const front = flashcard.hidden ? from : reviewFrameHeight(cardFront);
+      const bridge = front + Math.min(96, Math.max(0, from - front) * .28);
       for (const animation of interruptedAnswer || []) animation.pause();
+      reviewFrame.setAttribute("data-flipping", "");
       const exit = direction * Math.max(distance, Math.abs(offset) + 24);
-      outgoing = playReviewMotion(swipeContent, [
+      outgoing = playReviewMotion(oldContent, [
         {transform: `translateX(${offset}px)`, opacity: 1},
         {transform: `translateX(${exit}px)`, opacity: 0},
       ], exitTiming);
+      // Keep this frame fixed while the response swaps or fetches card contents.
+      frameMotion = moveReviewFrame(from, Math.min(from, bridge), exitTiming);
       if (barWasVisible) {
         voteActions.inert = true;
         const from = voteBarAnimation ? currentMotionFrame(voteActions) : barRaised;
@@ -681,7 +717,7 @@ async function slideReview({offset = 0, reversing = false, passToday = false} = 
         outgoingBar = moveVoteBar(from, barLeaving, exitTiming);
       }
     }
-    const beforeSwap = Promise.allSettled([outgoing?.finished, outgoingBar?.finished]);
+    const beforeSwap = Promise.allSettled([outgoing?.finished, outgoingBar?.finished, frameMotion?.finished]);
     // Run the local request and card exit together. Keep the outgoing frames
     // in place until both finish, even when the request takes longer.
     if (reversing) await undo(beforeSwap);
@@ -697,18 +733,25 @@ async function slideReview({offset = 0, reversing = false, passToday = false} = 
         transform: incomingTarget === emptyPanel ? "translateY(6px)" : `translateX(${-direction * 24}px)`,
         opacity: .55,
       };
+      const from = reviewFrame.getBoundingClientRect().height;
+      const goal = reviewFrameHeight(incomingTarget === emptyPanel ? emptyPanel : flashcard);
       outgoing?.cancel();
+      frameMotion?.cancel();
       resetReviewSlide();
-      const incoming = playReviewMotion(incomingTarget, [start, {transform: "none", opacity: 1}], entryTiming, "none");
+      incoming = playReviewMotion(incomingTarget, [start, {transform: "none", opacity: 1}], entryTiming);
+      frameMotion = moveReviewFrame(from, goal, entryTiming);
       let incomingBar;
       if (mobile && (barWasVisible || barVisible)) {
         const from = voteDock.hidden ? barLowered : currentMotionFrame(voteActions);
         incomingBar = moveVoteBar(from, barVisible ? barRaised : barLowered, entryTiming);
       }
-      await Promise.allSettled([incoming.finished, incomingBar?.finished]);
+      await Promise.allSettled([incoming.finished, incomingBar?.finished, frameMotion.finished]);
     }
   } finally {
     outgoing?.cancel();
+    incoming?.cancel();
+    frameMotion?.cancel();
+    reviewFrame.removeAttribute("data-flipping");
     resetReviewSlide();
     swiping = false;
     if (interruptedAnswer === answerAnimation) {
@@ -980,10 +1023,10 @@ function renderWordPreview(card, progress) {
   timing.textContent = progress;
   const body = el("word-preview-content");
   body.replaceChildren(timing, ...fields, group("我的备注", card.personalNote, "暂无备注。"));
-  for (const [label, value] of [["词性", card.pos], ["音标", sound.join(" · ")],
-    ["词根和词源", card.etymology], ["搭配", card.collocations], ["记忆提示", card.note]]) {
+  for (const [label, value] of [["词性", card.pos], ["音标", sound.join(" · ")], ["搭配", card.collocations]]) {
     if (value) body.append(group(label, value));
   }
+  appendReferenceData(card, body);
   if (sources.childElementCount) body.append(sources);
   el("word-preview-title").textContent = card.word;
 }
@@ -1273,7 +1316,11 @@ async function openEditor(key) {
   editing = await api("/api/card/" + keyPath(key));
   el("edit-title").textContent = "编辑 " + editing.word;
   for (const field of editFields) el("edit-" + field).value = editing[field] || "";
-  el("retry-one").hidden = !!(editing.meaning && editing.pos && editing.examples && editing.exampleTranslation && editing.etymology);
+  el("edit-raw-etymology").hidden = !editing.rawEtymology;
+  el("edit-raw-etymology").open = false;
+  el("edit-raw-etymology-text").textContent = editing.rawEtymology || "";
+  el("use-raw-etymology").disabled = !!editing.etymology;
+  el("retry-one").hidden = !!(editing.meaning && editing.pos && editing.examples && editing.exampleTranslation && editing.rawEtymology);
   el("retry-one").disabled = !state?.settings.online;
   message("edit-status");
   el("edit-dialog").showModal();
@@ -2173,6 +2220,16 @@ el("edit-form").addEventListener("focusout", event => {
   if (event.target.id.startsWith("edit-")) flushEdit(event.target.id === "edit-word").catch(editError);
 });
 el("retry-one").onclick = retryOne;
+el("edit-etymology").addEventListener("input", event => {
+  el("use-raw-etymology").disabled = !!event.target.value.trim();
+});
+el("use-raw-etymology").onclick = () => {
+  const custom = el("edit-etymology");
+  if (!editing?.rawEtymology || custom.value.trim()) return;
+  custom.value = editing.rawEtymology;
+  custom.dispatchEvent(new Event("input", {bubbles: true}));
+  custom.focus();
+};
 el("action-form").onsubmit = confirmAction;
 el("add-form").onsubmit = submitWords;
 el("pick-word-file").onclick = () => el("word-file").click();
