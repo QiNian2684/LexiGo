@@ -2,11 +2,7 @@ name: Windows build
 
 on:
   workflow_dispatch:
-    inputs:
-      publish:
-        description: Publish the tested Windows Setup and portable EXE (same signing status as 3.3.1)
-        type: boolean
-        default: false
+  workflow_call:
 
 permissions:
   contents: read
@@ -52,6 +48,7 @@ jobs:
           path: dist/*.exe
           if-no-files-found: error
           compression-level: 0
+          overwrite: true
           retention-days: 1
 
   verify:
@@ -87,43 +84,23 @@ jobs:
           if ((Get-FileHash -LiteralPath $installed).Hash -ne (Get-FileHash -LiteralPath 'dist\LexiGo.exe').Hash) {
               throw 'Installed executable differs from the Windows build.'
           }
+          $version = ($setup.BaseName -replace '^LexiGo-Setup-', '')
+          $checksums = foreach ($file in @($setup, (Get-Item 'dist\LexiGo.exe'))) {
+              $productVersion = $file.VersionInfo.ProductVersion
+              if ($productVersion -notin @($version, "$version.0")) {
+                  throw "Unexpected product version in $($file.Name): $productVersion"
+              }
+              $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash.ToLowerInvariant()
+              "$hash  $($file.Name)"
+          }
+          $checksums | Set-Content -LiteralPath 'dist\SHA256SUMS' -Encoding utf8NoBOM
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: windows-build-for-signing
-          path: dist/*.exe
+          name: verified-windows-release
+          path: |
+            dist/*.exe
+            dist/SHA256SUMS
           if-no-files-found: error
           compression-level: 0
+          overwrite: true
           retention-days: 7
-
-  publish:
-    needs: verify
-    if: inputs.publish
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-    steps:
-      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
-        with:
-          name: windows-build-for-signing
-          path: dist
-      - name: Publish the Windows-only release
-        run: |
-          set -euo pipefail
-          installers=(dist/LexiGo-Setup-*.exe)
-          [[ ${#installers[@]} == 1 && -f "${installers[0]}" ]]
-          setup="${installers[0]##*/}"
-          [[ "$setup" =~ ^LexiGo-Setup-([0-9]+\.[0-9]+\.[0-9]+)\.exe$ ]]
-          version="${BASH_REMATCH[1]}"
-          tag="v$version-windows"
-          notes='Windows x64 安装版和便携版。已在 Windows 验证安装和运行。修复切页收尾旧画面闪回，精简侧栏滚动条，新增「首次记住即掌握」学习选项，默认关闭。与 3.3.1 的 Windows 安装包相同，此版本的 EXE 未做 Authenticode 签名。'
-          gh release create "$tag" "dist/$setup" dist/LexiGo.exe --draft --latest=false \
-            --target "$GITHUB_SHA" --title "LexiGo $version Windows" --notes "$notes"
-          remote="$(mktemp -d)"
-          (cd dist && sha256sum "$setup" LexiGo.exe) > "$remote/checksums"
-          gh release download "$tag" --dir "$remote" --pattern "$setup" --pattern LexiGo.exe
-          (cd "$remote" && sha256sum --check checksums)
-          gh release edit "$tag" --draft=false --latest=false

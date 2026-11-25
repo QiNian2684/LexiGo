@@ -1,0 +1,46 @@
+name: LexiGo release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lexigo-release
+  cancel-in-progress: false
+
+jobs:
+  android:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/android-release.yml
+    secrets:
+      LEXIGO_ANDROID_SIGNING: ${{ secrets.LEXIGO_ANDROID_SIGNING }}
+
+  windows:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/windows-build.yml
+
+  publish:
+    needs: [android, windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
+        with:
+          name: verified-android-release
+          path: dist/android
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
+        with:
+          name: verified-windows-release
+          path: dist/windows
+      - name: Publish the verified Android and Windows files
+        run: bash scripts/publish-release.sh

@@ -34,7 +34,7 @@ func myMemoryTranslation(ctx context.Context, client *http.Client, endpoint, sen
 		return "", err
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "LexiGo/3.5.3 (+https://github.com/QiNian2684/LexiGo)")
+	req.Header.Set("User-Agent", "LexiGo/3.5.5 (+https://github.com/QiNian2684/LexiGo)")
 	reply, err := client.Do(req)
 	if err != nil {
 		return "", err

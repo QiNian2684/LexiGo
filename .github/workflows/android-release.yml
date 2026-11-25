@@ -1,12 +1,11 @@
-name: Android release
+name: Android build
 
 on:
   workflow_dispatch:
-    inputs:
-      publish:
-        description: Publish the verified APK and incremental signature
-        type: boolean
-        default: false
+  workflow_call:
+    secrets:
+      LEXIGO_ANDROID_SIGNING:
+        required: true
 
 permissions:
   contents: read
@@ -20,8 +19,6 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
-    outputs:
-      tag: ${{ steps.build.outputs.tag }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -56,7 +53,6 @@ jobs:
           mv -- "$sdk/ndk/android-ndk-r28c" "$sdk/ndk/28.2.13676358"
           printf 'LEXIGO_ANDROID_SDK=%s\n' "$sdk" >> "$GITHUB_ENV"
       - name: Build, sign and verify
-        id: build
         env:
           ANDROID_SIGNING: ${{ secrets.LEXIGO_ANDROID_SIGNING }}
           WORDREVIEW_KEY_ALIAS: lexigo
@@ -102,7 +98,6 @@ jobs:
           grep -F "package: name='$package' versionCode='$version_code' versionName='$version'" "$signing/badging.txt"
           grep -E "^native-code: ('arm64-v8a' 'x86_64'|'x86_64' 'arm64-v8a')[[:space:]]*$" "$signing/badging.txt"
           (cd dist && sha256sum "$apk" "$apk.idsig" > SHA256SUMS)
-          printf 'tag=v%s-android\n' "$version" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: verified-android-release
@@ -112,6 +107,7 @@ jobs:
             dist/SHA256SUMS
           if-no-files-found: error
           compression-level: 0
+          overwrite: true
           retention-days: 7
 
   install:
@@ -134,44 +130,3 @@ jobs:
         run: |
           (cd dist && sha256sum --check SHA256SUMS)
           bash scripts/test-android-install.sh dist/*.apk
-
-  publish:
-    needs: [build, install]
-    if: inputs.publish
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    env:
-      TAG: ${{ needs.build.outputs.tag }}
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
-        with:
-          name: verified-android-release
-          path: dist
-      - name: Publish the verified files
-        run: |
-          set -euo pipefail
-          version="${TAG#v}"
-          version="${version%-android}"
-          apk="LexiGo-Android-$version.apk"
-          (cd dist && sha256sum --check SHA256SUMS)
-          notes=(--generate-notes)
-          if [[ -f "android/releases/$TAG.md" ]]; then
-            notes=(--notes-file "android/releases/$TAG.md")
-          fi
-          if gh release view "$TAG" --json isDraft --jq .isDraft > "$RUNNER_TEMP/lexigo-draft"; then
-            [[ "$(cat "$RUNNER_TEMP/lexigo-draft")" == true ]]
-            gh release upload "$TAG" "dist/$apk" "dist/$apk.idsig" --clobber
-          else
-            gh release create "$TAG" "dist/$apk" "dist/$apk.idsig" --draft \
-              --target "$GITHUB_SHA" --title "LexiGo $version Android" "${notes[@]}"
-          fi
-          remote="$(mktemp -d)"
-          gh release download "$TAG" --dir "$remote" --pattern "$apk" --pattern "$apk.idsig"
-          (cd "$remote" && sha256sum --check "$GITHUB_WORKSPACE/dist/SHA256SUMS")
-          gh release edit "$TAG" --draft=false --latest

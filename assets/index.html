@@ -78,9 +78,11 @@
         </div>
         </div>
         <div class="swipe-cue" id="swipe-cue" aria-hidden="true"><svg class="icon"><use id="swipe-icon" href="/icons.svg#check"/></svg><span id="swipe-label">记住了</span></div>
-        <div class="card-actions" id="vote-actions" hidden>
-          <button class="button outline" id="forgot" type="button"><span id="forgot-label">没记住</span> <kbd>1</kbd></button>
-          <button class="button primary" id="pass" type="button">记住了 <kbd>2</kbd></button>
+        <div class="vote-dock" id="vote-dock" hidden>
+          <div class="card-actions" id="vote-actions" inert>
+            <button class="button outline" id="forgot" type="button"><span id="forgot-label">没记住</span> <kbd>1</kbd></button>
+            <button class="button primary" id="pass" type="button">记住了 <kbd>2</kbd></button>
+          </div>
         </div>
       </article>
       <article class="card empty-state" id="review-empty" aria-busy="true">
@@ -193,10 +195,10 @@
       <header class="page-heading">
         <h1 id="settings-title" tabindex="-1">设置</h1>
       </header>
-      <div class="settings-layout">
-        <form id="settings-form" class="settings-stack" data-validation="study-settings-status">
+      <form id="settings-form" class="settings-layout" data-validation="study-settings-status">
+        <div class="settings-stack">
           <section class="card settings-group" aria-labelledby="learning-settings-title">
-            <header><h2 id="learning-settings-title">学习</h2></header>
+            <header><h2 id="learning-settings-title">学习规则</h2></header>
             <div class="setting-row setting-limit">
               <div class="setting-text"><label for="daily-limit">每日复习上限</label><p>当天导入的词优先，可超过上限。</p></div>
               <div class="setting-control">
@@ -209,36 +211,46 @@
               </div>
             </div>
             <div class="setting-row">
-              <div class="setting-text"><label for="daily-goal">每日记忆所需连对次数</label><p>首次完成记忆需要连对设定次数。以后再次复习这个词时，首答记住即可完成当天的记忆，首答没记住则需重新连对。</p></div>
+              <div class="setting-text"><label for="daily-goal">每日记忆所需连对次数</label><p>首次记忆要连对。后续复习首答通过即可完成当天任务，答错则重新连对。</p></div>
               <div class="number-unit"><input type="number" inputmode="numeric" min="1" max="99" step="1" id="daily-goal" required><span aria-hidden="true">次</span></div>
             </div>
             <div class="setting-row">
-              <div class="setting-text"><label for="goal">长期掌握所需累计天数</label><p>每天完成记忆计 1 天。达到目标的当天须首答记住，才能标为已掌握。首答没记住时，当天完成仍计 1 天，达标顺延到后续学习日。</p></div>
+              <div class="setting-text"><label for="goal">长期掌握所需累计天数</label><p>每天完成记忆计 1 天。达标当天须首答记住。首答错时，完成天数照计，掌握顺延。</p></div>
               <div class="number-unit"><input type="number" inputmode="numeric" min="1" max="99" step="1" id="goal" required><span aria-hidden="true">天</span></div>
             </div>
             <label class="setting-row switch-row">
               <span class="setting-text">
                 <strong id="first-try-mastery-label">首次记住即掌握</strong>
-                <span class="setting-help" id="first-try-mastery-help">新词和重新学习的词，首次答对直接掌握，答错则继续按日复习。</span>
+                <span class="setting-help" id="first-try-mastery-help">尚未作答的新词或重新学习的词，首答记住即掌握。首答错则按日复习。</span>
               </span>
               <input type="checkbox" role="switch" id="first-try-mastery" aria-labelledby="first-try-mastery-label" aria-describedby="first-try-mastery-help">
               <span class="switch-indicator" aria-hidden="true"></span>
             </label>
-            <div class="setting-row">
-              <div class="setting-text"><label for="study-rollover">学习日结束时间</label><p>按设备本地时间换日，默认 05:00。</p></div>
-              <div class="setting-control"><input id="study-rollover" type="time" step="60" required></div>
+          </section>
+
+          <section class="card settings-group time-settings" aria-labelledby="time-settings-title">
+            <header><h2 id="time-settings-title">时间与考试</h2></header>
+            <div class="setting-row time-setting">
+              <div class="setting-text"><label for="study-rollover">学习日结束时间</label><p id="study-rollover-help">按本地时间换日，默认 05:00。</p></div>
+              <div class="setting-control picker-control time-control">
+                <input id="study-rollover" type="time" step="60" aria-describedby="study-rollover-help" required>
+                <div class="picker-box" aria-hidden="true">
+                  <span id="study-rollover-display">05:00</span>
+                  <svg class="icon" focusable="false"><use href="/icons.svg#down"/></svg>
+                </div>
+              </div>
             </div>
-            <div class="setting-row" id="exam-mode-row">
-              <div class="setting-text"><label for="exam-mode">考试日期</label><p>按设备本地日历倒计时。</p></div>
+            <div class="setting-row time-setting">
+              <div class="setting-text"><label for="exam-mode">考试日期模式</label><p>按本地日历倒计时。</p></div>
               <div class="setting-control">
                 <select id="exam-mode" data-styled><option value="annual">每年循环</option><option value="fixed">指定日期</option></select>
               </div>
             </div>
-            <div class="setting-row" id="exam-date-row">
-              <label class="setting-text" for="exam-date">考试日</label>
-              <div class="setting-control exam-date-control">
+            <div class="setting-row time-setting">
+              <div class="setting-text"><label for="exam-date">考试日</label></div>
+              <div class="setting-control picker-control">
                 <input id="exam-date" type="date" min="1900-01-01" max="9999-12-31">
-                <div class="exam-date-box" aria-hidden="true">
+                <div class="picker-box" aria-hidden="true">
                   <span id="exam-date-display">选择日期</span>
                   <svg class="icon" focusable="false"><use href="/icons.svg#down"/></svg>
                 </div>
@@ -246,10 +258,18 @@
             </div>
           </section>
 
+          <section class="card settings-group" aria-labelledby="review-display-title">
+            <header><h2 id="review-display-title">复习显示</h2></header>
+            <label class="setting-row switch-row"><span>在复习卡显示音标</span><input type="checkbox" role="switch" id="show-ipa"><span class="switch-indicator" aria-hidden="true"></span></label>
+          </section>
+          <p id="study-settings-status" class="inline-status error" role="alert" hidden></p>
+        </div>
+
+        <div class="settings-stack">
           <section class="card settings-group" aria-labelledby="appearance-title">
             <header><h2 id="appearance-title">外观</h2></header>
             <fieldset class="theme-field">
-              <legend>主题</legend>
+              <legend class="visually-hidden">主题</legend>
               <div class="theme-segments">
                 <label><input type="radio" name="appearance-theme" value="system" checked><span><svg class="icon" aria-hidden="true"><use href="/icons.svg#screen"/></svg>跟随系统</span></label>
                 <label><input type="radio" name="appearance-theme" value="light"><span><svg class="icon" aria-hidden="true"><use href="/icons.svg#sun"/></svg>浅色</span></label>
@@ -257,17 +277,12 @@
               </div>
               <p id="theme-status" class="inline-status error" role="status" hidden></p>
             </fieldset>
-            <label class="setting-row switch-row"><span>在复习卡显示音标</span><input type="checkbox" role="switch" id="show-ipa"><span class="switch-indicator" aria-hidden="true"></span></label>
           </section>
 
           <section class="card settings-group" aria-labelledby="dictionary-settings-title">
             <header><h2 id="dictionary-settings-title">词典</h2><p>联网时，可从 Wiktionary、Tatoeba 和 Wikipedia 查找例句，并通过 MyMemory 补译公开例句。自填例句和个人备注保留在本机。</p></header>
             <label class="setting-row switch-row"><span>联网补充缺失的词典资料</span><input type="checkbox" role="switch" id="online"><span class="switch-indicator" aria-hidden="true"></span></label>
           </section>
-          <p id="study-settings-status" class="inline-status error" role="alert" hidden></p>
-        </form>
-
-        <div class="settings-stack">
           <section class="card settings-group data-controls" aria-labelledby="data-title">
             <header><h2 id="data-title">数据管理</h2><p>存储位置 <code id="storage-path">Data&#92;vocabulary.db</code></p></header>
             <div class="data-actions">
@@ -281,8 +296,8 @@
               <button class="settings-operation" id="transfer-recovery" type="button" hidden>
                 <svg class="icon" aria-hidden="true"><use href="/icons.svg#history"/></svg><span>导出覆盖前备份</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
               </button>
-              <p class="data-guide"><strong>使用方法</strong> <span id="transfer-guide">在原设备导出 .lexi 文件，将它发送到另一台设备，再选择「导入数据」。</span></p>
-              <p class="data-guide"><strong>注意</strong> 导入会覆盖本机数据，不会自动合并。</p>
+              <p class="data-guide" id="transfer-guide">在原设备导出 .lexi 文件，再到另一台设备导入。</p>
+              <p class="data-guide">导入将替换本机的词库、备注及学习记录。</p>
               <h3>本地备份</h3>
               <a class="settings-operation" id="download-backup" href="/api/backup" download>
                 <svg class="icon" aria-hidden="true"><use href="/icons.svg#backup"/></svg><span>备份数据</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
@@ -290,14 +305,13 @@
               <button class="settings-operation" id="pick-restore" type="button">
                 <svg class="icon" aria-hidden="true"><use href="/icons.svg#history"/></svg><span>恢复备份</span><svg class="icon trailing" aria-hidden="true"><use href="/icons.svg#right"/></svg>
               </button>
-              <p class="data-guide"><strong>备份数据</strong> 保存词库、备注、学习进度和历史记录。</p>
-              <p class="data-guide"><strong>恢复备份</strong> 用此前保存的备份替换当前学习状态。</p>
+              <p class="data-guide">备份包含词库、备注、进度和历史。恢复时会替换本机学习数据。</p>
               <input id="restore-file" type="file" accept=".lexi,.json,application/json" hidden>
             </div>
             <p id="settings-status" class="inline-status" role="status" hidden></p>
           </section>
         </div>
-      </div>
+      </form>
       <footer class="settings-footer">
         <button class="quiet" type="button" id="open-guide">使用说明</button>
         <a href="/licenses" id="open-licenses">第三方许可</a>
@@ -354,6 +368,7 @@
               <dt><kbd>Ctrl</kbd> + <kbd>Z</kbd></dt><dd>撤销上一次作答。也可以点击复习区下方的「撤销上一次」。</dd>
             </dl>
             <dl class="guide-controls" id="guide-android" hidden>
+              <dt><svg class="icon" aria-hidden="true"><use href="/icons.svg#down"/></svg> 向下滑</dt><dd>释义收起时，在卡片正面向下滑可展开释义。</dd>
               <dt><svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-left"/></svg> 向左滑</dt><dd>展开释义后，在卡片上向左滑，等同于选择「记住了」。已记录遗忘时，左滑会翻到下一词。</dd>
               <dt><svg class="icon guide-arrow-right" aria-hidden="true"><use href="/icons.svg#arrow-left"/></svg> 向右滑</dt><dd>撤销上一次作答并重新打开上一词的释义。也可以从复习页的空白处开始右滑。</dd>
             </dl>
@@ -372,10 +387,10 @@
             <figure class="guide-figure">
               <img class="guide-light" src="/guide/rules.webp" width="754" height="754" alt="学习设置可调整每日复习上限、连对次数和长期掌握所需累计天数" loading="lazy">
               <img class="guide-dark" src="/guide/rules-dark.webp" width="754" height="754" alt="学习设置可调整每日复习上限、连对次数和长期掌握所需累计天数" loading="lazy">
-              <figcaption>在「设置 → 学习」调整连对次数和长期掌握所需天数。</figcaption>
+              <figcaption>在「设置 → 学习规则」调整连对次数和长期掌握所需天数。</figcaption>
             </figure>
           </div>
-          <p class="guide-note">可在「设置 → 学习」开启「首次记住即掌握」。新词、尚未作答的词和重新学习的词，只在本轮首次答对时直接掌握。首答错后照常连对和累计学习日。</p>
+          <p class="guide-note">可在「设置 → 学习规则」开启「首次记住即掌握」。新词、尚未作答的词和重新学习的词，只在本轮首次答对时直接掌握。首答错后照常连对和累计学习日。</p>
           <p class="guide-note">学习日默认在本机时间 05:00 换日，可在设置修改。每天回顾恰好 5 个学习日前答错次数最多的 10 个词。首答记住即通过。首答没记住时，当天需连对 3 次，即使完成也会顺延，直到某天首答记住。易错词计入今日进度，与普通复习重叠时只计一个词。</p>
         </section>
 
@@ -401,7 +416,7 @@
           <div class="guide-layout">
             <div>
               <p><strong>看最近的学习情况。</strong> 在「统计」切换最近 7 天或 30 天。想知道学了多少不同的词，选「学习词数」。想知道答对和答错多少次，选「作答情况」。点击图表上的日期可查看具体数字。</p>
-              <p><strong>按自己的计划设置。</strong> 在「设置 → 学习」调整每日复习上限，也可以设定考试倒计时，选择每年重复的日期或一个指定日期。</p>
+              <p><strong>按自己的计划设置。</strong> 在「学习规则」调整每日复习上限，在「时间与考试」设定换日时间和考试倒计时。</p>
               <p><strong>调整显示。</strong> 「外观」可以切换浅色、深色或跟随系统，也可以选择是否在复习卡上显示音标。</p>
             </div>
             <figure class="guide-figure">

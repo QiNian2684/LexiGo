@@ -101,6 +101,11 @@ body.platform-android {
 .platform-android #card-metadata { margin-block: .8rem; }
 .platform-android[data-view="review"],
 .platform-android[data-view="review"] .shell { touch-action: pan-y pinch-zoom; }
+/* On the closed front, reserve a downward drag while leaving upward scroll and pinch to WebView. */
+.platform-android .card-front[data-swipe-reveal] {
+  touch-action: pinch-zoom;
+  touch-action: pan-down pinch-zoom;
+}
 .platform-android .swipe-content { position: relative; }
 .platform-android .review-card { position: relative; overflow-x: clip; overflow-y: visible; }
 .platform-android .swipe-cue {
@@ -109,16 +114,17 @@ body.platform-android {
   color: var(--accent); background: var(--accent-soft); border-radius: var(--radius-small);
   font-size: .84rem; pointer-events: none;
 }
-.platform-android .card-actions {
+.platform-android .vote-dock {
   grid-area: 2 / 1;
   z-index: 19;
+}
+.platform-android .card-actions {
   padding: .53rem 1rem;
   background: var(--surface);
-  box-shadow: var(--shadow);
 }
 body.platform-android.editing-input { grid-template-rows: minmax(0, 1fr); }
 .platform-android.editing-input .sidebar,
-.platform-android.editing-input .card-actions { display: none; }
+.platform-android.editing-input .vote-dock { display: none; }
 .platform-android.editing-input .shell { padding-bottom: .85rem; }
 .platform-android textarea:focus, .platform-android input:focus { scroll-margin-block-end: .8rem; }
 .platform-android .empty-state { min-height: 14.25rem; padding: 2.15rem .9rem; }
@@ -155,20 +161,15 @@ body.platform-android.editing-input { grid-template-rows: minmax(0, 1fr); }
 .platform-android .row-actions > .quiet { display: none; }
 .platform-android .pagination { padding-inline: .69rem; }
 
-.platform-android .settings-layout { grid-template-columns: minmax(0, 1fr); gap: .85rem; }
-.platform-android .settings-stack { gap: .78rem; }
-.platform-android .setting-row, .platform-android .theme-field { margin-inline: .88rem; }
-.platform-android .settings-group header { padding-inline: .88rem; }
+.platform-android #settings-view {
+  --settings-inset: .88rem;
+  --settings-gap: .78rem;
+  --settings-control-width: clamp(7.2rem, 35vw, 9.5rem);
+}
+.platform-android .settings-layout { grid-template-columns: minmax(0, 1fr); }
 .platform-android .setting-row { min-height: 3.4rem; padding-block: .58rem; }
-.platform-android .setting-control { width: clamp(7.55rem, 35vw, 10rem); }
-.platform-android .setting-text label { font-size: .94rem; }
-.platform-android #exam-date-row { grid-template-columns: minmax(0, 1fr); gap: .42rem; }
-.platform-android #exam-date-row .setting-control { width: 100%; }
-.platform-android .number-unit { width: 4.5rem; }
+.platform-android .number-unit { width: 4.65rem; }
 .platform-android .theme-segments label > span { min-height: 3rem; }
-.platform-android .settings-actions { margin: -.05rem 0 .28rem; }
-.platform-android .settings-actions .button.primary { min-width: 6.9rem; }
-.platform-android .data-actions, .platform-android .exit-group { padding-inline: .88rem; }
 .platform-android .settings-operation { min-height: 3rem; }
 
 .platform-android dialog:not(.control-popup) {
@@ -209,8 +210,7 @@ body.platform-android.editing-input { grid-template-rows: minmax(0, 1fr); }
 .platform-android .popup-item[aria-selected="true"] { margin-block: .07rem; }
 @media (max-width: 360px) {
   .platform-android .shell { padding-inline: .67rem; }
-  .platform-android .settings-group header { padding-inline: .72rem; }
-  .platform-android .setting-row, .platform-android .theme-field { margin-inline: .72rem; }
+  .platform-android #settings-view { --settings-inset: .72rem; }
   .platform-android .theme-segments .icon { display: none; }
   .platform-android .word-row { gap: .23rem; }
   .platform-android .dialog-footer .button { padding-inline: .5rem; }
@@ -218,6 +218,6 @@ body.platform-android.editing-input { grid-template-rows: minmax(0, 1fr); }
 
 
 @media (max-width: 24rem) {
-  .platform-android #exam-mode-row { grid-template-columns: minmax(0, 1fr); gap: .42rem; }
-  .platform-android #exam-mode-row .setting-control { width: 100%; }
+  .platform-android .time-setting { grid-template-columns: minmax(0, 1fr); gap: .42rem; }
+  .platform-android .time-setting .setting-control { width: 100%; }
 }

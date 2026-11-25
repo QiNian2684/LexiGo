@@ -10,6 +10,9 @@ $project = Split-Path -Parent $PSScriptRoot
 . (Join-Path $PSScriptRoot 'windows-signatures.ps1')
 
 $version = $Tag.Substring(1, $Tag.Length - 'v-windows'.Length)
+if ([version]$version -ge [version]'3.5.5') {
+    throw 'For LexiGo 3.5.5 and newer, use the unified LexiGo release workflow.'
+}
 $thumbprint = Get-CodeSigningThumbprint $SigningCertificateThumbprint
 $root = (Resolve-Path -LiteralPath $Artifacts).Path
 $names = @('LexiGo.exe', "LexiGo-Setup-$version.exe")
