@@ -91,6 +91,7 @@ type application struct {
 	transferMu      sync.Mutex
 	transfer        transferDraft
 	appearance      *appearanceSettings
+	shortcuts       *reviewShortcutSettings
 	translations    translationQueue
 }
 
@@ -337,6 +338,9 @@ func (a *application) handler() http.Handler {
 	mux := http.NewServeMux()
 	a.transferRoutes(mux)
 	a.appearanceRoutes(mux)
+	if a.shortcuts != nil {
+		a.shortcuts.routes(mux)
+	}
 	cookieName := "wordreview_" + a.token[:10]
 	mux.HandleFunc("GET /start/{token}", func(w http.ResponseWriter, r *http.Request) {
 		if subtle.ConstantTimeCompare([]byte(r.PathValue("token")), []byte(a.token)) != 1 {
@@ -368,9 +372,13 @@ func (a *application) handler() http.Handler {
 		// These attributes contain only known theme names, never user-entered text.
 		attributes := fmt.Sprintf(`<html lang="zh-CN" data-theme-preference="%s" data-system-theme="%s" data-show-guide="%t" data-hide-guide="%t">`,
 			prefs.Theme, systemAppearance(), showGuide, prefs.HideGuide)
+		if a.shortcuts != nil {
+			keys, _ := json.Marshal(a.shortcuts.snapshot())
+			attributes = strings.TrimSuffix(attributes, ">") + ` data-review-keys="` + html.EscapeString(string(keys)) + `">`
+		}
 		if runtime.GOOS == "windows" && !a.mobile {
 			extra := fmt.Sprintf(` data-review-shortcuts="windows" data-window-ticket="%d">`, a.windowTicket.Add(1))
-			attributes = strings.Replace(attributes, ">", extra, 1)
+			attributes = strings.TrimSuffix(attributes, ">") + extra
 		}
 		rendered := bytes.Replace(page, []byte(`<html lang="zh-CN">`), []byte(attributes), 1)
 		asset("text/html; charset=utf-8", rendered)(w, r)
@@ -467,7 +475,6 @@ func (a *application) handler() http.Handler {
 	mux.HandleFunc("GET /api/cards", func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
 		page, _ := strconv.Atoi(query.Get("page"))
-		page = min(100_000, max(0, page))
 		a.store.mu.Lock()
 		data := a.store.list(selection{Query: query.Get("query"), Filter: query.Get("filter"), Sort: query.Get("sort")}, page)
 		paused, online := time.Now().Before(a.paused), a.store.db.Settings.Online

@@ -470,20 +470,24 @@ type cardRow struct {
 type listResult struct {
 	Rows    []cardRow `json:"rows"`
 	Total   int       `json:"total"`
+	Page    int       `json:"page"`
+	Pages   int       `json:"pages"`
 	Pending int       `json:"pending"`
 	Goal    int       `json:"goal"`
 }
 
 func (s *store) list(selecting selection, page int) listResult {
 	matched := s.matching(selecting)
-	result := listResult{Rows: []cardRow{}, Total: len(matched), Goal: s.db.Settings.Goal}
+	const pageSize = 24
+	pages := (len(matched) + pageSize - 1) / pageSize
+	page = max(0, min(page, pages-1))
+	result := listResult{Rows: []cardRow{}, Total: len(matched), Page: page, Pages: pages, Goal: s.db.Settings.Goal}
 	for _, card := range s.db.Words {
 		if card.Lookup == "pending" && !card.Deleted {
 			result.Pending++
 		}
 	}
-	const pageSize = 24
-	start := min(len(matched), page*pageSize)
+	start := page * pageSize
 	end := min(len(matched), start+pageSize)
 	for _, item := range matched[start:end] {
 		meaning, _, _ := strings.Cut(item.Meaning, "\n")

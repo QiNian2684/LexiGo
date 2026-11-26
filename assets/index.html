@@ -35,7 +35,7 @@
       <p class="desktop-data-copy">学习进度已保存，可以关闭窗口。</p>
     </section>
 
-    <section id="review-view" aria-labelledby="review-title">
+    <section id="review-view" aria-labelledby="review-title" tabindex="-1">
       <header class="page-heading review-heading">
         <div><h1 id="review-title" class="exam-countdown">考试倒计时</h1><p id="date" class="review-date"></p></div>
         <div class="study-summary" id="study-summary" hidden>
@@ -81,8 +81,8 @@
         <div class="swipe-cue" id="swipe-cue" aria-hidden="true"><svg class="icon"><use id="swipe-icon" href="/icons.svg#check"/></svg><span id="swipe-label">记住了</span></div>
         <div class="vote-dock" id="vote-dock" hidden>
           <div class="card-actions" id="vote-actions" inert>
-            <button class="button outline" id="forgot" type="button"><span id="forgot-label">没记住</span> <kbd>1</kbd></button>
-            <button class="button primary" id="pass" type="button">记住了 <kbd>2</kbd></button>
+            <button class="button outline" id="forgot" type="button"><span id="forgot-label">没记住</span> <kbd id="forgot-key">1</kbd></button>
+            <button class="button primary" id="pass" type="button"><span>记住了</span> <kbd id="remember-key">2</kbd></button>
           </div>
         </div>
       </article>
@@ -94,8 +94,8 @@
       </article>
       </div>
       <div class="session-tools" id="session-tools" hidden>
-        <span id="session-hint">Enter 查看释义 · 1 没记住 · 2 记住了</span>
-        <button class="quiet" type="button" id="undo">撤销上一次</button>
+        <span id="session-hint"></span>
+        <button class="quiet" type="button" id="undo">撤销上一次 <kbd id="undo-key" hidden></kbd></button>
       </div>
     </section>
 
@@ -218,8 +218,8 @@
         </div>
         <div id="word-list" class="word-list"></div>
         <div class="pagination">
-          <span id="results"></span>
-          <div><button id="prev-page" class="quiet" type="button">上一页</button><button id="next-page" class="quiet" type="button">下一页</button></div>
+          <span id="results" role="status"></span>
+          <div><button id="prev-page" class="quiet" type="button" disabled>上一页</button><button id="next-page" class="quiet" type="button" disabled>下一页</button></div>
         </div>
       </div>
     </section>
@@ -334,6 +334,22 @@
             </fieldset>
           </section>
 
+          <section class="card settings-group" id="shortcut-settings" aria-labelledby="shortcut-settings-title" hidden>
+            <header>
+              <h2 id="shortcut-settings-title">快捷键</h2>
+              <p>点击当前按键重新录入。展开释义和下一单词可共用一个键。</p>
+            </header>
+            <div class="setting-row"><span id="shortcut-reveal-name">展开中文释义</span><button class="button outline shortcut-key" type="button" data-shortcut="reveal" aria-labelledby="shortcut-reveal-name shortcut-reveal-label"><kbd id="shortcut-reveal-label" data-shortcut-label="reveal"></kbd></button></div>
+            <div class="setting-row"><span id="shortcut-forgot-name">没记住</span><button class="button outline shortcut-key" type="button" data-shortcut="forgot" aria-labelledby="shortcut-forgot-name shortcut-forgot-label"><kbd id="shortcut-forgot-label" data-shortcut-label="forgot"></kbd></button></div>
+            <div class="setting-row"><span id="shortcut-remember-name">记住了</span><button class="button outline shortcut-key" type="button" data-shortcut="remember" aria-labelledby="shortcut-remember-name shortcut-remember-label"><kbd id="shortcut-remember-label" data-shortcut-label="remember"></kbd></button></div>
+            <div class="setting-row"><span id="shortcut-next-name">下一单词</span><button class="button outline shortcut-key" type="button" data-shortcut="next" aria-labelledby="shortcut-next-name shortcut-next-label"><kbd id="shortcut-next-label" data-shortcut-label="next"></kbd></button></div>
+            <div class="setting-row"><span id="shortcut-undo-name">撤销上一次作答</span><button class="button outline shortcut-key" type="button" data-shortcut="undo" aria-labelledby="shortcut-undo-name shortcut-undo-label"><kbd id="shortcut-undo-label" data-shortcut-label="undo"></kbd></button></div>
+            <div class="setting-row">
+              <p id="shortcut-status" class="inline-status error" role="alert" hidden></p>
+              <button class="quiet" id="reset-shortcuts" type="button">恢复默认快捷键</button>
+            </div>
+          </section>
+
           <section class="card settings-group" aria-labelledby="dictionary-settings-title">
             <header><h2 id="dictionary-settings-title">词典</h2><p>联网时，可从 Wiktionary、Tatoeba 和 Wikipedia 查找例句，并通过 MyMemory 补译公开例句。自填例句和个人备注保留在本机。</p></header>
             <label class="setting-row switch-row"><span>联网补充缺失的词典资料</span><input type="checkbox" role="switch" id="online"><span class="switch-indicator" aria-hidden="true"></span></label>
@@ -418,15 +434,17 @@
           <div class="guide-platform">
             <h4 id="guide-controls-title">Windows 快捷键</h4>
             <dl class="guide-controls" id="guide-windows">
-              <dt><kbd>Enter</kbd></dt><dd>展开中文释义。</dd>
-              <dt><kbd>1</kbd></dt><dd>选择「没记住」。已记录遗忘时，再按一次会翻到下一词。</dd>
-              <dt><kbd>2</kbd></dt><dd>选择「记住了」。</dd>
-              <dt><kbd>Ctrl</kbd> + <kbd>Z</kbd></dt><dd>撤销上一次作答。也可以点击复习区下方的「撤销上一次」。</dd>
+              <dt><kbd data-shortcut-label="reveal">Enter</kbd></dt><dd>展开中文释义。</dd>
+              <dt><kbd data-shortcut-label="forgot">1</kbd></dt><dd>选择「没记住」，留在当前单词。</dd>
+              <dt><kbd data-shortcut-label="remember">2</kbd></dt><dd>选择「记住了」并翻页。</dd>
+              <dt><kbd data-shortcut-label="next">Enter</kbd></dt><dd>记录遗忘后，进入下一单词。</dd>
+              <dt><kbd data-shortcut-label="undo">Ctrl + Z</kbd></dt><dd>撤销上一次作答。尚未翻页的「没记住」会原地撤销。</dd>
             </dl>
+            <p id="guide-custom-shortcuts" hidden>可在「设置 → 快捷键」修改这些按键或恢复默认值。</p>
             <dl class="guide-controls" id="guide-android" hidden>
               <dt><svg class="icon" aria-hidden="true"><use href="/icons.svg#down"/></svg> 向下滑</dt><dd>释义收起时，在复习正文向下滑可展开释义，日期、进度和卡片下方的空白都可以。展开后可正常上下滚动。</dd>
               <dt><svg class="icon" aria-hidden="true"><use href="/icons.svg#arrow-left"/></svg> 向左滑</dt><dd>展开释义后，在卡片上向左滑，等同于选择「记住了」。已记录遗忘时，左滑会翻到下一词。</dd>
-              <dt><svg class="icon guide-arrow-right" aria-hidden="true"><use href="/icons.svg#arrow-left"/></svg> 向右滑</dt><dd>撤销上一次作答并重新打开上一词的释义。也可以从复习页的空白处开始右滑。</dd>
+              <dt><svg class="icon guide-arrow-right" aria-hidden="true"><use href="/icons.svg#arrow-left"/></svg> 向右滑</dt><dd>撤销上一次作答。尚未翻页的「没记住」会原地撤销，已经翻页则回到上一词。也可从复习页空白处开始。</dd>
             </dl>
             <p id="guide-swipe-area" hidden>正在编辑备注时，先退出输入框再滑动。</p>
           </div>
@@ -571,6 +589,17 @@
       </div>
     </form>
   </dialog>
+  <dialog id="shortcut-dialog" aria-labelledby="shortcut-dialog-title" aria-describedby="shortcut-instructions">
+    <div class="dialog-form">
+      <header class="dialog-header"><h2 id="shortcut-dialog-title" tabindex="-1">设置快捷键</h2></header>
+      <div class="dialog-body">
+        <p id="shortcut-instructions">请按下新的快捷键。按 Esc 可取消。</p>
+        <p id="shortcut-recording-status" class="inline-status error" role="alert" hidden></p>
+      </div>
+      <div class="dialog-footer"><button class="button outline" id="cancel-shortcut" type="button">取消录入</button></div>
+    </div>
+  </dialog>
+
   <dialog id="history-dialog" aria-labelledby="history-title">
     <div class="dialog-form">
       <header class="dialog-header"><h2 id="history-title">学习历史</h2><button class="icon-button" type="button" data-close aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="/icons.svg#close"/></svg></button></header>

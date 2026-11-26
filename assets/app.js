@@ -17,6 +17,7 @@ const answerPanel = el("answer");
 const answerContent = answerPanel.firstElementChild;
 const revealButton = el("reveal");
 const revealIcon = revealButton.querySelector(".icon");
+const shortcutDialog = el("shortcut-dialog");
 const voteDock = el("vote-dock");
 const voteActions = el("vote-actions");
 const barRaised = {transform: "translateY(0%)", opacity: 1};
@@ -50,6 +51,9 @@ let busy = false;
 let swiping = false;
 let editTimer, editJob;
 let settingsDraft, settingsJob, settingsSaved;
+let reviewKeys = windowsReview ? JSON.parse(document.documentElement.dataset.reviewKeys) : undefined;
+let recordingShortcut;
+let shortcutJob;
 let savedNote = "";
 let noteClock = 0;
 let noteTimer;
@@ -58,6 +62,8 @@ let wordFileFormat = "";
 let imported = [];
 let importPending = false;
 let listPage = 0;
+let shownListPage = 0;
+let listPages = 0;
 let listRequest = 0;
 let listTotal = 0;
 let listSignature;
@@ -163,11 +169,8 @@ function renderReview() {
   el("review-empty").removeAttribute("aria-busy");
   el("session-tools").hidden = mobile || !studying || !!practice;
   const waiting = !practice && next.waitingForNext;
-  el("session-hint").textContent = next.current
-    ? waiting ? "1 下一单词" : "Enter 查看释义 · 1 没记住 · 2 记住了"
-    : "";
-  el("session-hint").hidden = !next.current;
   el("forgot-label").textContent = waiting ? "下一单词" : "没记住";
+  renderReviewKeys();
   voteActions.classList.toggle("awaiting-next", !!waiting);
   updateReviewControls();
   el("pass-today").hidden = !studying || !!practice || !next.current || !!next.current.recall;
@@ -215,6 +218,10 @@ function updateReviewControls() {
   }
   el("pass-today").disabled = blocked || !!waiting;
   syncRevealGesture();
+}
+
+function focusReview() {
+  if (windowsReview && view === "review") el("review-view").focus({preventScroll: true});
 }
 
 function syncRevealGesture() {
@@ -606,7 +613,7 @@ async function nextCard(beforeSwap) {
   } finally {
     busy = false;
     updateReviewControls();
-    if (windowsReview && state?.current && !state.waitingForNext) el("reveal").focus({preventScroll: true});
+    focusReview();
   }
 }
 
@@ -650,31 +657,52 @@ async function vote(remembered, {beforeSwap, passToday = false} = {}) {
   } finally {
     busy = false;
     updateReviewControls();
-    if (windowsReview && state?.current && studying) (state.waitingForNext ? el("forgot") : el("reveal")).focus({preventScroll: true});
+    focusReview();
   }
   return completed;
 }
 
-async function undo(beforeSwap) {
-  if (view !== "review" || !state?.canUndo || busy || (swiping && !beforeSwap) || practice) return;
+async function requestUndo({offset = 0} = {}) {
+  if (view !== "review" || !state?.canUndo || busy || swiping || practice || pendingNavigation) {
+    if (offset) returnReviewSwipe(offset);
+    return;
+  }
+  if (!state.waitingForNext) return slideReview({offset, reversing: true});
+
+  returnReviewSwipe(offset);
+  const changedCard = await undo();
+  if (changedCard) await slideReview({reversing: true, undoResult: changedCard});
+}
+
+async function undo(beforeSwap, result) {
   busy = true;
+  showError();
+  updateReviewControls();
   let revealAfterUndo = false;
   let cardRequest;
   try {
-    await flushNote();
-    const wasWaiting = state.waitingForNext;
-    const result = await api("/api/undo", {});
-    if (result.current && (studying || result.waitingForNext) &&
-        !(wasWaiting && revealed?.key === result.current.key && result.date === state.date && answerExpanded())) {
+    const {date, current} = state;
+    if (!result) {
+      await flushNote();
+      result = await api("/api/undo", {});
+    }
+    // Waiting means the learner is still on the answered card. The server
+    // restores its review count and order, which can change without a flip.
+    if (!beforeSwap && (result.date !== date || result.current?.key !== current?.key)) return result;
+    if (beforeSwap && result.current && (studying || result.waitingForNext)) {
       cardRequest = api("/api/card/" + keyPath(result.current.key));
       cardRequest.catch(() => {}); // toggleReveal reports an error when the card is shown.
     }
     if (beforeSwap) await beforeSwap;
     if (beforeSwap && result.current && studying) revealAfterUndo = !result.waitingForNext;
-    applyState(result, !wasWaiting);
+    applyState(result, Boolean(beforeSwap));
     if (beforeSwap) pageScroller().scrollTo({top: 0});
   } catch (error) { showError(error); }
-  finally { busy = false; updateReviewControls(); }
+  finally {
+    busy = false;
+    updateReviewControls();
+    focusReview();
+  }
   const revealOptions = {animate: false, duringSlide: true, cardRequest};
   if (state?.waitingForNext) await resumeWaiting(revealOptions);
   else if (revealAfterUndo && !answerExpanded()) await toggleReveal(revealOptions);
@@ -693,6 +721,15 @@ function resetReviewSlide() {
   swipeContent.style.transform = "";
   swipeContent.style.opacity = "";
   swipeCue.style.opacity = "";
+}
+
+function returnReviewSwipe(offset) {
+  resetReviewSlide();
+  if (!offset || flashcard.hidden) return;
+  const timing = reviewTiming("--motion-card-in", "--motion-card-ease");
+  if (timing) playReviewMotion(swipeContent, [
+    {transform: `translateX(${offset}px)`}, {transform: "none"},
+  ], timing, {fill: "none"});
 }
 
 function reviewFrameHeight(content) {
@@ -737,7 +774,7 @@ function retargetReviewResize(resize, from, target, timing) {
   return motion;
 }
 
-async function slideReview({offset = 0, reversing = false, passToday = false} = {}) {
+async function slideReview({offset = 0, reversing = false, passToday = false, undoResult} = {}) {
   if (view !== "review" || !state || practice || busy || swiping ||
       (reversing ? !state.canUndo : passToday
         ? !studying || !state.current || state.current.recall || state.waitingForNext
@@ -781,7 +818,7 @@ async function slideReview({offset = 0, reversing = false, passToday = false} = 
     // The response and old content's exit run together. The frame and dock
     // span the whole flip and don't have to stop at the content handoff.
     const beforeSwap = outgoing?.finished.catch(() => {}) || Promise.resolve();
-    if (reversing) await undo(beforeSwap);
+    if (reversing) await undo(beforeSwap, undoResult);
     else if (waiting) await nextCard(beforeSwap);
     else completed = await vote(true, {beforeSwap, passToday});
 
@@ -985,7 +1022,7 @@ async function startReview(intent) {
     studying = true;
     practice = undefined;
     applyState(result, manual);
-    if (windowsReview && result.current) el("reveal").focus({preventScroll: true});
+    if (result.current) focusReview();
   } catch (error) {
     if (intent === viewRequest) showError(error);
   } finally {
@@ -1212,13 +1249,23 @@ function addWordActions(row, entry, progress) {
 async function refreshLibrary(animate = false) {
   const requestID = ++listRequest;
   const intent = viewRequest;
-  const data = await api("/api/cards?" + new URLSearchParams({...libraryQuery(), page: listPage}));
-  if (requestID !== listRequest || !isViewDestination("library", intent)) return;
-  if (listPage && !data.rows.length) {
-    listPage = Math.max(0, Math.ceil(data.total / 24) - 1);
-    return refreshLibrary(animate);
+  const current = () => requestID === listRequest && isViewDestination("library", intent);
+  let data;
+  try {
+    data = await api("/api/cards?" + new URLSearchParams({...libraryQuery(), page: listPage}));
+  } catch (error) {
+    if (!current()) return;
+    listPage = shownListPage;
+    updatePageButtons();
+    throw error;
   }
+  if (!current()) return;
+  listPage = shownListPage = data.page;
+  listPages = data.pages;
   listTotal = data.total;
+  const status = `共 ${data.total} 个 · 第 ${listPages ? listPage + 1 : 0} / ${listPages} 页`;
+  if (el("results").textContent !== status) el("results").textContent = status;
+  updatePageButtons();
   showSelection();
   el("lookup-bar").hidden = !data.pending;
   el("lookup-status").textContent = !data.online ? `有 ${data.pending} 个词待补充，联网查词已关闭。`
@@ -1274,9 +1321,6 @@ async function refreshLibrary(animate = false) {
   }
   const list = el("word-list");
   list.replaceChildren(rows);
-  el("results").textContent = data.total ? `共 ${data.total} 个 · 第 ${listPage + 1} 页` : "共 0 个";
-  el("prev-page").disabled = listPage === 0;
-  el("next-page").disabled = (listPage + 1) * 24 >= data.total;
   if (animate === true && !pageTransition && !reducedMotion.matches && list.animate) {
     listAnimation?.cancel();
     listAnimation = list.animate([{opacity: .7}, {opacity: 1}], motionOptions("--motion-panel"));
@@ -1284,14 +1328,27 @@ async function refreshLibrary(animate = false) {
 }
 
 function clearSelection() { selected.clear(); selectedAll = false; }
+function updatePageButtons() {
+  el("prev-page").disabled = listPage === 0;
+  el("next-page").disabled = listPage + 1 >= listPages;
+}
+
 function runSearch() {
   clearSelection();
-  listPage = 0;
+  listRequest++;
+  listPage = shownListPage = listPages = 0;
+  updatePageButtons();
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => refreshLibrary(true).catch(showError), 130);
+  searchTimer = setTimeout(() => {
+    searchTimer = undefined;
+    refreshLibrary(true).catch(showError);
+  }, 130);
 }
 function usePage(delta) {
-  listPage += delta;
+  const page = listPage + delta;
+  if (page < 0 || page >= listPages) return;
+  listPage = page;
+  updatePageButtons();
   refreshLibrary(true).catch(showError);
 }
 
@@ -1659,7 +1716,7 @@ async function closeSettings(intent) {
   controls.close(false);
   // Keep the current card and scroll position when returning from settings.
   const next = settingsFrom;
-  const focus = next === "review" && !el("flashcard").hidden ? el("reveal")
+  const focus = next === "review" && !el("flashcard").hidden ? el("review-view")
     : navigationButtons.find(button => button.dataset.view === next);
   await Promise.all([
     displayView(next, {intent, top: settingsOffset, focus}),
@@ -1738,7 +1795,9 @@ async function showRestored() {
   practice = undefined;
   clearAnswer();
   clearSelection();
-  listPage = 0;
+  listRequest++;
+  listPage = shownListPage = listPages = 0;
+  updatePageButtons();
   listSignature = undefined;
   imported = [];
   importPending = false;
@@ -1883,18 +1942,141 @@ async function refreshStorage() {
   message("storage-notice", data.notice);
 }
 
+function shortcutName(chord) {
+  const names = {ArrowLeft: "←", ArrowRight: "→", ArrowUp: "↑", ArrowDown: "↓",
+    Add: "+", Subtract: "−", Multiply: "×", Divide: "÷", Decimal: ".", Equal: "=", Comma: ","};
+  return chord.split("+").map(part => {
+    if (!part.startsWith("Numpad")) return names[part] || part;
+    const key = part.slice(6);
+    return "小键盘 " + (names[key] || key);
+  }).join(" + ");
+}
+
+function renderReviewKeys() {
+  const hint = el("session-hint");
+  hint.hidden = !state?.current;
+  if (!reviewKeys) {
+    hint.textContent = state?.waitingForNext ? "1 下一单词" : "Space 查看释义 · 1 没记住 · 2 记住了";
+    return;
+  }
+  const {reveal, forgot, remember, next, undo} = Object.fromEntries(
+    Object.entries(reviewKeys).map(([action, chord]) => [action, shortcutName(chord)]));
+  hint.textContent = state?.waitingForNext
+    ? `${next} 下一单词 · ${undo} 撤销`
+    : `${reveal} 查看释义 · ${forgot} 没记住 · ${remember} 记住了`;
+  el("forgot-key").textContent = state?.waitingForNext ? next : forgot;
+  el("remember-key").textContent = remember;
+  el("undo-key").hidden = false;
+  el("undo-key").textContent = undo;
+}
+
+function renderShortcutSettings() {
+  for (const label of all("[data-shortcut-label]")) {
+    label.textContent = shortcutName(reviewKeys[label.dataset.shortcutLabel]);
+  }
+  renderReviewKeys();
+}
+
+function shortcutChord(event) {
+  const {code, key, ctrlKey, altKey, shiftKey} = event;
+  if (event.metaKey || event.getModifierState("AltGraph") || ["Dead", "Process", "Unidentified"].includes(key)) return;
+  let base;
+  if (/^Numpad(?:[0-9]|Enter|Add|Subtract|Multiply|Divide|Decimal|Equal|Comma)$/.test(code)) base = code;
+  else if (/^[a-z0-9]$/i.test(key)) base = key.toUpperCase();
+  else if (shiftKey && /^Digit[0-9]$/.test(code)) base = code.slice(-1);
+  else if (key === " ") base = "Space";
+  else if (/^(?:Enter|Arrow(?:Up|Down|Left|Right)|F(?:[1-9]|1[0-2]))$/.test(key)) base = key;
+  if (base) return (ctrlKey ? "Ctrl+" : "") + (altKey ? "Alt+" : "") + (shiftKey ? "Shift+" : "") + base;
+}
+
+function openShortcutRecorder(trigger) {
+  if (shortcutJob) return;
+  recordingShortcut = trigger.dataset.shortcut;
+  const title = el("shortcut-dialog-title");
+  title.textContent = "设置「" + el("shortcut-" + recordingShortcut + "-name").textContent + "」快捷键";
+  message("shortcut-status");
+  message("shortcut-recording-status");
+  shortcutDialog.showModal();
+  title.focus();
+}
+
+async function saveShortcuts(update, status) {
+  if (shortcutJob) return false;
+  el("cancel-shortcut").disabled = el("reset-shortcuts").disabled = true;
+  message(status);
+  shortcutJob = api("/api/shortcuts", update, {keepalive: true});
+  try {
+    reviewKeys = await shortcutJob;
+    renderShortcutSettings();
+    return true;
+  } catch (error) {
+    message(status, error.message);
+    return false;
+  } finally {
+    shortcutJob = undefined;
+    el("cancel-shortcut").disabled = el("reset-shortcuts").disabled = false;
+  }
+}
+
+async function recordShortcut(event) {
+  if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.key === "Tab") return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    if (!shortcutJob) shortcutDialog.close();
+    return;
+  }
+  if (event.target === el("cancel-shortcut") && ["Enter", " "].includes(event.key) &&
+      !event.ctrlKey && !event.altKey && !event.shiftKey && !event.metaKey) return;
+  if (["Control", "Alt", "Shift", "Meta", "AltGraph"].includes(event.key)) return;
+  event.preventDefault();
+  if (event.repeat || shortcutJob) return;
+  const binding = shortcutChord(event);
+  if (!binding) {
+    message("shortcut-recording-status", "请选择字母、数字、小键盘、方向键、Enter、Space 或可用的功能键。");
+    return;
+  }
+  if (await saveShortcuts({action: recordingShortcut, binding}, "shortcut-recording-status")) shortcutDialog.close();
+}
+
 function reviewKeyAllowed(event) {
   const target = event.target;
-  return !event.defaultPrevented && !event.isComposing && event.keyCode !== 229 &&
-    !event.ctrlKey && !event.altKey && !event.metaKey && view === "review" &&
-    studying && !practice && !busy && !swiping && state?.current &&
-    !controls.isOpen() && !document.querySelector("dialog[open]") && target instanceof Element &&
-    !target.isContentEditable &&
-    (!target.closest("input,textarea,select,button,a[href],summary,[contenteditable]") ||
-     target === el("reveal") || target.closest("#vote-actions"));
+  if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || view !== "review" ||
+      practice || controls.isOpen() || document.querySelector("dialog[open]") || !(target instanceof Element)) return false;
+  const control = target.closest("input,textarea,select,button,a[href],summary,[contenteditable]");
+  return !control || control === revealButton || control === el("undo") || voteActions.contains(control);
+}
+
+function windowsReviewKey(event) {
+  if (!reviewKeyAllowed(event)) return;
+  const chord = shortcutChord(event);
+  if (!chord) return;
+  const keys = Object.entries(reviewKeys);
+  let actions = keys.filter(([, binding]) => binding === chord);
+  // Main Enter and digits also work on the keypad until that key is assigned.
+  if (!actions.length && /^(?:Enter|[0-9])$/.test(event.key) && chord.includes("Numpad")) {
+    const shared = chord.replace("Numpad", "");
+    actions = keys.filter(([, binding]) => binding === shared);
+  }
+  if (!actions.length) return;
+  event.preventDefault();
+  if (!state || event.repeat || busy || swiping || pendingNavigation || revealButton.disabled) return;
+  const waiting = state.waitingForNext;
+  const action = actions.length === 2 ? (waiting ? "next" : "reveal") : actions[0][0];
+  if (action === "undo") {
+    requestUndo();
+    return;
+  }
+  if (!studying || !state.current) return;
+  if (waiting) {
+    if (action === "next") slideReview();
+  } else if (answerExpanded()) {
+    if (action === "forgot") vote(false);
+    if (action === "remember") slideReview();
+  } else if (action === "reveal") toggleReveal();
 }
 
 function keyboard(event) {
+  if (shortcutDialog.open) { recordShortcut(event); return; }
   if (event.key === "Escape" && (preview || previewStart) && !controls.isOpen()) {
     event.preventDefault();
     closeWordPreview();
@@ -1902,25 +2084,21 @@ function keyboard(event) {
   }
   if (view === "settings" && event.key === "Escape" && !controls.isOpen() && !document.querySelector("dialog[open]")) {
     event.preventDefault();
-    changeView(settingsFrom);
+    if (!event.repeat) changeView(settingsFrom);
     return;
   }
-  if (windowsReview && event.key === "Enter" && reviewKeyAllowed(event)) {
-    event.preventDefault();
-    if (!event.repeat && !event.shiftKey && !el("reveal").disabled && !answerExpanded()) toggleReveal();
-    return;
-  }
+  if (windowsReview) { windowsReviewKey(event); return; }
   if (view !== "review" || event.repeat || event.altKey || event.isComposing || event.keyCode === 229 ||
       event.defaultPrevented || !(event.target instanceof Element) || event.target.isContentEditable ||
       event.target.closest("textarea,input,select,[contenteditable]") || controls.isOpen() || document.querySelector("dialog[open]")) return;
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
-    event.preventDefault(); slideReview({reversing: true}); return;
+    event.preventDefault(); requestUndo(); return;
   }
   if (event.ctrlKey || event.metaKey) return;
   if (event.code === "Space" && !event.target.closest("button,a,.meaning-panel,.memory-panel")) {
     event.preventDefault(); toggleReveal();
   }
-  const voteKeys = windowsReview ? ["1", "2"] : ["1", "2", "ArrowLeft", "ArrowRight"];
+  const voteKeys = ["1", "2", "ArrowLeft", "ArrowRight"];
   if (voteKeys.includes(event.key) && !voteDock.hidden && answerExpanded()) {
     event.preventDefault();
     const remembered = event.key === "2" || event.key === "ArrowRight";
@@ -2015,13 +2193,7 @@ if (mobile) {
     cancelAnimationFrame(frame);
     const x = drag.action === "reveal" ? 0 : drag.offset;
     drag = undefined;
-    resetReviewSlide();
-    if (x && !flashcard.hidden) {
-      const timing = reviewTiming("--motion-card-in", "--motion-card-ease");
-      if (timing) playReviewMotion(swipeContent, [
-        {transform: `translateX(${x}px)`}, {transform: "none"},
-      ], timing, {fill: "none"});
-    }
+    returnReviewSwipe(x);
   }
 
   document.addEventListener("click", event => {
@@ -2063,7 +2235,7 @@ if (mobile) {
         if (reversing ? !drag.undo : !drag.forward) { cancelDrag(); return; }
         drag.action = reversing ? "undo" : "forward";
         drag.threshold = reversing ? Math.max(52, Math.min(78, innerWidth * .18)) : Math.min(88, swipeContent.clientWidth * .21) * .75;
-        el("swipe-label").textContent = reversing ? "撤销上一次" : drag.waiting ? "下一单词" : "记住了";
+        el("swipe-label").textContent = reversing ? (drag.waiting ? "撤销没记住" : "撤销上一次") : drag.waiting ? "下一单词" : "记住了";
         el("swipe-icon").setAttribute("href", "/icons.svg#" + (reversing ? "arrow-left" : drag.waiting ? "right" : "check"));
       } else {
         if (y > 10 && y >= x && (!drag.reveal || dy < 0)) cancelDrag();
@@ -2102,7 +2274,8 @@ if (mobile) {
     if (reversing ? !state.canUndo : !canAdvanceReview()) { cancelDrag(); return; }
     drag = undefined;
     cancelAnimationFrame(frame);
-    await slideReview({offset, reversing});
+    if (reversing) await requestUndo({offset});
+    else await slideReview({offset});
   });
 }
 
@@ -2153,6 +2326,7 @@ function openGuide() {
   el("guide-controls-title").textContent = mobile ? "Android 手势" : "Windows 快捷键";
   el("guide-windows").hidden = mobile;
   el("guide-android").hidden = !mobile;
+  el("guide-custom-shortcuts").hidden = !windowsReview;
   el("guide-swipe-area").hidden = !mobile;
   el("guide-preview-tip").textContent = mobile ? "长按词条可预览详情。" : "把鼠标停在词条上可预览详情。";
   el("guide-export-tip").textContent = mobile ? "在 Android 选择「分享数据」或「保存到手机」。" : "在 Windows 选择文件的保存位置。";
@@ -2162,6 +2336,14 @@ function openGuide() {
   el("guide-dialog").querySelector(".dialog-body").scrollTop = 0;
 }
 el("open-guide").onclick = openGuide;
+if (windowsReview) {
+  el("shortcut-settings").hidden = false;
+  renderShortcutSettings();
+  for (const trigger of all("[data-shortcut]")) trigger.onclick = () => openShortcutRecorder(trigger);
+  el("cancel-shortcut").onclick = () => shortcutDialog.close();
+  shortcutDialog.addEventListener("cancel", event => { if (shortcutJob) event.preventDefault(); });
+  el("reset-shortcuts").onclick = () => saveShortcuts({reset: true}, "shortcut-status");
+}
 el("guide-form").onsubmit = async event => {
   event.preventDefault();
   const hidden = el("hide-guide").checked;
@@ -2245,7 +2427,7 @@ el("download-backup").onclick = event => {
 el("pick-restore").onclick = () => el("restore-file").click();
 el("restore-file").onchange = restoreFile;
 el("start-review").onclick = () => startReview();
-el("undo").onclick = () => slideReview({reversing: true});
+el("undo").onclick = () => requestUndo();
 el("reveal").onclick = () => toggleReveal();
 el("forgot").onclick = () => state?.waitingForNext ? slideReview() : vote(false);
 el("pass").onclick = () => slideReview();
@@ -2326,6 +2508,7 @@ if (window.wordReviewFinishClose) {
       commitFocusedSetting();
       await flushSettings();
       await flushNote();
+      if (shortcutJob) await shortcutJob;
       if (editing) await flushEdit(true);
       saved = true;
     } catch (error) {
@@ -2346,7 +2529,7 @@ window.addEventListener("pagehide", event => {
 });
 if (windowsReview) window.addEventListener("beforeunload", event => {
   commitFocusedSetting();
-  if (noteDirty() || editJob || hasSettingChanges() || Object.keys(editedFields(true)).length) {
+  if (noteDirty() || editJob || shortcutJob || hasSettingChanges() || Object.keys(editedFields(true)).length) {
     flushOnHide();
     if (editing) flushEdit(true).catch(editError);
     event.preventDefault();
@@ -2358,7 +2541,7 @@ setInterval(async () => {
   if (busy || swiping || pendingNavigation) return;
   tick++;
   try {
-    if (view === "library" && !controls.isOpen() && !document.querySelector("dialog[open]")) await refreshLibrary();
+    if (view === "library" && !searchTimer && !controls.isOpen() && !document.querySelector("dialog[open]")) await refreshLibrary();
     if (view === "add" && importPending) await updateImportStatus();
     if (view === "review" && revealed && answerExpanded() && state.settings.online &&
         (revealed.lookup === "pending" || revealed.translationPending)) {

@@ -284,6 +284,7 @@ body:not(.platform-android) .swipe-cue { display: none; }
   pointer-events: none;
 }
 .review-frame { overflow: clip; overflow-anchor: none; }
+#review-view:focus { outline: none; }
 .review-frame:has(.review-card:not([hidden])) { box-shadow: var(--shadow); }
 .review-frame[data-flipping] :is(.swipe-content, #review-empty) { opacity: 0; }
 .card-front {
@@ -401,6 +402,7 @@ body:not([data-view="review"]) > .vote-dock { display: none; }
 :root[data-review-shortcuts="windows"] .meaning-panel p { max-inline-size: 75ch; }
 :root[data-review-shortcuts="windows"] .vote-dock { grid-area: 2 / 2; }
 :root[data-review-shortcuts="windows"] .card-actions { padding: .72rem clamp(.45rem, 3vw, 1.25rem); }
+:root[data-review-shortcuts="windows"] .card-actions .button { flex-wrap: wrap; row-gap: .15rem; }
 :root[data-review-shortcuts="windows"] .personal-note textarea { resize: none; overflow-y: hidden; }
 kbd {
   padding: .01rem .31rem; line-height: 1.37; border: 1px solid currentColor;
@@ -586,8 +588,9 @@ input[type=checkbox]:disabled { opacity: .55; cursor: default; }
 .pagination {
   display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
   gap: .45rem; padding: .52rem 1rem; font-size: .87rem; color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
-.pagination > div { display: flex; gap: .3rem; }
+.pagination > div { display: flex; gap: .3rem; margin-inline-start: auto; }
 
 .summary {
   display: grid;
@@ -631,6 +634,12 @@ td:first-child, th:first-child { min-width: 7.4rem; }
 .setting-text label, .setting-text strong, .switch-row > span:first-child { display: block; font-size: .96rem; font-weight: 575; line-height: 1.4; }
 .setting-text p, .setting-help { display: block; font-weight: 400; color: var(--muted); font-size: .8rem; margin-top: .23rem; line-height: 1.45; }
 .setting-control { width: var(--settings-control-width); }
+.shortcut-key { min-width: 4.3rem; max-width: min(12rem, 45vw); padding-inline: .48rem; color: var(--accent); }
+.shortcut-key kbd { border: 0; padding: 0; font-size: .86rem; opacity: 1; }
+#reset-shortcuts { grid-column: 2; }
+#shortcut-status { margin-block: 0; }
+#shortcut-dialog { width: min(27rem, calc(100vw - 2rem)); }
+#shortcut-dialog-title:focus { outline: none; }
 .time-settings { container-type: inline-size; }
 @container (max-width: 20rem) {
   .time-setting { grid-template-columns: minmax(0, 1fr); gap: .42rem; }

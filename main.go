@@ -116,6 +116,9 @@ func runEngine(serveOnly bool, dir string, ready func(string)) error {
 		appearance:   openAppearance(dir),
 		translations: translationQueue{wake: make(chan struct{}, 1)},
 	}
+	if !app.mobile {
+		app.shortcuts = openReviewShortcuts(dir)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	workerDone := make(chan struct{})
 	translationsDone := make(chan struct{})
